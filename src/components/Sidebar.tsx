@@ -5,23 +5,26 @@ const Sidebar = () => {
   return (
     <div style={{
       width: '250px',
-      height: '100%', 
+      height: '100%',
       backgroundColor: '#2c3e50',
       color: 'white',
       padding: '20px',
       display: 'flex',
       flexDirection: 'column',
       gap: '20px',
-      flexShrink: 0 
+      flexShrink: 0
     }}>
       <h2 style={{ borderBottom: '1px solid #7f8c8d', paddingBottom: '10px' }}>Flexy Stok</h2>
 
       <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
         <Link to="/" style={linkStyle}>🏠 Ana Sayfa</Link>
         <Link to="/products" style={linkStyle}>📦 Ürün Listesi</Link>
-        <Link to="/products/add" style={linkStyle}>➕ Ürün Ekle</Link>
         <Link to="/definitions/groups/list" style={linkStyle}>👥 Gruplar</Link>
-        <Link to="/definitions/groups/add" style={linkStyle}>➕ Yeni Grup</Link>
+        <Link to="/definitions/categories/list" style={linkStyle}>🗂 Kategoriler</Link>
+        <Link to="/definitions/colors" style={linkStyle}>🎨 Renkler</Link>
+        <Link to="/definitions/dimensions" style={linkStyle}>📏 Ebatlar</Link>
+        <Link to="/definitions/cushions" style={linkStyle}>🛋️ Minderler</Link>
+        <Link to="/prices/list" style={linkStyle}>💲 Fiyat Yönetimi</Link>
       </nav>
 
       <div style={{ marginTop: 'auto', fontSize: '12px', color: '#bdc3c7' }}>

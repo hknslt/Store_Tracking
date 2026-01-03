@@ -1,6 +1,6 @@
 // src/services/productService.ts
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc,collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
 import type { Product } from "../types";
 
 // Koleksiyon adını sabitleyelim, hata yapmayalım
@@ -32,6 +32,22 @@ export const getProducts = async (): Promise<Product[]> => {
         })) as Product[];
     } catch (error) {
         console.error("Ürünler çekilirken hata:", error);
+        throw error;
+    }
+};
+
+export const getProductById = async (id: string): Promise<Product | null> => {
+    try {
+        const docRef = doc(db, "products", id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as Product;
+        } else {
+            return null; // Ürün bulunamadı
+        }
+    } catch (error) {
+        console.error("Ürün detay hatası:", error);
         throw error;
     }
 };

@@ -5,21 +5,21 @@ import { addGroup } from "../../../services/definitionService";
 const GroupAdd = () => {
     // const navigate = useNavigate(); // Yönlendirmeyi kapattık
     const [groupName, setGroupName] = useState("");
+    const [message, setMessage] = useState("");
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!groupName) return alert("Grup adını yazınız!");
+        if (!groupName) return;
 
         try {
             await addGroup({ groupName });
-
-            // 1. Kullanıcıya bilgi ver
-            alert("✅ Grup eklendi! Sıradakini yazabilirsiniz.");
-
-            // 2. Kutucuğu temizle (En önemli kısım burası)
+            setMessage("✅ Grup başarıyla eklendi!");
             setGroupName("");
+            setTimeout(() => {
+                setMessage("");
+            }, 2000);
 
-            // 3. navigate komutunu SİLDİK. Artık sayfada kalacak.
+
 
         } catch (error) {
             alert("Hata oluştu.");
@@ -29,9 +29,7 @@ const GroupAdd = () => {
     return (
         <div style={{ maxWidth: '500px' }}>
             <h2>Yeni Grup Tanımla</h2>
-            <div style={{ marginBottom: '10px', fontSize: '14px', color: '#666' }}>
-                Buradan arka arkaya grup ekleyebilirsiniz.
-            </div>
+            {message && <div style={successStyle}>{message}</div>}
 
             <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                 <div>
@@ -54,5 +52,15 @@ const GroupAdd = () => {
 
 const inputStyle = { width: '100%', padding: '10px', marginTop: '5px', borderRadius: '5px', border: '1px solid #ccc' };
 const buttonStyle = { padding: '12px', backgroundColor: '#8e44ad', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold' };
+const successStyle = {
+    padding: '10px',
+    backgroundColor: '#d4edda',
+    color: '#155724',
+    border: '1px solid #c3e6cb',
+    borderRadius: '5px',
+    marginBottom: '10px'
+};
+
+
 
 export default GroupAdd;

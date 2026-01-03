@@ -2,14 +2,25 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { addProduct } from "../../services/productService";
-import { getGroups } from "../../services/definitionService"; // <-- Grup servisini çağırdık
-import type { Product, Group } from "../../types"; // <-- Group tipini ekledik
+// Tüm tanımlama servislerini çağırıyoruz
+import { 
+  getGroups, 
+  getCategoriesByGroupId, 
+  getColors, 
+  getDimensions, 
+  getCushions 
+} from "../../services/definitionService"; 
+import type { Product, Group, Category, Color, Dimension, Cushion } from "../../types";
 
 const ProductAdd = () => {
   const navigate = useNavigate();
 
-  // Grupları tutacağımız state
+  // Tüm listeleri tutacak stateler
   const [groups, setGroups] = useState<Group[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [colors, setColors] = useState<Color[]>([]);
+  const [dimensions, setDimensions] = useState<Dimension[]>([]);
+  const [cushions, setCushions] = useState<Cushion[]>([]);
 
   const [formData, setFormData] = useState<Partial<Product>>({
     productName: "",
@@ -17,24 +28,40 @@ const ProductAdd = () => {
     categoryId: "",
     colorId: "",
     cushionId: "",
-    dimension: "",
+    dimension: "", // Dikkat: Type dosyasında dimensionId olarak değiştirmediysek burada string kalabilir, ama biz ID yapacağız.
     explanation: ""
   });
 
-  // Sayfa açılınca Grupları veritabanından çek
+  // Sayfa açılınca GENEL listeleri çek
   useEffect(() => {
-    getGroups().then(data => setGroups(data));
+    getGroups().then(setGroups);
+    getColors().then(setColors);
+    getDimensions().then(setDimensions);
+    getCushions().then(setCushions);
   }, []);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = async (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setFormData((prev) => ({ ...prev, [name]: value }));
+
+    // Grup değişince Kategori listesini güncelle
+    if (name === "groupId") {
+      setFormData((prev) => ({ ...prev, groupId: value, categoryId: "" }));
+      if (value) {
+        const filteredCats = await getCategoriesByGroupId(value);
+        setCategories(filteredCats);
+      } else {
+        setCategories([]);
+      }
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!formData.productName || !formData.groupId) {
-      alert("Lütfen ürün adını ve grubunu seçiniz!");
+    // Zorunlu alan kontrolü (Hepsini ID olarak kontrol ediyoruz)
+    if (!formData.productName || !formData.groupId || !formData.categoryId || !formData.colorId || !formData.cushionId) {
+      alert("Lütfen tüm seçimleri yapınız!");
       return;
     }
 
@@ -48,52 +75,59 @@ const ProductAdd = () => {
   };
 
   return (
-    <div style={{ maxWidth: '600px', backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
+    <div style={{ maxWidth: '700px', backgroundColor: 'white', padding: '30px', borderRadius: '10px', boxShadow: '0 2px 10px rgba(0,0,0,0.05)' }}>
       <h2 style={{ marginBottom: '20px', color: '#2c3e50' }}>Yeni Ürün Tanımla</h2>
       <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
 
-        {/* GRUP SEÇİMİ - ARTIK SELECTBOX */}
+        {/* 1. GRUP SEÇİMİ */}
         <div>
           <label style={labelStyle}>Ürün Grubu</label>
-          <select
-            name="groupId"
-            value={formData.groupId}
-            onChange={handleChange}
-            style={inputStyle}
-          >
-            <option value="">-- Bir Grup Seçiniz --</option>
-            {groups.map(g => (
-              // Burada value olarak ID'yi gönderiyoruz ama ekranda İsmi gösteriyoruz
-              <option key={g.id} value={g.id}>{g.groupName}</option>
-            ))}
+          <select name="groupId" value={formData.groupId} onChange={handleChange} style={inputStyle}>
+            <option value="">-- Grup Seçiniz --</option>
+            {groups.map(g => (<option key={g.id} value={g.id}>{g.groupName}</option>))}
           </select>
         </div>
 
-        {/* ŞİMDİLİK DİĞERLERİ MANUEL KALSIN (Sonra onları da böyle yapacağız) */}
+        {/* 2. KATEGORİ SEÇİMİ */}
         <div>
-          <label style={labelStyle}>Kategori ID</label>
-          <input name="categoryId" placeholder="Kategori ID" value={formData.categoryId} onChange={handleChange} style={inputStyle} />
+          <label style={labelStyle}>Kategori</label>
+          <select name="categoryId" value={formData.categoryId} onChange={handleChange} style={inputStyle} disabled={!formData.groupId}>
+            <option value="">-- Kategori Seçiniz --</option>
+            {categories.map(c => (<option key={c.id} value={c.id}>{c.categoryName}</option>))}
+          </select>
         </div>
 
+        {/* 3. ÜRÜN ADI */}
         <div>
           <label style={labelStyle}>Ürün Adı</label>
           <input name="productName" placeholder="Ürün Adı" value={formData.productName} onChange={handleChange} style={inputStyle} />
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        {/* 4. RENK ve MİNDER (Yan Yana) */}
+        <div style={{ display: 'flex', gap: '15px' }}>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Renk ID</label>
-            <input name="colorId" value={formData.colorId} onChange={handleChange} style={inputStyle} />
+            <label style={labelStyle}>Renk</label>
+            <select name="colorId" value={formData.colorId} onChange={handleChange} style={inputStyle}>
+              <option value="">-- Renk Seç --</option>
+              {colors.map(c => (<option key={c.id} value={c.id}>{c.colorName}</option>))}
+            </select>
           </div>
           <div style={{ flex: 1 }}>
-            <label style={labelStyle}>Minder ID</label>
-            <input name="cushionId" value={formData.cushionId} onChange={handleChange} style={inputStyle} />
+            <label style={labelStyle}>Minder Tipi</label>
+            <select name="cushionId" value={formData.cushionId} onChange={handleChange} style={inputStyle}>
+              <option value="">-- Minder Seç --</option>
+              {cushions.map(c => (<option key={c.id} value={c.id}>{c.cushionName}</option>))}
+            </select>
           </div>
         </div>
 
+        {/* 5. EBAT (Selectbox oldu) */}
         <div>
-          <label style={labelStyle}>Ölçüler</label>
-          <input name="dimension" placeholder="Örn: 200x90x75" value={formData.dimension} onChange={handleChange} style={inputStyle} />
+          <label style={labelStyle}>Ebat / Ölçü</label>
+          <select name="dimension" value={formData.dimension} onChange={handleChange} style={inputStyle}>
+            <option value="">-- Ölçü Seçiniz --</option>
+            {dimensions.map(d => (<option key={d.id} value={d.id}>{d.dimensionName}</option>))}
+          </select>
         </div>
 
         <div>
@@ -108,7 +142,7 @@ const ProductAdd = () => {
 };
 
 const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '14px', fontWeight: '500', color: '#34495e' };
-const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '14px', backgroundColor: '#fff', color: '#333' };
+const inputStyle = { width: '100%', padding: '12px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '14px', backgroundColor: '#fff', color: '#333' };
 const buttonStyle = { padding: '12px', backgroundColor: '#2980b9', color: 'white', border: 'none', borderRadius: '5px', cursor: 'pointer', fontWeight: 'bold', marginTop: '10px' };
 
 export default ProductAdd;

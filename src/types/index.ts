@@ -14,6 +14,32 @@ export interface Product {
 
 
 export interface Group {
-    id?: string;       // Firebase ID'si (Otomatik)
-    groupName: string; // Grup Adı (Örn: "Oturma Grubu")
+    id?: string;      
+    groupName: string; 
+}
+
+export interface Category {
+    id?: string;
+    groupId: string;      
+    categoryName: string; 
+}
+
+export interface Color {
+    id?: string;
+    colorName: string; 
+}
+
+export interface Dimension {
+    id?: string;
+    dimensionName: string; 
+}
+
+export interface Cushion {
+    id?: string;
+    cushionName: string;  
+}
+export interface Price {
+    id?: string;
+    productId: string; 
+    amount: number;    
 }
