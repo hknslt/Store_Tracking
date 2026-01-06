@@ -2,26 +2,21 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { getProducts } from "../../services/productService";
-// Tüm tanımlama servisleri
 import {
   getGroups,
   getCategories,
   getColors,
-  getDimensions,
-  getCushions
+  getDimensions
 } from "../../services/definitionService";
-import type { Product, Group, Category, Color, Dimension, Cushion } from "../../types";
+import type { Product, Group, Category, Color, Dimension } from "../../types";
+import "../../App.css"; // Ortak stiller
 
 const ProductList = () => {
   const [products, setProducts] = useState<Product[]>([]);
-
-  // Referans listeleri
   const [groups, setGroups] = useState<Group[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [colors, setColors] = useState<Color[]>([]);
   const [dimensions, setDimensions] = useState<Dimension[]>([]);
-  const [cushions, setCushions] = useState<Cushion[]>([]);
-
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -30,14 +25,12 @@ const ProductList = () => {
 
   const loadData = async () => {
     try {
-      // Hepsini paralel olarak çek (Performans için önemli)
-      const [pData, gData, cData, colData, dData, cushData] = await Promise.all([
+      const [pData, gData, cData, colData, dData] = await Promise.all([
         getProducts(),
         getGroups(),
         getCategories(),
         getColors(),
-        getDimensions(),
-        getCushions()
+        getDimensions()
       ]);
 
       setProducts(pData);
@@ -45,78 +38,113 @@ const ProductList = () => {
       setCategories(cData);
       setColors(colData);
       setDimensions(dData);
-      setCushions(cushData);
-
     } catch (error) {
-      console.error("Veri hatası:", error);
+      console.error(error);
     } finally {
       setLoading(false);
     }
   };
 
-  // --- İSİM BULUCU YARDIMCI FONKSİYONLAR ---
-  // Listeden ID'ye göre ismi bulur, bulamazsa "-" koyar veya ID'yi gösterir.
-
-  const getName = (list: any[], id: string | undefined, nameKey: string) => {
-    if (!id) return "-";
+  const getName = (list: any[], id: string | undefined | null, nameKey: string) => {
+    if (!id) return <span style={{ color: '#ccc' }}>-</span>;
     const item = list.find(x => x.id === id);
-    return item ? item[nameKey] : "Silinmiş Veri";
+    return item ? item[nameKey] : <span style={{ color: '#ccc' }}>-</span>;
   };
 
-  if (loading) return <p>Yükleniyor...</p>;
+  if (loading) return <div className="page-container">Yükleniyor...</div>;
 
   return (
-    <div>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <h1 style={{ color: '#2c3e50' }}>Ürün Listesi ({products.length})</h1>
-        <Link to="/products/add" style={{ padding: '10px 20px', backgroundColor: '#3498db', color: 'white', textDecoration: 'none', borderRadius: '5px' }}>+ Yeni Ekle</Link>
+    <div className="page-container">
+      {/* --- BAŞLIK VE YENİ EKLE BUTONU --- */}
+      <div className="page-header">
+        <div className="page-title">
+          <h2>Ürün Listesi</h2>
+          <p>Toplam {products.length} ürün listeleniyor</p>
+        </div>
+        <Link to="/products/add" className="btn btn-primary">
+          + Yeni Ürün
+        </Link>
       </div>
 
-      <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' }}>
-        <thead>
-          <tr style={{ backgroundColor: '#f8f9fa', textAlign: 'left', color: '#2c3e50' }}>
-            <th style={thStyle}>Ürün Adı</th>
-            <th style={thStyle}>Grup</th>
-            <th style={thStyle}>Kategori</th>
-            <th style={thStyle}>Renk</th>
-            <th style={thStyle}>Minder</th>
-            <th style={thStyle}>Ebat</th>
-            <th style={thStyle}>İşlem</th>
-          </tr>
-        </thead>
-        <tbody>
-          {products.map((p) => (
-            <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-              <td style={tdStyle}><b>{p.productName}</b></td>
-              <td style={tdStyle}>{getName(groups, p.groupId, 'groupName')}</td>
-              <td style={tdStyle}>{getName(categories, p.categoryId, 'categoryName')}</td>
-              <td style={tdStyle}>{getName(colors, p.colorId, 'colorName')}</td>
-              <td style={tdStyle}>{getName(cushions, p.cushionId, 'cushionName')}</td>
-              <td style={tdStyle}>{getName(dimensions, p.dimension, 'dimensionName')}</td>
-              <td style={tdStyle}>
-                <Link
-                  to={`/products/detail/${p.id}`}
-                  style={{
-                    textDecoration: 'none',
-                    color: 'white',
-                    backgroundColor: '#3498db',
-                    padding: '6px 12px',
-                    borderRadius: '4px',
-                    fontSize: '13px'
-                  }}
-                >
-                  Detay
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      {/* --- TABLO KARTI --- */}
+      <div className="card">
+        <div className="card-body">
+          {products.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
+              Henüz ürün eklenmemiş.
+            </div>
+          ) : (
+            <div style={{ overflowX: 'auto' }}>
+              {/* "dense" sınıfı CSS'e eklediğimiz sıkıştırma için */}
+              <table className="data-table dense">
+                <thead>
+                  <tr>
+                    <th style={{ width: '30%' }}>Ürün Adı</th>
+                    <th style={{ width: '25%' }}>Grup &rsaquo; Kategori</th>
+                    <th style={{ width: '15%' }}>Renk</th>
+                    <th style={{ width: '15%' }}>Ebat</th>
+                    <th style={{ width: '15%', textAlign: 'right' }}>İşlem</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {products.map((p) => (
+                    <tr key={p.id}>
+                      {/* Ürün Adı */}
+                      <td>
+                        <div style={{ fontWeight: '600', color: '#2c3e50' }}>
+                          {p.productName}
+                        </div>
+                      </td>
+
+                      {/* Grup > Kategori (Yan yana) */}
+                      <td>
+                        <span style={{ fontWeight: '500', color: '#7f8c8d' }}>
+                          {getName(groups, p.groupId, 'groupName')}
+                        </span>
+                        <span style={{ margin: '0 5px', color: '#bdc3c7' }}>&rsaquo;</span>
+                        <span style={{ color: '#2c3e50' }}>
+                          {getName(categories, p.categoryId, 'categoryName')}
+                        </span>
+                      </td>
+
+                      {/* Renk */}
+                      <td>
+                        {/* Renk isminin yanına küçük bir kutucuk koyabiliriz (opsiyonel) */}
+                        {getName(colors, p.colorId, 'colorName')}
+                      </td>
+
+                      {/* Ebat */}
+                      <td>
+                        <span className="badge" style={{ backgroundColor: '#f1f2f6', color: '#555' }}>
+                          {getName(dimensions, p.dimensionId, 'dimensionName')}
+                        </span>
+                      </td>
+
+                      {/* İşlem Butonu */}
+                      <td style={{ textAlign: 'right' }}>
+                        <Link
+                          to={`/products/detail/${p.id}`}
+                          className="btn btn-primary"
+                          style={{
+                            padding: '4px 10px',
+                            fontSize: '12px',
+                            height: 'auto',
+                            minWidth: 'auto'
+                          }}
+                        >
+                          Detay
+                        </Link>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 };
-
-const thStyle = { padding: '15px', borderBottom: '2px solid #e9ecef', fontWeight: '600', fontSize: '14px' };
-const tdStyle = { padding: '15px', color: '#555', fontSize: '14px' };
 
 export default ProductList;

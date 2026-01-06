@@ -1,71 +1,87 @@
 // src/services/productService.ts
 import { db } from "../firebase";
-import { doc, getDoc,collection, addDoc, getDocs, query, orderBy, where } from "firebase/firestore";
+import {
+    collection,
+    getDocs,
+    query,
+    orderBy,
+    where,
+    doc,
+    getDoc,
+    writeBatch // <-- Toplu işlem için bunu ekledik
+} from "firebase/firestore";
 import type { Product } from "../types";
 
-// Koleksiyon adını sabitleyelim, hata yapmayalım
 const COLLECTION_NAME = "products";
 
-export const addProduct = async (product: Product) => {
+// YENİ: Çoklu Renk ile Ürün Ekleme (Batch İşlemi)
+export const addProductBatch = async (
+    // 'id' ve 'createdAt' alanlarını da hariç tutuyoruz (Omit)
+    baseData: Omit<Product, 'colorId' | 'id' | 'createdAt'>,
+    colorIds: string[]
+) => {
     try {
-        const docRef = await addDoc(collection(db, COLLECTION_NAME), {
-            ...product,
-            createdAt: new Date() // Tarihi sunucu zamanı olarak kaydedelim
+        const batch = writeBatch(db);
+
+        colorIds.forEach(colorId => {
+            const newDocRef = doc(collection(db, COLLECTION_NAME));
+
+            const productData: Product = {
+                ...baseData,
+                colorId: colorId,
+                createdAt: new Date() // Tarihi burada biz veriyoruz
+            };
+
+            batch.set(newDocRef, productData);
         });
-        return docRef.id;
+
+        await batch.commit();
+
     } catch (error) {
-        console.error("Ürün eklenirken hata:", error);
+        console.error("Toplu ürün ekleme hatası:", error);
         throw error;
     }
 };
 
+// ... Diğer getProducts, getProductById, getProductsByCategoryId fonksiyonları AYNI kalacak ...
+// (Sadece getProducts içinde Cushion ile ilgili bir işlem yapıyorsan onu silmen yeterli)
+
 export const getProducts = async (): Promise<Product[]> => {
     try {
-        // Ürünleri oluşturulma tarihine göre tersten sırala (en yeni en üstte)
         const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
         const querySnapshot = await getDocs(q);
-        
-        // Gelen veriyi bizim Product tipimize dönüştür
         return querySnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         })) as Product[];
     } catch (error) {
-        console.error("Ürünler çekilirken hata:", error);
+        console.error("Hata:", error);
         throw error;
     }
 };
 
 export const getProductById = async (id: string): Promise<Product | null> => {
     try {
-        const docRef = doc(db, "products", id);
+        const docRef = doc(db, COLLECTION_NAME, id);
         const docSnap = await getDoc(docRef);
-
         if (docSnap.exists()) {
             return { id: docSnap.id, ...docSnap.data() } as Product;
         } else {
-            return null; // Ürün bulunamadı
+            return null;
         }
     } catch (error) {
-        console.error("Ürün detay hatası:", error);
+        console.error(error);
         throw error;
     }
 };
 
-
 export const getProductsByCategoryId = async (categoryId: string): Promise<Product[]> => {
     try {
-        const q = query(
-            collection(db, "products"), 
-            where("categoryId", "==", categoryId)
-        );
+        const q = query(collection(db, COLLECTION_NAME), where("categoryId", "==", categoryId));
         const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as Product[];
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
     } catch (error) {
-        console.error("Hata:", error);
+        console.error(error);
         return [];
     }
 };

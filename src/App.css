@@ -314,3 +314,13 @@ body {
   from { transform: translateX(100%); opacity: 0; }
   to { transform: translateX(0); opacity: 1; }
 }
+
+.data-table.dense th,
+.data-table.dense td {
+  padding: 8px 12px; /* 15px yerine daha az boşluk */
+  font-size: 13px;   /* Yazı boyutunu hafif küçült */
+}
+
+.data-table.dense tbody tr:hover {
+  background-color: #f8f9fa; /* Üzerine gelince satır parlasın */
+}

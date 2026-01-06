@@ -64,8 +64,7 @@ const Sidebar = () => {
           Ürün Listesi
         </NavLink>
 
-        {/* App.tsx'teki rota '/prices' idi, onu düzelttik */}
-        <NavLink to="/prices" className="nav-item">
+        <NavLink to="/prices/list" className="nav-item">
           <span className="nav-icon">💲</span>
           Fiyat Yönetimi
         </NavLink>
@@ -76,14 +75,9 @@ const Sidebar = () => {
         </NavLink>
 
         {/* Grup ve Kategori rotaları ayrıydı, onları ayırdık */}
-        <NavLink to="/definitions/groups" className="nav-item">
+        <NavLink to="/definitions/general" className="nav-item">
           <span className="nav-icon">📂</span>
-          Gruplar
-        </NavLink>
-
-        <NavLink to="/definitions/categories" className="nav-item">
-          <span className="nav-icon">📁</span>
-          Kategoriler
+          Gruplar/Kategoriler
         </NavLink>
 
         <NavLink to="/definitions/colors" className="nav-item">

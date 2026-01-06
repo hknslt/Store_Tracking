@@ -6,10 +6,10 @@ export interface Product {
     categoryId: string; // Zorunlu (İlişkisel ID)
     productName: string; // Zorunlu
     colorId: string; // Zorunlu
-    dimension?: string; // Opsiyonel
-    cushionId: string; // Zorunlu (Minder/Yastık bilgisi)
+    dimensionId?: string | null; // Opsiyonel
+    //cushionId: string; // Zorunlu (Minder/Yastık bilgisi)
     explanation?: string; // Opsiyonel
-    createdAt: Date;
+    createdAt?: any;
 }
 
 
@@ -53,28 +53,32 @@ export interface Stock {
 
 //-----------Modules----------------
 
-export interface Purchase {
-    id?: string;
-    date: string;          // Tarih (2024-05-20 gibi)
-    personnel: string;     // Personel Adı
-    receiptNo: string;     // Fiş No
-    
-    // Ürün Hiyerarşisi
-    groupId: string;       
+export interface PurchaseItem {
+    groupId: string;
     categoryId: string;
-    productId: string;     // Seçilen Ürün ID'si
-    
-    // Özellikler
+    productId: string;
+    productName: string; // Listede ID yerine isim göstermek için saklayalım
     colorId: string;
     cushionId: string;
-    dimensionId: string; // Veritabanında ID tutmak en sağlıklısıdır
-    
+    dimensionId: string;
+    quantity: number;
+    amount: number;
     explanation?: string;
-    quantity: number;      // Adet
-    amount: number;        // Tutar (Toplam)
-    status: 'Alış' | 'İade'; // Durum
+    status: 'Alış' | 'İade'; // Her satırın durumu ayrı olabilir
 }
 
+// Fişin Kendisi (Başlık)
+export interface Purchase {
+    id?: string;
+    storeId: string;       // Hangi mağazaya yapıldı?
+    date: string;
+    receiptNo: string;
+    personnelId: string;   // Kim yaptı?
+    personnelName: string; 
+    items: PurchaseItem[]; // Ürün Listesi
+    totalAmount: number;   // Fiş Genel Toplamı
+    createdAt?: any;
+}
 
 
 
