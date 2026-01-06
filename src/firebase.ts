@@ -1,6 +1,7 @@
 // src/firebase.ts
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore"; // Veritabanı kütüphanesini ekledik
+import { getFirestore } from "firebase/firestore";
+import { getAuth } from "firebase/auth";
 
 // Senin yapılandırma bilgilerin
 const firebaseConfig = {
@@ -19,3 +20,4 @@ const app = initializeApp(firebaseConfig);
 
 // Veritabanını başlat ve dışarı aktar (Burası hatayı çözen kısım)
 export const db = getFirestore(app);
+export const auth = getAuth(app);

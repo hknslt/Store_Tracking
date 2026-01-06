@@ -1,9 +1,264 @@
-#root {
-  max-width: 1280px;
-  margin: 0 auto;
-  padding: 2rem;
-  text-align: center;
+/* =========================================
+   1. TEMEL AYARLAR VE DEĞİŞKENLER
+   ========================================= */
+:root {
+  --primary-color: #3498db;  /* Mavi */
+  --secondary-color: #2c3e50; /* Koyu Lacivert */
+  --success-color: #2ecc71;  /* Yeşil */
+  --warning-color: #f39c12;  /* Turuncu */
+  --danger-color: #e74c3c;   /* Kırmızı */
+  --light-bg: #f8f9fa;       /* Açık Gri Arka Plan */
+  --border-color: #ecf0f1;   /* Kenarlık Rengi */
+  --card-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  --radius: 8px;
+  
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
 }
+
+body {
+  margin: 0;
+  background-color: var(--light-bg);
+  color: #213547;
+}
+
+/* React Vite Default ayarını eziyoruz: Admin paneli tam genişlik olmalı */
+#root {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  text-align: left; /* Ortalama yerine sola dayalı */
+}
+
+/* =========================================
+   2. GENEL SAYFA DÜZENİ (LAYOUT)
+   ========================================= */
+.page-container {
+  padding: 20px;
+  max-width: 1400px; /* Çok geniş ekranlarda dağılmasın */
+  margin: 0 auto;
+  min-height: 100vh;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 30px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.page-title h2 {
+  margin: 0;
+  color: var(--secondary-color);
+  font-size: 1.8rem;
+}
+
+.page-title p {
+  margin: 5px 0 0;
+  color: #7f8c8d;
+  font-size: 0.9rem;
+}
+
+/* =========================================
+   3. KARTLAR VE GRID (DASHBOARD)
+   ========================================= */
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 20px;
+}
+
+.card {
+  background-color: white;
+  border-radius: 12px;
+  box-shadow: var(--card-shadow);
+  border: 1px solid var(--border-color);
+  overflow: hidden; /* Köşelerin yuvarlak kalması için */
+  display: flex;
+  flex-direction: column;
+  transition: transform 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-2px); /* Hafif yukarı kalkma efekti */
+}
+
+.card-header {
+  background-color: #fdfdfd;
+  padding: 15px 20px;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--secondary-color);
+}
+
+.card-body {
+  padding: 0; /* Tablo kenarlara yapışsın */
+  flex: 1;
+  overflow-x: auto; /* Mobilde tablo taşarsa kaydırma çubuğu çıksın */
+}
+
+/* =========================================
+   4. TABLO STİLLERİ
+   ========================================= */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+}
+
+.data-table thead tr {
+  background-color: #f1f2f6;
+  text-align: left;
+}
+
+.data-table th {
+  padding: 12px 20px;
+  font-weight: 600;
+  color: var(--secondary-color);
+}
+
+.data-table tr {
+  border-bottom: 1px solid #eee;
+}
+
+.data-table tr:last-child {
+  border-bottom: none;
+}
+
+.data-table td {
+  padding: 12px 20px;
+  color: #34495e;
+}
+
+/* =========================================
+   5. BUTONLAR VE ROZETLER
+   ========================================= */
+.btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 600;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  transition: all 0.2s;
+}
+
+.btn:hover { opacity: 0.9; transform: scale(1.02); }
+.btn:active { transform: scale(0.98); }
+
+.btn-primary { background-color: var(--primary-color); color: white; }
+.btn-success { background-color: var(--success-color); color: white; }
+.btn-secondary { background-color: #95a5a6; color: white; }
+
+.btn-warning { 
+  background-color: var(--warning-color); 
+  color: white; 
+  padding: 6px 12px; 
+  font-size: 12px; 
+}
+
+.btn-danger { 
+  background-color: var(--danger-color); 
+  color: white; 
+  padding: 6px 12px; 
+  font-size: 12px; 
+}
+
+.badge {
+  background-color: #eab3082b; /* Açık sarımsı */
+  color: #854d0e;
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* =========================================
+   6. FORM ELEMANLARI
+   ========================================= */
+.form-group { margin-bottom: 15px; }
+
+.form-label {
+  display: block;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--secondary-color);
+  font-size: 14px;
+}
+
+.form-input {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid #bdc3c7;
+  font-size: 14px;
+  transition: border-color 0.2s;
+  background-color: #fff;
+  box-sizing: border-box;
+}
+
+.form-input:focus {
+  border-color: var(--primary-color);
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.1);
+}
+
+/* =========================================
+   7. MODAL (AÇILIR PENCERE)
+   ========================================= */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: rgba(0,0,0,0.6);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 9999;
+  backdrop-filter: blur(3px);
+  padding: 20px;
+}
+
+.modal-content {
+  background-color: white;
+  padding: 30px;
+  border-radius: 16px;
+  width: 100%;
+  max-width: 450px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  animation: modalFadeIn 0.3s ease-out;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 25px;
+  padding-top: 20px;
+  border-top: 1px solid #f1f1f1;
+}
+
+@keyframes modalFadeIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
+}
+
 
 .logo {
   height: 6em;
@@ -11,32 +266,51 @@
   will-change: filter;
   transition: filter 300ms;
 }
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.react:hover {
-  filter: drop-shadow(0 0 2em #61dafbaa);
-}
+.logo:hover { filter: drop-shadow(0 0 2em #646cffaa); }
+.logo.react:hover { filter: drop-shadow(0 0 2em #61dafbaa); }
 
 @keyframes logo-spin {
-  from {
-    transform: rotate(0deg);
-  }
-  to {
-    transform: rotate(360deg);
-  }
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
 }
-
 @media (prefers-reduced-motion: no-preference) {
-  a:nth-of-type(2) .logo {
-    animation: logo-spin infinite 20s linear;
-  }
+  a:nth-of-type(2) .logo { animation: logo-spin infinite 20s linear; }
 }
 
-.card {
-  padding: 2em;
+
+
+/* --- TOAST BİLDİRİM MESAJI --- */
+.toast-container {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 9999;
+  animation: slideIn 0.3s ease-out;
 }
 
-.read-the-docs {
-  color: #888;
+.toast-message {
+  padding: 15px 25px;
+  border-radius: 8px;
+  color: white;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 250px;
+}
+
+.toast-success {
+  background-color: var(--success-color); /* Yeşil */
+  border-left: 5px solid #27ae60;
+}
+
+.toast-error {
+  background-color: var(--danger-color); /* Kırmızı */
+  border-left: 5px solid #c0392b;
+}
+
+@keyframes slideIn {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
 }

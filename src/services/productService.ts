@@ -1,6 +1,6 @@
 // src/services/productService.ts
 import { db } from "../firebase";
-import { doc, getDoc,collection, addDoc, getDocs, query, orderBy } from "firebase/firestore";
+import { doc, getDoc,collection, addDoc, getDocs, query, orderBy, where } from "firebase/firestore";
 import type { Product } from "../types";
 
 // Koleksiyon adını sabitleyelim, hata yapmayalım
@@ -49,5 +49,23 @@ export const getProductById = async (id: string): Promise<Product | null> => {
     } catch (error) {
         console.error("Ürün detay hatası:", error);
         throw error;
+    }
+};
+
+
+export const getProductsByCategoryId = async (categoryId: string): Promise<Product[]> => {
+    try {
+        const q = query(
+            collection(db, "products"), 
+            where("categoryId", "==", categoryId)
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as Product[];
+    } catch (error) {
+        console.error("Hata:", error);
+        return [];
     }
 };

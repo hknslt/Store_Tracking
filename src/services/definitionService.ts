@@ -1,6 +1,6 @@
 // src/services/definitionService.ts
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, query, orderBy ,where } from "firebase/firestore";
+import { collection, addDoc, getDocs, query, orderBy ,where, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import type { Group ,Category,Color, Cushion, Dimension } from "../types";
 
 const GROUP_COLLECTION = "groups";
@@ -32,6 +32,20 @@ export const getGroups = async (): Promise<Group[]> => {
         throw error;
     }
 };
+
+//  Grup Güncelleme
+export const updateGroup = async (id: string, data: Partial<Group>) => {
+    const docRef = doc(db, GROUP_COLLECTION, id);
+    await updateDoc(docRef, data);
+};
+
+// Grup Silme
+export const deleteGroup = async (id: string) => {
+    const docRef = doc(db, GROUP_COLLECTION, id);
+    await deleteDoc(docRef);
+};
+
+// Kategoriler
 
 export const addCategory = async (category: Category) => {
     try {
@@ -74,6 +88,31 @@ export const getCategoriesByGroupId = async (groupId: string): Promise<Category[
         throw error;
     }
 };
+
+
+
+
+export const updateCategory = async (id: string, data: Partial<Category>) => {
+    try {
+        const docRef = doc(db, CATEGORY_COLLECTION, id);
+        await updateDoc(docRef, data);
+    } catch (error) {
+        console.error("Güncelleme hatası:", error);
+        throw error;
+    }
+};
+
+export const deleteCategory = async (id: string) => {
+    try {
+        const docRef = doc(db, CATEGORY_COLLECTION, id);
+        await deleteDoc(docRef);
+    } catch (error) {
+        console.error("Silme hatası:", error);
+        throw error;
+    }
+};
+
+// Renkler
 
 export const addColor = async (color: Color) => {
     try {

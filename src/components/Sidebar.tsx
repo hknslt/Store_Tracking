@@ -1,46 +1,133 @@
 // src/components/Sidebar.tsx
-import { Link } from "react-router-dom";
+import { NavLink, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext"; // 1. Auth context'i çektik
+import { signOut } from "firebase/auth";
+import { auth } from "../firebase";
+import "./styles/Sidebar.css";
 
 const Sidebar = () => {
-  return (
-    <div style={{
-      width: '250px',
-      height: '100%',
-      backgroundColor: '#2c3e50',
-      color: 'white',
-      padding: '20px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: '20px',
-      flexShrink: 0
-    }}>
-      <h2 style={{ borderBottom: '1px solid #7f8c8d', paddingBottom: '10px' }}>Flexy Stok</h2>
+  const { currentUser } = useAuth(); // 2. Aktif kullanıcıyı al
+  const navigate = useNavigate();
 
-      <nav style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-        <Link to="/" style={linkStyle}>🏠 Ana Sayfa</Link>
-        <Link to="/products" style={linkStyle}>📦 Ürün Listesi</Link>
-        <Link to="/definitions/groups/list" style={linkStyle}>👥 Gruplar</Link>
-        <Link to="/definitions/categories/list" style={linkStyle}>🗂 Kategoriler</Link>
-        <Link to="/definitions/colors" style={linkStyle}>🎨 Renkler</Link>
-        <Link to="/definitions/dimensions" style={linkStyle}>📏 Ebatlar</Link>
-        <Link to="/definitions/cushions" style={linkStyle}>🛋️ Minderler</Link>
-        <Link to="/prices/list" style={linkStyle}>💲 Fiyat Yönetimi</Link>
+  // 3. Çıkış Yapma Fonksiyonu
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      navigate("/login"); // Çıkış yapınca login'e at
+    } catch (error) {
+      console.error("Çıkış hatası:", error);
+    }
+  };
+
+  return (
+    <div className="sidebar">
+      <div className="sidebar-header">
+        <h2>Flexy Mağaza</h2>
+        {/* Kullanıcı rolünü veya e-postasını burada veya footerda gösterebiliriz */}
+      </div>
+
+      <nav className="sidebar-nav">
+
+        <NavLink to="/" className="nav-item" end>
+          <span className="nav-icon">🏠</span>
+          Ana Sayfa
+        </NavLink>
+
+        <div className="nav-section">YÖNETİM</div>
+
+        <NavLink to="/stores" className="nav-item">
+          <span className="nav-icon">🏢</span>
+          Mağazalar
+        </NavLink>
+
+        <NavLink to="/personnel" className="nav-item">
+          <span className="nav-icon">👥</span>
+          Personeller
+        </NavLink>
+
+        <NavLink to="/store-stocks" className="nav-item">
+          <span className="nav-icon">🏪</span>
+          Mağaza Stokları
+        </NavLink>
+
+        <div className="nav-section">MODÜLLER</div>
+
+        <NavLink to="/purchases" className="nav-item">
+          <span className="nav-icon">🛒</span>
+          Alışlar
+        </NavLink>
+
+        <div className="nav-section">TANIMLAMALAR</div>
+
+        <NavLink to="/products" className="nav-item">
+          <span className="nav-icon">📦</span>
+          Ürün Listesi
+        </NavLink>
+
+        {/* App.tsx'teki rota '/prices' idi, onu düzelttik */}
+        <NavLink to="/prices" className="nav-item">
+          <span className="nav-icon">💲</span>
+          Fiyat Yönetimi
+        </NavLink>
+
+        <NavLink to="/stocks" className="nav-item">
+          <span className="nav-icon">📊</span>
+          Merkez Stok
+        </NavLink>
+
+        {/* Grup ve Kategori rotaları ayrıydı, onları ayırdık */}
+        <NavLink to="/definitions/groups" className="nav-item">
+          <span className="nav-icon">📂</span>
+          Gruplar
+        </NavLink>
+
+        <NavLink to="/definitions/categories" className="nav-item">
+          <span className="nav-icon">📁</span>
+          Kategoriler
+        </NavLink>
+
+        <NavLink to="/definitions/colors" className="nav-item">
+          <span className="nav-icon">🎨</span>
+          Renkler
+        </NavLink>
+
+        <NavLink to="/definitions/dimensions" className="nav-item">
+          <span className="nav-icon">📏</span>
+          Ebatlar
+        </NavLink>
+
+        <NavLink to="/definitions/cushions" className="nav-item">
+          <span className="nav-icon">🛋️</span>
+          Minderler
+        </NavLink>
+
       </nav>
 
-      <div style={{ marginTop: 'auto', fontSize: '12px', color: '#bdc3c7' }}>
-        v1.0.0 - Admin Panel
+      {/* FOOTER: Kullanıcı Bilgisi ve Çıkış */}
+      <div className="sidebar-footer">
+        <div style={{ marginBottom: '10px', fontSize: '12px', color: '#bdc3c7' }}>
+          Giriş Yapan: <br />
+          <span style={{ color: 'white' }}>{currentUser?.email}</span>
+        </div>
+
+        <button
+          onClick={handleLogout}
+          style={{
+            width: '100%',
+            padding: '8px',
+            backgroundColor: '#c0392b',
+            color: 'white',
+            border: 'none',
+            borderRadius: '4px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Çıkış Yap
+        </button>
       </div>
     </div>
   );
-};
-
-const linkStyle = {
-  color: 'white',
-  textDecoration: 'none',
-  padding: '10px',
-  backgroundColor: '#34495e',
-  borderRadius: '5px',
-  display: 'block'
 };
 
 export default Sidebar;
