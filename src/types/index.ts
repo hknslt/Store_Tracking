@@ -115,3 +115,60 @@ export interface StoreProduct {
     id: string;    // Ürün ID'si (Döküman ID'si ile aynı)
     stock: number; // Stok Adedi
 }
+
+
+
+
+//-----------SATIŞ MODÜLÜ----------------
+export type SaleStatus = 'Sipariş' | 'Müşteri' | 'Teslim' | 'Stok' | 'İade' | 'İptal';
+
+export interface SaleItem {
+    // Seçim hiyerarşisi için
+    groupId: string;
+    categoryId: string;
+    
+    productId: string; 
+    // Seçilen varyant (Ad + Renk + Ebat)
+    colorId?: string;   
+    productName: string; 
+    dimensionId?: string | null;  // Listede göstermek için
+    
+    cushionId?: string;    // Minder seçimi (Satış anında)
+    
+    quantity: number;
+    price: number;         // Birim Fiyat
+    discount: number;      // İskonto Tutar
+    total: number;         // (Fiyat - İskonto) * Adet
+    
+    productNote?: string;  // Ürün Açıklaması
+    deadline?: string;     // Termin Tarihi
+    status: SaleStatus;    // Satır bazlı durum
+}
+
+export interface Sale {
+    id?: string;
+    storeId: string;
+    personnelId: string;
+    personnelName: string;
+    
+    // Fiş Başlık Bilgileri
+    date: string;
+    receiptNo: string;
+    
+    // Müşteri Bilgileri
+    customerName: string;
+    phone: string;
+    city: string;
+    district: string;
+    address: string;
+    customerNote?: string;
+    
+    // Alt Bilgiler
+    sshNote?: string;
+    shippingNote?: string;
+    shippingCost: number;
+    
+    items: SaleItem[];     // Ürün Listesi
+    grandTotal: number;    // Genel Toplam
+    createdAt?: any;
+}

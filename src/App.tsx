@@ -29,6 +29,8 @@ import StoreAdd from "./pages/stores/StoreAdd";
 import PersonnelList from "./pages/personnel/PersonnelList";
 import PersonnelAdd from "./pages/personnel/PersonnelAdd";
 import StoreStockManager from "./pages/stocks/StoreStockManager";
+import SaleList from "./pages/sales/SaleList";
+import SaleAdd from "./pages/sales/SaleAdd";
 
 // --- 1. KORUMALI DÜZEN (Sidebar Burada Olacak) ---
 // Giriş yapmış kullanıcılar burayı ve Sidebar'ı görür.
@@ -124,6 +126,11 @@ function App() {
             <Route path="/stores/add" element={<StoreAdd />} />
             <Route path="/personnel" element={<PersonnelList />} />
             <Route path="/personnel/add" element={<PersonnelAdd />} />
+
+
+            {/* Satış Modülü */}
+            <Route path="/sales" element={<SaleList />} />
+            <Route path="/sales/add" element={<SaleAdd />} />
           </Route>
 
           {/* Hatalı Rota */}

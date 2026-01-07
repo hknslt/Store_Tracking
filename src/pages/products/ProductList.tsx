@@ -45,101 +45,99 @@ const ProductList = () => {
     }
   };
 
+  // İsim getirme yardımcısı (Eğer yoksa '-' döner)
   const getName = (list: any[], id: string | undefined | null, nameKey: string) => {
-    if (!id) return <span style={{ color: '#ccc' }}>-</span>;
+    if (!id) return "-";
     const item = list.find(x => x.id === id);
-    return item ? item[nameKey] : <span style={{ color: '#ccc' }}>-</span>;
+    return item ? item[nameKey] : "-";
   };
 
   if (loading) return <div className="page-container">Yükleniyor...</div>;
 
   return (
     <div className="page-container">
-      {/* --- BAŞLIK VE YENİ EKLE BUTONU --- */}
+      {/* --- BAŞLIK VE BUTON --- */}
       <div className="page-header">
         <div className="page-title">
           <h2>Ürün Listesi</h2>
-          <p>Toplam {products.length} ürün listeleniyor</p>
+          <p>Toplam {products.length} ürün tanımlı</p>
         </div>
         <Link to="/products/add" className="btn btn-primary">
           + Yeni Ürün
         </Link>
       </div>
 
-      {/* --- TABLO KARTI --- */}
+      {/* --- LİSTE KARTI --- */}
       <div className="card">
-        <div className="card-body">
+        <div className="card-body" style={{ padding: 0 }}>
           {products.length === 0 ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: '#999' }}>
-              Henüz ürün eklenmemiş.
+            <div style={{ padding: '30px', textAlign: 'center', color: '#999' }}>
+              Henüz sisteme kayıtlı ürün bulunmuyor.
             </div>
           ) : (
-            <div style={{ overflowX: 'auto' }}>
-              {/* "dense" sınıfı CSS'e eklediğimiz sıkıştırma için */}
-              <table className="data-table dense">
-                <thead>
-                  <tr>
-                    <th style={{ width: '30%' }}>Ürün Adı</th>
-                    <th style={{ width: '25%' }}>Grup &rsaquo; Kategori</th>
-                    <th style={{ width: '15%' }}>Renk</th>
-                    <th style={{ width: '15%' }}>Ebat</th>
-                    <th style={{ width: '15%', textAlign: 'right' }}>İşlem</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {products.map((p) => (
-                    <tr key={p.id}>
-                      {/* Ürün Adı */}
-                      <td>
-                        <div style={{ fontWeight: '600', color: '#2c3e50' }}>
-                          {p.productName}
-                        </div>
-                      </td>
+            <table className="data-table dense">
+              <thead>
+                <tr style={{ backgroundColor: '#f8f9fa' }}>
+                  <th style={{ width: '50%' }}>Ürün Bilgisi</th>
+                  <th style={{ width: '30%' }}>Renk</th>
+                  <th style={{ width: '20%', textAlign: 'right' }}>İşlem</th>
+                </tr>
+              </thead>
+              <tbody>
+                {products.map((p) => {
+                  const groupName = getName(groups, p.groupId, 'groupName');
+                  const categoryName = getName(categories, p.categoryId, 'categoryName');
+                  const dimensionName = p.dimensionId ? getName(dimensions, p.dimensionId, 'dimensionName') : null;
+                  const colorName = getName(colors, p.colorId, 'colorName');
 
-                      {/* Grup > Kategori (Yan yana) */}
-                      <td>
-                        <span style={{ fontWeight: '500', color: '#7f8c8d' }}>
-                          {getName(groups, p.groupId, 'groupName')}
-                        </span>
-                        <span style={{ margin: '0 5px', color: '#bdc3c7' }}>&rsaquo;</span>
-                        <span style={{ color: '#2c3e50' }}>
-                          {getName(categories, p.categoryId, 'categoryName')}
-                        </span>
+                  return (
+                    <tr key={p.id}>
+                      {/* Ürün Bilgisi (Ad + Ebat + Grup/Kategori) */}
+                      <td style={{ padding: '10px 15px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '6px' }}>
+                          <span style={{ fontWeight: '600', color: '#2c3e50', fontSize: '14px' }}>
+                            {p.productName}
+                          </span>
+
+                          {/* Ebat varsa turuncu renkte göster */}
+                          {dimensionName && dimensionName !== '-' && (
+                            <span style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '13px' }}>
+                              {dimensionName}
+                            </span>
+                          )}
+                          <span style={{ fontSize: '12px', color: '#7f8c8d', marginTop: '2px' }}>{categoryName}</span>
+                        </div>
+
                       </td>
 
                       {/* Renk */}
-                      <td>
-                        {/* Renk isminin yanına küçük bir kutucuk koyabiliriz (opsiyonel) */}
-                        {getName(colors, p.colorId, 'colorName')}
-                      </td>
-
-                      {/* Ebat */}
-                      <td>
-                        <span className="badge" style={{ backgroundColor: '#f1f2f6', color: '#555' }}>
-                          {getName(dimensions, p.dimensionId, 'dimensionName')}
-                        </span>
+                      <td style={{ padding: '10px 15px', verticalAlign: 'middle' }}>
+                        {colorName !== '-' ? (
+                          <span style={{ fontWeight: '500', color: '#555' }}>{colorName}</span>
+                        ) : (
+                          <span style={{ color: '#ccc' }}>-</span>
+                        )}
                       </td>
 
                       {/* İşlem Butonu */}
-                      <td style={{ textAlign: 'right' }}>
+                      <td style={{ textAlign: 'right', padding: '10px 15px', verticalAlign: 'middle' }}>
                         <Link
                           to={`/products/detail/${p.id}`}
                           className="btn btn-primary"
                           style={{
-                            padding: '4px 10px',
+                            padding: '5px 12px',
                             fontSize: '12px',
-                            height: 'auto',
-                            minWidth: 'auto'
+                            textDecoration: 'none'
                           }}
                         >
                           Detay
                         </Link>
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           )}
         </div>
       </div>

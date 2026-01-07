@@ -1,15 +1,22 @@
 // src/pages/purchases/PurchaseAdd.tsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore"; // Kullanıcı detayı için
+import { doc, getDoc } from "firebase/firestore";
 
 import { addPurchase } from "../../services/purchaseService";
-import { getGroups, getCategoriesByGroupId, getColors, getDimensions, getCushions } from "../../services/definitionService";
+import {
+    getGroups,
+    getCategoriesByGroupId,
+    getColors,
+    getDimensions,
+    getCushions
+} from "../../services/definitionService";
 import { getProductsByCategoryId } from "../../services/productService";
 import { getStores } from "../../services/storeService";
 
 import type { Group, Category, Product, Color, Dimension, Cushion, PurchaseItem, Store, Personnel } from "../../types";
+import "../../App.css";
 
 const PurchaseAdd = () => {
     const { currentUser } = useAuth();
@@ -18,76 +25,98 @@ const PurchaseAdd = () => {
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
-    const [colors, setColors] = useState<Color[]>([]);
-    const [dimensions, setDimensions] = useState<Dimension[]>([]);
+
+    // --- ÜRÜN & VARYANT YÖNETİMİ ---
+    const [allRawProducts, setAllRawProducts] = useState<Product[]>([]);
+
+    // 1. Kademe: İsimler
+    const [uniqueProductNames, setUniqueProductNames] = useState<string[]>([]);
+
+    // 2. Kademe: Renkler (İsim seçilince dolar)
+    const [availableColors, setAvailableColors] = useState<Color[]>([]);
+
+    // 3. Kademe: Ebatlar (Renk seçilince dolar - YENİ)
+    const [availableDimensions, setAvailableDimensions] = useState<Dimension[]>([]);
+
+    // --- TANIMLAR ---
+    const [allColors, setAllColors] = useState<Color[]>([]);
+    const [allDimensions, setAllDimensions] = useState<Dimension[]>([]); // İsim çakışmasın diye 'all' ekledik
     const [cushions, setCushions] = useState<Cushion[]>([]);
 
-    // --- KULLANICI & YETKİ ---
+    // --- KULLANICI ---
     const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // --- FİŞ BAŞLIĞI VERİLERİ ---
+    // --- FİŞ BAŞLIĞI ---
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
-        storeId: "" // Seçilen veya atanan mağaza
+        storeId: ""
     });
 
-    // --- EKLENECEK SATIR (Geçici) ---
+    // --- SEÇİM STATE'LERİ ---
+    const [selectedProductName, setSelectedProductName] = useState("");
+    const [selectedColorId, setSelectedColorId] = useState("");
+    const [selectedDimensionId, setSelectedDimensionId] = useState(""); // YENİ
+
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "",
         colorId: "", cushionId: "", dimensionId: "",
         quantity: 1, amount: 0, explanation: "", status: 'Alış'
     });
 
-    // --- EKLENMİŞ LİSTE ---
     const [addedItems, setAddedItems] = useState<PurchaseItem[]>([]);
-    const [message, setMessage] = useState("");
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+    const quantityInputRef = useRef<HTMLInputElement>(null);
 
-    // 1. Sayfa Yüklenince: Tanımları ve Kullanıcıyı Çek
+    const showToast = (type: 'success' | 'error', text: string) => {
+        setMessage({ type, text });
+        setTimeout(() => setMessage(null), 3000);
+    };
+
+    // 1. BAŞLANGIÇ
     useEffect(() => {
         const initData = async () => {
-            // Tanımlar
-            getGroups().then(setGroups);
-            getColors().then(setColors);
-            getDimensions().then(setDimensions);
-            getCushions().then(setCushions);
+            try {
+                const [g, c, col, dim] = await Promise.all([
+                    getGroups(), getCushions(), getColors(), getDimensions()
+                ]);
+                setGroups(g);
+                setCushions(c);
+                setAllColors(col);
+                setAllDimensions(dim);
 
-            // Giriş Yapan Kullanıcı Detayı
-            if (currentUser) {
-                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-                if (userDoc.exists()) {
-                    const userData = userDoc.data() as Personnel;
-                    setCurrentPersonnel(userData);
+                if (currentUser) {
+                    const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                    if (userDoc.exists()) {
+                        const userData = userDoc.data() as Personnel;
+                        setCurrentPersonnel(userData);
 
-                    if (userData.role === 'admin') {
-                        setIsAdmin(true);
-                        getStores().then(setStores); // Admin ise mağazaları getir
-                    } else {
-                        // Admin değilse kendi mağazasını ata
-                        setIsAdmin(false);
-                        setHeaderData(prev => ({ ...prev, storeId: userData.storeId }));
+                        if (userData.role === 'admin') {
+                            setIsAdmin(true);
+                            getStores().then(setStores);
+                        } else {
+                            setIsAdmin(false);
+                            setHeaderData(prev => ({ ...prev, storeId: userData.storeId }));
+                        }
                     }
                 }
+            } catch (error) {
+                console.error(error);
+                showToast('error', "Veri yükleme hatası.");
             }
         };
         initData();
     }, [currentUser]);
 
     // --- HANDLERS ---
+    const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
+    const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    const handleHeaderChange = (e: any) => {
-        setHeaderData({ ...headerData, [e.target.name]: e.target.value });
-    };
-
-    const handleLineChange = (e: any) => {
-        setLineItem({ ...lineItem, [e.target.name]: e.target.value });
-    };
-
-    // Grup değişince
+    // GRUP -> Kategori Getir
     const handleGroupChange = async (groupId: string) => {
         setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
+        setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
         if (groupId) {
             const cats = await getCategoriesByGroupId(groupId);
             setCategories(cats);
@@ -96,74 +125,145 @@ const PurchaseAdd = () => {
         }
     };
 
-    // Kategori değişince
+    // KATEGORİ -> Tüm Varyantları Çek ve İsimleri Listele
     const handleCategoryChange = async (categoryId: string) => {
         setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
+        setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
+        setUniqueProductNames([]);
+
         if (categoryId) {
-            const prods = await getProductsByCategoryId(categoryId);
-            setProducts(prods);
+            const rawProds = await getProductsByCategoryId(categoryId);
+            setAllRawProducts(rawProds);
+
+            // Benzersiz isimleri al
+            const names = Array.from(new Set(rawProds.map(p => p.productName)));
+            setUniqueProductNames(names);
         } else {
-            setProducts([]);
+            setAllRawProducts([]);
         }
     };
 
-    // Ürün değişince (İsmini de alalım)
-    const handleProductChange = (productId: string) => {
-        const prod = products.find(p => p.id === productId);
-        setLineItem(prev => ({
-            ...prev,
-            productId,
-            productName: prod ? prod.productName : ""
-        }));
+    // 1. ÜRÜN ADI SEÇİLİNCE -> Renkleri Filtrele
+    const handleProductNameChange = (prodName: string) => {
+        setSelectedProductName(prodName);
+        setSelectedColorId(""); setSelectedDimensionId(""); // Alt seçimleri sıfırla
+
+        if (prodName) {
+            // Bu isme sahip tüm varyantları bul
+            const variants = allRawProducts.filter(p => p.productName === prodName);
+            // Renk ID'lerini al
+            const colorIds = variants.map(v => v.colorId);
+            // Global renk listesinden eşleşenleri filtrele
+            const filteredColors = allColors.filter(c => colorIds.includes(c.id!));
+            setAvailableColors(filteredColors);
+        } else {
+            setAvailableColors([]);
+        }
     };
 
-    // LİSTEYE EKLE BUTONU
+    // 2. RENK SEÇİLİNCE -> Ebatları Filtrele
+    const handleColorChange = (colorId: string) => {
+        setSelectedColorId(colorId);
+        setSelectedDimensionId(""); // Ebatı sıfırla
+
+        if (selectedProductName && colorId) {
+            // İsim ve Rengi tutan varyantları bul
+            const variants = allRawProducts.filter(p =>
+                p.productName === selectedProductName && p.colorId === colorId
+            );
+
+            // Ebat ID'lerini al
+            const dimIds = variants.map(v => v.dimensionId).filter(id => id); // null olmayanlar
+
+            if (dimIds.length > 0) {
+                // Ebatlı ürünse ebatları listele
+                const filteredDims = allDimensions.filter(d => dimIds.includes(d.id!));
+                setAvailableDimensions(filteredDims);
+            } else {
+                // Ebatsız ürünse direkt seçimi tamamla (Tek varyant vardır)
+                setAvailableDimensions([]);
+                selectFinalProduct(variants[0]); // İlk (ve tek) varyantı seç
+            }
+        } else {
+            setAvailableDimensions([]);
+        }
+    };
+
+    // 3. EBAT SEÇİLİNCE -> Ürünü Tamamla
+    const handleDimensionChange = (dimId: string) => {
+        setSelectedDimensionId(dimId);
+        if (selectedProductName && selectedColorId && dimId) {
+            // İsim + Renk + Ebat eşleşen TEK ürünü bul
+            const targetProduct = allRawProducts.find(p =>
+                p.productName === selectedProductName &&
+                p.colorId === selectedColorId &&
+                p.dimensionId === dimId
+            );
+
+            if (targetProduct) {
+                selectFinalProduct(targetProduct);
+            }
+        }
+    };
+
+    // --- SON AŞAMA: ÜRÜNÜ STATE'E İŞLEME ---
+    const selectFinalProduct = (product: Product) => {
+        const colorName = allColors.find(c => c.id === product.colorId)?.colorName || "";
+        const dimName = allDimensions.find(d => d.id === product.dimensionId)?.dimensionName || "";
+
+        // Ebat varsa isme ekle, yoksa ekleme
+        const displayName = product.dimensionId
+            ? `${product.productName} - ${colorName} ${dimName}`
+            : `${product.productName} - ${colorName}`;
+
+        setLineItem(prev => ({
+            ...prev,
+            productId: product.id,
+            colorId: product.colorId,
+            dimensionId: product.dimensionId || "",
+            productName: displayName
+        }));
+
+        // Miktara odaklan
+        setTimeout(() => quantityInputRef.current?.focus(), 100);
+    };
+
+    // LİSTEYE EKLE
     const addLineItem = () => {
         if (!lineItem.productId || !lineItem.quantity || !lineItem.amount) {
-            return alert("Lütfen ürün, adet ve tutar giriniz.");
+            showToast('error', "Ürün seçimi tamamlanmadı veya miktar/tutar eksik.");
+            return;
         }
 
-        // Listeye ekle
-        setAddedItems([...addedItems, lineItem as PurchaseItem]);
+        setAddedItems([lineItem as PurchaseItem, ...addedItems]);
 
-        // Formu temizle (Grup/Kat kalsın kolaylık olsun)
+        // Temizle
         setLineItem(prev => ({
             ...prev,
-            quantity: 1,
-            amount: 0,
-            explanation: ""
+            cushionId: "", quantity: 1, amount: 0, explanation: "",
+            productId: "", productName: ""
         }));
+
+        // Seçim kutularını sıfırla
+        setSelectedProductName("");
+        setSelectedColorId("");
+        setSelectedDimensionId("");
+        setAvailableColors([]);
+        setAvailableDimensions([]);
     };
 
-    // SATIR SİL
     const removeLineItem = (index: number) => {
         const newList = [...addedItems];
         newList.splice(index, 1);
         setAddedItems(newList);
     };
 
-    // KAYDET BUTONU (Tüm Fişi)
     const saveReceipt = async () => {
-        // 1. KONTROL: Veriler Dolu mu?
-        if (!headerData.storeId) {
-            return alert("HATA: Mağaza seçilmedi! (storeId eksik)");
-        }
-        if (!headerData.receiptNo) {
-            return alert("HATA: Fiş numarası girilmedi!");
-        }
-        if (addedItems.length === 0) {
-            return alert("HATA: Listeye hiç ürün eklenmedi!");
-        }
+        if (!headerData.storeId) return showToast('error', "Mağaza seçilmedi!");
+        if (!headerData.receiptNo) return showToast('error', "Fiş numarası girilmedi!");
+        if (addedItems.length === 0) return showToast('error', "Listeye ürün eklenmedi!");
 
-        // 2. KONTROL: Eklenen ürünlerde eksik ID var mı?
-        const invalidItem = addedItems.find(item => !item.productId);
-        if (invalidItem) {
-            return alert("HATA: Listede ID'si olmayan bozuk bir ürün var!");
-        }
-
-        // Toplam Tutar Hesapla
         const totalAmount = addedItems.reduce((sum, item) => sum + Number(item.amount), 0);
-
         const purchaseData = {
             storeId: headerData.storeId,
             date: headerData.date,
@@ -175,171 +275,159 @@ const PurchaseAdd = () => {
             createdAt: new Date()
         };
 
-        // KONSOLA YAZ (F12 -> Console sekmesinden bakabilirsin)
-        console.log("Gönderilecek Veri:", purchaseData);
-
         try {
             await addPurchase(purchaseData);
-            setMessage("✅ Alış Fişi ve Stoklar Kaydedildi!");
-            
-            // Temizlik
+            showToast('success', "Fiş kaydedildi!");
             setAddedItems([]);
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
-            
-            setTimeout(() => setMessage(""), 3000);
+            // Full Reset
+            setLineItem({ groupId: "", categoryId: "", productId: "", productName: "", quantity: 1, amount: 0, explanation: "", status: 'Alış' });
+            setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
         } catch (error: any) {
-            // HATAYI EKRANA BASALIM
-            console.error("Firebase Hatası:", error);
-            alert("KAYIT BAŞARISIZ OLDU!\n\nHata Detayı: " + error.message);
+            showToast('error', "Hata: " + error.message);
         }
     };
 
     return (
-        <div>
-            <h2 style={{ color: '#2c3e50', marginBottom: '20px' }}>Yeni Mal Kabul / İade Fişi</h2>
-
-            {message && <div style={successStyle}>{message}</div>}
-
-            {/* --- 1. FİŞ BAŞLIĞI --- */}
-            <div style={cardStyle}>
-                <h4 style={sectionTitle}>Fiş Bilgileri</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px' }}>
-
-                    <div>
-                        <label style={labelStyle}>Tarih</label>
-                        <input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} style={inputStyle} />
+        <div className="page-container">
+            {message && (
+                <div className="toast-container">
+                    <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>
+                        {message.type === 'success' ? '✅' : '⚠️'} {message.text}
                     </div>
+                </div>
+            )}
 
-                    <div>
-                        <label style={labelStyle}>Mağaza</label>
+            <div className="page-header">
+                <div className="page-title">
+                    <h2>Mal Kabul / İade Fişi</h2>
+                </div>
+                {addedItems.length > 0 && (
+                    <button onClick={saveReceipt} className="btn btn-success" style={{ padding: '10px 20px' }}>
+                        💾 KAYDET ({addedItems.reduce((a, b) => a + Number(b.amount), 0)} ₺)
+                    </button>
+                )}
+            </div>
+
+            {/* --- FİŞ BAŞLIĞI --- */}
+            <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+                    <div><label className="form-label">Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" /></div>
+                    <div><label className="form-label">Mağaza</label>
                         {isAdmin ? (
-                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} style={inputStyle}>
+                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input">
                                 <option value="">-- Mağaza Seç --</option>
                                 {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                             </select>
-                        ) : (
-                            <input type="text" value={currentPersonnel ? "📍 Kendi Mağazam" : "Yükleniyor..."} disabled style={{ ...inputStyle, backgroundColor: '#eee' }} />
-                        )}
+                        ) : <input disabled value={currentPersonnel ? "📍 Kendi Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee' }} />}
                     </div>
-
-                    <div>
-                        <label style={labelStyle}>Personel</label>
-                        <input type="text" value={currentPersonnel?.fullName || ""} disabled style={{ ...inputStyle, backgroundColor: '#eee' }} />
-                    </div>
-
-                    <div>
-                        <label style={labelStyle}>Fiş / Belge No</label>
-                        <input type="text" name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} style={inputStyle} placeholder="Örn: IRS-2024-001" />
-                    </div>
+                    <div><label className="form-label">Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="IRS-001" /></div>
                 </div>
             </div>
 
-            {/* --- 2. ÜRÜN EKLEME PANELİ --- */}
-            <div style={{ ...cardStyle, marginTop: '20px', borderLeft: '5px solid #3498db' }}>
-                <h4 style={sectionTitle}>Ürün Ekle</h4>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
-
-                    {/* Grup - Kategori - Ürün */}
-                    <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} style={inputStyle}>
-                        <option value="">Grup Seç...</option>
-                        {groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
-                    </select>
-
-                    <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} style={inputStyle} disabled={!lineItem.groupId}>
-                        <option value="">Kategori Seç...</option>
-                        {categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
-                    </select>
-
-                    <select value={lineItem.productId} onChange={e => handleProductChange(e.target.value)} style={{ ...inputStyle, fontWeight: 'bold' }} disabled={!lineItem.categoryId}>
-                        <option value="">Ürün Seç...</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.productName}</option>)}
-                    </select>
-
-                    {/* Özellikler */}
-                    <select name="colorId" value={lineItem.colorId} onChange={handleLineChange} style={inputStyle}>
-                        <option value="">Renk...</option>
-                        {colors.map(c => <option key={c.id} value={c.id}>{c.colorName}</option>)}
-                    </select>
-
-                    <select name="dimensionId" value={lineItem.dimensionId} onChange={handleLineChange} style={inputStyle}>
-                        <option value="">Ebat...</option>
-                        {dimensions.map(d => <option key={d.id} value={d.id}>{d.dimensionName}</option>)}
-                    </select>
-
-                    <select name="cushionId" value={lineItem.cushionId} onChange={handleLineChange} style={inputStyle}>
-                        <option value="">Minder...</option>
-                        {cushions.map(c => <option key={c.id} value={c.id}>{c.cushionName}</option>)}
-                    </select>
-
-                    {/* Adet - Tutar - Durum */}
-                    <input type="number" name="quantity" placeholder="Adet" value={lineItem.quantity} onChange={handleLineChange} style={inputStyle} />
-                    <input type="number" name="amount" placeholder="Tutar" value={lineItem.amount} onChange={handleLineChange} style={inputStyle} />
-
-                    <select name="status" value={lineItem.status} onChange={handleLineChange} style={{ ...inputStyle, color: lineItem.status === 'Alış' ? 'green' : 'red' }}>
-                        <option value="Alış">Alış (Giriş)</option>
-                        <option value="İade">İade (Müşteriden)</option>
-                    </select>
-
-                    <input type="text" name="explanation" placeholder="Açıklama" value={lineItem.explanation} onChange={handleLineChange} style={{ gridColumn: 'span 3', ...inputStyle }} />
-
-                </div>
-                <button onClick={addLineItem} style={addBtnStyle}>+ Listeye Ekle</button>
-            </div>
-
-            {/* --- 3. EKLENEN LİSTE --- */}
-            <div style={{ marginTop: '20px' }}>
-                <h4 style={{ color: '#2c3e50' }}>Eklenecek Ürünler ({addedItems.length})</h4>
-                <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', boxShadow: '0 2px 5px rgba(0,0,0,0.1)' }}>
-                    <thead>
-                        <tr style={{ backgroundColor: '#ecf0f1', textAlign: 'left', fontSize: '13px' }}>
-                            <th style={thStyle}>Ürün</th>
-                            <th style={thStyle}>Özellikler</th>
-                            <th style={thStyle}>Durum</th>
-                            <th style={thStyle}>Adet</th>
-                            <th style={thStyle}>Tutar</th>
-                            <th style={thStyle}>İşlem</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {addedItems.map((item, index) => (
-                            <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-                                <td style={tdStyle}>{item.productName}</td>
-                                <td style={tdStyle}><small>RenkID:{item.colorId}, EbatID:{item.dimensionId}</small></td>
-                                <td style={tdStyle}>
-                                    <span style={{ color: item.status === 'Alış' ? 'green' : 'red', fontWeight: 'bold' }}>{item.status}</span>
+            {/* --- EXCEL GİRİŞ --- */}
+            <div className="card">
+                <div className="card-body" style={{ padding: 0 }}>
+                    <table className="data-table dense" style={{ width: '100%' }}>
+                        <thead style={{ backgroundColor: '#f1f2f6' }}>
+                            <tr>
+                                <th style={{ width: '10%' }}>Grup/Kat.</th>
+                                <th style={{ width: '15%' }}>Ürün Adı</th>
+                                <th style={{ width: '10%' }}>Renk</th>
+                                <th style={{ width: '10%' }}>Ebat</th> {/* YENİ */}
+                                <th style={{ width: '10%' }}>Minder</th>
+                                <th style={{ width: '8%' }}>Durum</th>
+                                <th style={{ width: '7%' }}>Adet</th>
+                                <th style={{ width: '8%' }}>Tutar</th>
+                                <th>Açıklama</th>
+                                <th style={{ width: '5%' }}>+</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {/* INPUT SATIRI */}
+                            <tr style={{ backgroundColor: '#eaf2f8', borderBottom: '2px solid #3498db' }}>
+                                <td>
+                                    <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="form-input input-sm" style={{ marginBottom: '2px' }}>
+                                        <option value="">Grup...</option>
+                                        {groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
+                                    </select>
+                                    <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} className="form-input input-sm" disabled={!lineItem.groupId}>
+                                        <option value="">Kat...</option>
+                                        {categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
+                                    </select>
                                 </td>
-                                <td style={tdStyle}>{item.quantity}</td>
-                                <td style={tdStyle}>{item.amount} ₺</td>
-                                <td style={tdStyle}>
-                                    <button onClick={() => removeLineItem(index)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>Sil</button>
+                                <td>
+                                    <select value={selectedProductName} onChange={e => handleProductNameChange(e.target.value)} className="form-input input-sm" disabled={!lineItem.categoryId} style={{ fontWeight: 'bold' }}>
+                                        <option value="">Seçiniz...</option>
+                                        {uniqueProductNames.map((n, i) => <option key={i} value={n}>{n}</option>)}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select value={selectedColorId} onChange={e => handleColorChange(e.target.value)} className="form-input input-sm" disabled={!selectedProductName}>
+                                        <option value="">Seç...</option>
+                                        {availableColors.map(c => <option key={c.id} value={c.id}>{c.colorName}</option>)}
+                                    </select>
+                                </td>
+                                <td>
+                                    {/* EBAT SEÇİMİ (Eğer ürünün ebatı varsa aktif olur) */}
+                                    <select
+                                        value={selectedDimensionId}
+                                        onChange={e => handleDimensionChange(e.target.value)}
+                                        className="form-input input-sm"
+                                        disabled={availableDimensions.length === 0}
+                                        style={{ backgroundColor: availableDimensions.length === 0 ? '#eee' : 'white' }}
+                                    >
+                                        <option value="">{availableDimensions.length > 0 ? "Seç..." : "-"}</option>
+                                        {availableDimensions.map(d => <option key={d.id} value={d.id}>{d.dimensionName}</option>)}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="cushionId" value={lineItem.cushionId} onChange={handleLineChange} className="form-input input-sm">
+                                        <option value="">Yok</option>
+                                        {cushions.map(c => <option key={c.id} value={c.id}>{c.cushionName}</option>)}
+                                    </select>
+                                </td>
+                                <td>
+                                    <select name="status" value={lineItem.status} onChange={handleLineChange} className="form-input input-sm">
+                                        <option value="Alış">Alış</option>
+                                        <option value="İade">İade</option>
+                                    </select>
+                                </td>
+                                <td>
+                                    <input type="number" ref={quantityInputRef} name="quantity" value={lineItem.quantity} onChange={handleLineChange} className="form-input input-sm" style={{ textAlign: 'center' }} />
+                                </td>
+                                <td>
+                                    <input type="number" name="amount" value={lineItem.amount} onChange={handleLineChange} className="form-input input-sm" />
+                                </td>
+                                <td>
+                                    <input type="text" name="explanation" value={lineItem.explanation} onChange={handleLineChange} className="form-input input-sm" onKeyDown={e => e.key === 'Enter' && addLineItem()} />
+                                </td>
+                                <td>
+                                    <button onClick={addLineItem} className="btn btn-primary" style={{ padding: '4px 8px' }}>+</button>
                                 </td>
                             </tr>
-                        ))}
-                        {addedItems.length === 0 && <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#999' }}>Henüz ürün eklenmedi.</td></tr>}
-                    </tbody>
-                </table>
-            </div>
 
-            {/* --- GENEL TOPLAM VE KAYDET --- */}
-            {addedItems.length > 0 && (
-                <div style={{ marginTop: '20px', textAlign: 'right' }}>
-                    <h3 style={{ margin: '10px 0' }}>Genel Toplam: {addedItems.reduce((a, b) => a + Number(b.amount), 0)} ₺</h3>
-                    <button onClick={saveReceipt} style={saveBtnStyle}>✅ FİŞİ KAYDET VE STOKLARI GÜNCELLE</button>
+                            {/* LİSTE */}
+                            {addedItems.map((item, idx) => (
+                                <tr key={idx}>
+                                    <td style={{ fontSize: '11px', color: '#888' }}>{groups.find(g => g.id === item.groupId)?.groupName}</td>
+                                    <td style={{ fontWeight: '500' }}>{item.productName.split('-')[0]}</td>
+                                    <td>{allColors.find(c => c.id === item.colorId)?.colorName}</td>
+                                    <td>{allDimensions.find(d => d.id === item.dimensionId)?.dimensionName || "-"}</td>
+                                    <td>{cushions.find(c => c.id === item.cushionId)?.cushionName || "-"}</td>
+                                    <td>{item.status}</td>
+                                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                                    <td>{item.amount} ₺</td>
+                                    <td style={{ fontSize: '12px' }}>{item.explanation}</td>
+                                    <td><button onClick={() => removeLineItem(idx)} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>×</button></td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
-            )}
+            </div>
         </div>
     );
 };
-
-// --- STİLLER ---
-const cardStyle = { backgroundColor: 'white', padding: '20px', borderRadius: '8px', boxShadow: '0 1px 3px rgba(0,0,0,0.1)' };
-const sectionTitle = { marginTop: 0, marginBottom: '15px', color: '#7f8c8d', borderBottom: '1px solid #eee', paddingBottom: '10px' };
-const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 'bold', color: '#555', marginBottom: '5px' };
-const inputStyle = { width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '4px' };
-const addBtnStyle = { marginTop: '15px', width: '100%', padding: '10px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '4px', fontWeight: 'bold', cursor: 'pointer' };
-const saveBtnStyle = { padding: '15px 30px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer' };
-const successStyle = { padding: '15px', backgroundColor: '#d4edda', color: '#155724', borderRadius: '5px', marginBottom: '20px', textAlign: 'center' as 'center' };
-const thStyle = { padding: '10px', borderBottom: '2px solid #ddd' };
-const tdStyle = { padding: '10px', color: '#333' };
 
 export default PurchaseAdd;
