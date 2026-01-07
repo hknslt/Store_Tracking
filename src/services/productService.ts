@@ -2,86 +2,77 @@
 import { db } from "../firebase";
 import {
     collection,
+    addDoc,
     getDocs,
     query,
-    orderBy,
     where,
-    doc,
-    getDoc,
-    writeBatch // <-- Toplu işlem için bunu ekledik
+    orderBy,
+    doc,     // <-- EKLENDİ
+    getDoc   // <-- EKLENDİ
 } from "firebase/firestore";
 import type { Product } from "../types";
 
 const COLLECTION_NAME = "products";
 
-// YENİ: Çoklu Renk ile Ürün Ekleme (Batch İşlemi)
-export const addProductBatch = async (
-    // 'id' ve 'createdAt' alanlarını da hariç tutuyoruz (Omit)
-    baseData: Omit<Product, 'colorId' | 'id' | 'createdAt'>,
-    colorIds: string[]
-) => {
+export const addProduct = async (product: Product) => {
     try {
-        const batch = writeBatch(db);
-
-        colorIds.forEach(colorId => {
-            const newDocRef = doc(collection(db, COLLECTION_NAME));
-
-            const productData: Product = {
-                ...baseData,
-                colorId: colorId,
-                createdAt: new Date() // Tarihi burada biz veriyoruz
-            };
-
-            batch.set(newDocRef, productData);
+        const docRef = await addDoc(collection(db, COLLECTION_NAME), {
+            ...product,
+            createdAt: new Date()
         });
-
-        await batch.commit();
-
-    } catch (error) {
-        console.error("Toplu ürün ekleme hatası:", error);
-        throw error;
-    }
-};
-
-// ... Diğer getProducts, getProductById, getProductsByCategoryId fonksiyonları AYNI kalacak ...
-// (Sadece getProducts içinde Cushion ile ilgili bir işlem yapıyorsan onu silmen yeterli)
-
-export const getProducts = async (): Promise<Product[]> => {
-    try {
-        const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        return querySnapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as Product[];
+        return docRef.id;
     } catch (error) {
         console.error("Hata:", error);
         throw error;
     }
 };
 
-export const getProductById = async (id: string): Promise<Product | null> => {
+// orderBy kaldırıldı (Index hatasını önlemek için)
+export const getProductsByCategoryId = async (categoryId: string): Promise<Product[]> => {
     try {
-        const docRef = doc(db, COLLECTION_NAME, id);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            return { id: docSnap.id, ...docSnap.data() } as Product;
-        } else {
-            return null;
-        }
+        const q = query(
+            collection(db, COLLECTION_NAME),
+            where("categoryId", "==", categoryId)
+        );
+        const snapshot = await getDocs(q);
+        const list = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as Product[];
+
+        // JavaScript tarafında sıralama
+        return list.sort((a, b) => a.productName.localeCompare(b.productName));
     } catch (error) {
-        console.error(error);
-        throw error;
+        console.error("Ürün çekme hatası:", error);
+        return [];
     }
 };
 
-export const getProductsByCategoryId = async (categoryId: string): Promise<Product[]> => {
+export const getProducts = async (): Promise<Product[]> => {
     try {
-        const q = query(collection(db, COLLECTION_NAME), where("categoryId", "==", categoryId));
+        const q = query(collection(db, COLLECTION_NAME), orderBy("createdAt", "desc"));
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Product[];
     } catch (error) {
         console.error(error);
         return [];
+    }
+};
+
+// 👇 EKSİK OLAN FONKSİYON BURAYA EKLENDİ 👇
+export const getProductById = async (id: string): Promise<Product | null> => {
+    try {
+        const docRef = doc(db, COLLECTION_NAME, id);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as Product;
+        } else {
+            console.log("Ürün bulunamadı!");
+            return null;
+        }
+    } catch (error) {
+        console.error("Tekil ürün çekme hatası:", error);
+        throw error;
     }
 };

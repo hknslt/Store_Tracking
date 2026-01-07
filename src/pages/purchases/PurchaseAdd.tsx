@@ -26,28 +26,19 @@ const PurchaseAdd = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
 
-    // --- ÜRÜN & VARYANT YÖNETİMİ ---
-    const [allRawProducts, setAllRawProducts] = useState<Product[]>([]);
+    // Ürün Listesi (Base Products)
+    const [productsInCat, setProductsInCat] = useState<Product[]>([]);
 
-    // 1. Kademe: İsimler
-    const [uniqueProductNames, setUniqueProductNames] = useState<string[]>([]);
-
-    // 2. Kademe: Renkler (İsim seçilince dolar)
-    const [availableColors, setAvailableColors] = useState<Color[]>([]);
-
-    // 3. Kademe: Ebatlar (Renk seçilince dolar - YENİ)
-    const [availableDimensions, setAvailableDimensions] = useState<Dimension[]>([]);
-
-    // --- TANIMLAR ---
+    // Tanımlar
     const [allColors, setAllColors] = useState<Color[]>([]);
-    const [allDimensions, setAllDimensions] = useState<Dimension[]>([]); // İsim çakışmasın diye 'all' ekledik
+    const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
 
-    // --- KULLANICI ---
+    // Kullanıcı
     const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // --- FİŞ BAŞLIĞI ---
+    // Fiş Başlığı
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
@@ -55,13 +46,13 @@ const PurchaseAdd = () => {
     });
 
     // --- SEÇİM STATE'LERİ ---
-    const [selectedProductName, setSelectedProductName] = useState("");
+    const [selectedProductId, setSelectedProductId] = useState(""); // ID tutuyoruz
     const [selectedColorId, setSelectedColorId] = useState("");
-    const [selectedDimensionId, setSelectedDimensionId] = useState(""); // YENİ
+    const [selectedDimensionId, setSelectedDimensionId] = useState("");
 
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "",
-        colorId: "", cushionId: "", dimensionId: "",
+        colorId: "", cushionId: "", dimensionId: null,
         quantity: 1, amount: 0, explanation: "", status: 'Alış'
     });
 
@@ -74,7 +65,7 @@ const PurchaseAdd = () => {
         setTimeout(() => setMessage(null), 3000);
     };
 
-    // 1. BAŞLANGIÇ
+    // 1. BAŞLANGIÇ VERİLERİ
     useEffect(() => {
         const initData = async () => {
             try {
@@ -91,7 +82,6 @@ const PurchaseAdd = () => {
                     if (userDoc.exists()) {
                         const userData = userDoc.data() as Personnel;
                         setCurrentPersonnel(userData);
-
                         if (userData.role === 'admin') {
                             setIsAdmin(true);
                             getStores().then(setStores);
@@ -109,14 +99,16 @@ const PurchaseAdd = () => {
         initData();
     }, [currentUser]);
 
-    // --- HANDLERS ---
+    // HANDLERS
     const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    // GRUP -> Kategori Getir
+    // GRUP DEĞİŞİNCE
     const handleGroupChange = async (groupId: string) => {
         setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
-        setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
+        setSelectedProductId("");
+        setProductsInCat([]); // Ürün listesini temizle
+
         if (groupId) {
             const cats = await getCategoriesByGroupId(groupId);
             setCategories(cats);
@@ -125,131 +117,94 @@ const PurchaseAdd = () => {
         }
     };
 
-    // KATEGORİ -> Tüm Varyantları Çek ve İsimleri Listele
+    // KATEGORİ DEĞİŞİNCE -> ÜRÜNLERİ GETİR
     const handleCategoryChange = async (categoryId: string) => {
         setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
-        setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
-        setUniqueProductNames([]);
+        setSelectedProductId("");
 
         if (categoryId) {
-            const rawProds = await getProductsByCategoryId(categoryId);
-            setAllRawProducts(rawProds);
-
-            // Benzersiz isimleri al
-            const names = Array.from(new Set(rawProds.map(p => p.productName)));
-            setUniqueProductNames(names);
+            // Servisten ürünleri çek
+            const prods = await getProductsByCategoryId(categoryId);
+            setProductsInCat(prods);
         } else {
-            setAllRawProducts([]);
+            setProductsInCat([]);
         }
     };
 
-    // 1. ÜRÜN ADI SEÇİLİNCE -> Renkleri Filtrele
-    const handleProductNameChange = (prodName: string) => {
-        setSelectedProductName(prodName);
-        setSelectedColorId(""); setSelectedDimensionId(""); // Alt seçimleri sıfırla
+    // ÜRÜN SEÇİLİNCE
+    const handleProductChange = (productId: string) => {
+        setSelectedProductId(productId);
 
-        if (prodName) {
-            // Bu isme sahip tüm varyantları bul
-            const variants = allRawProducts.filter(p => p.productName === prodName);
-            // Renk ID'lerini al
-            const colorIds = variants.map(v => v.colorId);
-            // Global renk listesinden eşleşenleri filtrele
-            const filteredColors = allColors.filter(c => colorIds.includes(c.id!));
-            setAvailableColors(filteredColors);
-        } else {
-            setAvailableColors([]);
+        // Ürün adını bul ve state'e yaz (şimdilik ham hali)
+        const product = productsInCat.find(p => p.id === productId);
+        if (product) {
+            updateLineItemName(product.productName, selectedColorId, selectedDimensionId);
+            setLineItem(prev => ({ ...prev, productId }));
         }
     };
 
-    // 2. RENK SEÇİLİNCE -> Ebatları Filtrele
+    // RENK DEĞİŞİNCE
     const handleColorChange = (colorId: string) => {
         setSelectedColorId(colorId);
-        setSelectedDimensionId(""); // Ebatı sıfırla
-
-        if (selectedProductName && colorId) {
-            // İsim ve Rengi tutan varyantları bul
-            const variants = allRawProducts.filter(p =>
-                p.productName === selectedProductName && p.colorId === colorId
-            );
-
-            // Ebat ID'lerini al
-            const dimIds = variants.map(v => v.dimensionId).filter(id => id); // null olmayanlar
-
-            if (dimIds.length > 0) {
-                // Ebatlı ürünse ebatları listele
-                const filteredDims = allDimensions.filter(d => dimIds.includes(d.id!));
-                setAvailableDimensions(filteredDims);
-            } else {
-                // Ebatsız ürünse direkt seçimi tamamla (Tek varyant vardır)
-                setAvailableDimensions([]);
-                selectFinalProduct(variants[0]); // İlk (ve tek) varyantı seç
-            }
-        } else {
-            setAvailableDimensions([]);
+        const product = productsInCat.find(p => p.id === selectedProductId);
+        if (product) {
+            updateLineItemName(product.productName, colorId, selectedDimensionId);
         }
     };
 
-    // 3. EBAT SEÇİLİNCE -> Ürünü Tamamla
+    // EBAT DEĞİŞİNCE
     const handleDimensionChange = (dimId: string) => {
         setSelectedDimensionId(dimId);
-        if (selectedProductName && selectedColorId && dimId) {
-            // İsim + Renk + Ebat eşleşen TEK ürünü bul
-            const targetProduct = allRawProducts.find(p =>
-                p.productName === selectedProductName &&
-                p.colorId === selectedColorId &&
-                p.dimensionId === dimId
-            );
-
-            if (targetProduct) {
-                selectFinalProduct(targetProduct);
-            }
+        const product = productsInCat.find(p => p.id === selectedProductId);
+        if (product) {
+            updateLineItemName(product.productName, selectedColorId, dimId);
         }
+        // Ebat seçilince miktara odaklan
+        if (dimId) setTimeout(() => quantityInputRef.current?.focus(), 100);
     };
 
-    // --- SON AŞAMA: ÜRÜNÜ STATE'E İŞLEME ---
-    const selectFinalProduct = (product: Product) => {
-        const colorName = allColors.find(c => c.id === product.colorId)?.colorName || "";
-        const dimName = allDimensions.find(d => d.id === product.dimensionId)?.dimensionName || "";
+    // İSİM GÜNCELLEME YARDIMCISI
+    const updateLineItemName = (baseName: string, colId: string, dimId: string) => {
+        const colName = allColors.find(c => c.id === colId)?.colorName || "";
+        const dimName = allDimensions.find(d => d.id === dimId)?.dimensionName || "";
 
-        // Ebat varsa isme ekle, yoksa ekleme
-        const displayName = product.dimensionId
-            ? `${product.productName} - ${colorName} ${dimName}`
-            : `${product.productName} - ${colorName}`;
+        let fullName = baseName;
+        if (colName) fullName += ` - ${colName}`;
+        if (dimName) fullName += ` ${dimName}`;
 
         setLineItem(prev => ({
             ...prev,
-            productId: product.id,
-            colorId: product.colorId,
-            dimensionId: product.dimensionId || "",
-            productName: displayName
+            productName: fullName,
+            colorId: colId,
+            dimensionId: dimId || null
         }));
-
-        // Miktara odaklan
-        setTimeout(() => quantityInputRef.current?.focus(), 100);
     };
+
+    // YARDIMCILAR
+    const getDimName = (id?: string | null) => id ? (allDimensions.find(d => d.id === id)?.dimensionName || "") : "";
+    const getCatName = (id?: string) => categories.find(c => c.id === id)?.categoryName || "";
 
     // LİSTEYE EKLE
     const addLineItem = () => {
-        if (!lineItem.productId || !lineItem.quantity || !lineItem.amount) {
-            showToast('error', "Ürün seçimi tamamlanmadı veya miktar/tutar eksik.");
+        // Kontrol: Ürün ve Renk zorunlu, Ebat opsiyonel
+        if (!lineItem.productId || !selectedColorId || !lineItem.quantity || !lineItem.amount) {
+            showToast('error', "Ürün, Renk, Miktar ve Fiyat zorunludur.");
             return;
         }
 
         setAddedItems([lineItem as PurchaseItem, ...addedItems]);
 
-        // Temizle
+        // Temizle (Grup, Kategori kalsın)
         setLineItem(prev => ({
             ...prev,
             cushionId: "", quantity: 1, amount: 0, explanation: "",
-            productId: "", productName: ""
+            productId: "", productName: "", colorId: "", dimensionId: null
         }));
 
-        // Seçim kutularını sıfırla
-        setSelectedProductName("");
+        // Alt seçimleri sıfırla
+        setSelectedProductId("");
         setSelectedColorId("");
         setSelectedDimensionId("");
-        setAvailableColors([]);
-        setAvailableDimensions([]);
     };
 
     const removeLineItem = (index: number) => {
@@ -280,9 +235,10 @@ const PurchaseAdd = () => {
             showToast('success', "Fiş kaydedildi!");
             setAddedItems([]);
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
+
             // Full Reset
-            setLineItem({ groupId: "", categoryId: "", productId: "", productName: "", quantity: 1, amount: 0, explanation: "", status: 'Alış' });
-            setSelectedProductName(""); setSelectedColorId(""); setSelectedDimensionId("");
+            setLineItem({ groupId: "", categoryId: "", productId: "", productName: "", quantity: 1, amount: 0, explanation: "", status: 'Alış', colorId: "", dimensionId: null });
+            setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
         } catch (error: any) {
             showToast('error', "Hata: " + error.message);
         }
@@ -309,7 +265,7 @@ const PurchaseAdd = () => {
                 )}
             </div>
 
-            {/* --- FİŞ BAŞLIĞI --- */}
+            {/* FİŞ BAŞLIĞI */}
             <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
                     <div><label className="form-label">Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" /></div>
@@ -321,20 +277,20 @@ const PurchaseAdd = () => {
                             </select>
                         ) : <input disabled value={currentPersonnel ? "📍 Kendi Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee' }} />}
                     </div>
-                    <div><label className="form-label">Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="IRS-001" /></div>
+                    <div><label className="form-label">Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="Fiş No
+                    " /></div>
                 </div>
             </div>
 
-            {/* --- EXCEL GİRİŞ --- */}
+            {/* ÜRÜN GİRİŞ TABLOSU */}
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
                     <table className="data-table dense" style={{ width: '100%' }}>
                         <thead style={{ backgroundColor: '#f1f2f6' }}>
                             <tr>
-                                <th style={{ width: '10%' }}>Grup/Kat.</th>
-                                <th style={{ width: '15%' }}>Ürün Adı</th>
+                                <th style={{ width: '20%' }}>Ürün Seçimi (Grup/Kat/Ad)</th>
                                 <th style={{ width: '10%' }}>Renk</th>
-                                <th style={{ width: '10%' }}>Ebat</th> {/* YENİ */}
+                                <th style={{ width: '10%' }}>Ebat</th>
                                 <th style={{ width: '10%' }}>Minder</th>
                                 <th style={{ width: '8%' }}>Durum</th>
                                 <th style={{ width: '7%' }}>Adet</th>
@@ -347,38 +303,47 @@ const PurchaseAdd = () => {
                             {/* INPUT SATIRI */}
                             <tr style={{ backgroundColor: '#eaf2f8', borderBottom: '2px solid #3498db' }}>
                                 <td>
-                                    <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="form-input input-sm" style={{ marginBottom: '2px' }}>
-                                        <option value="">Grup...</option>
-                                        {groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
-                                    </select>
-                                    <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} className="form-input input-sm" disabled={!lineItem.groupId}>
-                                        <option value="">Kat...</option>
-                                        {categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
-                                    </select>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                                        <div style={{ display: 'flex', gap: '2px' }}>
+                                            <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="form-input input-sm" style={{ flex: 1 }}>
+                                                <option value="">Grup...</option>
+                                                {groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
+                                            </select>
+                                            <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} className="form-input input-sm" style={{ flex: 1 }} disabled={!lineItem.groupId}>
+                                                <option value="">Kat...</option>
+                                                {categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
+                                            </select>
+                                        </div>
+                                        {/* ÜRÜN SEÇİMİ - ID KULLANARAK */}
+                                        <select
+                                            value={selectedProductId}
+                                            onChange={e => handleProductChange(e.target.value)}
+                                            className="form-input input-sm"
+                                            disabled={!lineItem.categoryId}
+                                            style={{ fontWeight: 'bold' }}
+                                        >
+                                            <option value="">Ürün Seçiniz...</option>
+                                            {productsInCat.map(p => (
+                                                <option key={p.id} value={p.id}>{p.productName}</option>
+                                            ))}
+                                        </select>
+                                    </div>
                                 </td>
                                 <td>
-                                    <select value={selectedProductName} onChange={e => handleProductNameChange(e.target.value)} className="form-input input-sm" disabled={!lineItem.categoryId} style={{ fontWeight: 'bold' }}>
-                                        <option value="">Seçiniz...</option>
-                                        {uniqueProductNames.map((n, i) => <option key={i} value={n}>{n}</option>)}
-                                    </select>
-                                </td>
-                                <td>
-                                    <select value={selectedColorId} onChange={e => handleColorChange(e.target.value)} className="form-input input-sm" disabled={!selectedProductName}>
+                                    <select value={selectedColorId} onChange={e => handleColorChange(e.target.value)} className="form-input input-sm" disabled={!selectedProductId}>
                                         <option value="">Seç...</option>
-                                        {availableColors.map(c => <option key={c.id} value={c.id}>{c.colorName}</option>)}
+                                        {allColors.map(c => <option key={c.id} value={c.id}>{c.colorName}</option>)}
                                     </select>
                                 </td>
                                 <td>
-                                    {/* EBAT SEÇİMİ (Eğer ürünün ebatı varsa aktif olur) */}
                                     <select
                                         value={selectedDimensionId}
                                         onChange={e => handleDimensionChange(e.target.value)}
                                         className="form-input input-sm"
-                                        disabled={availableDimensions.length === 0}
-                                        style={{ backgroundColor: availableDimensions.length === 0 ? '#eee' : 'white' }}
+                                        disabled={!selectedColorId}
                                     >
-                                        <option value="">{availableDimensions.length > 0 ? "Seç..." : "-"}</option>
-                                        {availableDimensions.map(d => <option key={d.id} value={d.id}>{d.dimensionName}</option>)}
+                                        <option value="">Seç...</option>
+                                        {allDimensions.map(d => <option key={d.id} value={d.id}>{d.dimensionName}</option>)}
                                     </select>
                                 </td>
                                 <td>
@@ -407,13 +372,25 @@ const PurchaseAdd = () => {
                                 </td>
                             </tr>
 
-                            {/* LİSTE */}
+                            {/* EKLENEN LİSTE */}
                             {addedItems.map((item, idx) => (
                                 <tr key={idx}>
-                                    <td style={{ fontSize: '11px', color: '#888' }}>{groups.find(g => g.id === item.groupId)?.groupName}</td>
-                                    <td style={{ fontWeight: '500' }}>{item.productName.split('-')[0]}</td>
+                                    <td style={{ padding: 8 }}>
+                                        <span style={{ fontWeight: '600', color: '#34495e', marginRight: '5px' }}>
+                                            {item.productName.split('-')[0].trim()}
+                                        </span>
+                                        {item.dimensionId && (
+                                            <span style={{ color: '#e67e22', fontWeight: 'bold', marginRight: '5px' }}>
+                                                {getDimName(item.dimensionId)}
+                                            </span>
+                                        )}
+                                        <span style={{ color: '#95a5a6', fontSize: '12px', marginTop: '2px' }}>
+                                            {getCatName(item.categoryId)}
+                                        </span>
+                                    </td>
+
                                     <td>{allColors.find(c => c.id === item.colorId)?.colorName}</td>
-                                    <td>{allDimensions.find(d => d.id === item.dimensionId)?.dimensionName || "-"}</td>
+                                    <td>{getDimName(item.dimensionId) || "-"}</td>
                                     <td>{cushions.find(c => c.id === item.cushionId)?.cushionName || "-"}</td>
                                     <td>{item.status}</td>
                                     <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>

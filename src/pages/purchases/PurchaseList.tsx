@@ -1,5 +1,5 @@
 // src/pages/purchases/PurchaseList.tsx
-import { useEffect, useState } from "react";
+import { useEffect, useState, Fragment } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -7,15 +7,15 @@ import { doc, getDoc } from "firebase/firestore";
 
 import { getPurchasesByStore } from "../../services/purchaseService";
 import { getStores } from "../../services/storeService";
-import { 
-    getCategories, 
-    getCushions, 
-    getColors, 
-    getDimensions 
+import {
+    getCategories,
+    getCushions,
+    getColors,
+    getDimensions
 } from "../../services/definitionService";
 
 import type { Purchase, Store, Personnel, Category, Cushion, Color, Dimension } from "../../types";
-import "../../App.css"; 
+import "../../App.css";
 
 const PurchaseList = () => {
     const { currentUser } = useAuth();
@@ -116,7 +116,6 @@ const PurchaseList = () => {
 
     return (
         <div className="page-container">
-            {/* --- HEADER --- */}
             <div className="page-header">
                 <div className="page-title">
                     <h2>Alış Fişleri Listesi</h2>
@@ -127,7 +126,6 @@ const PurchaseList = () => {
                 </Link>
             </div>
 
-            {/* --- FİLTRE --- */}
             <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
                     <label style={{ fontWeight: '600', color: '#2c3e50' }}>Mağaza Seçiniz:</label>
@@ -149,7 +147,6 @@ const PurchaseList = () => {
                 </div>
             </div>
 
-            {/* --- ANA TABLO --- */}
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
                     {selectedStoreId ? (
@@ -169,10 +166,8 @@ const PurchaseList = () => {
                                     purchases.map(p => {
                                         const calculatedTotal = calculateGrandTotal(p.items);
                                         return (
-                                            <>
-                                                {/* ANA SATIR */}
+                                            <Fragment key={p.id}>
                                                 <tr
-                                                    key={p.id}
                                                     onClick={() => p.id && toggleRow(p.id)}
                                                     style={{
                                                         cursor: 'pointer',
@@ -197,7 +192,6 @@ const PurchaseList = () => {
                                                     </td>
                                                 </tr>
 
-                                                {/* DETAY SATIRI (AÇILIR KAPANIR) */}
                                                 {expandedRowId === p.id && (
                                                     <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
                                                         <td colSpan={6} style={{ padding: '15px 20px' }}>
@@ -209,48 +203,37 @@ const PurchaseList = () => {
                                                                 <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse' }}>
                                                                     <thead>
                                                                         <tr style={{ color: '#95a5a6', textAlign: 'left', borderBottom: '1px solid #eee' }}>
-                                                                            <th style={{ padding: 8, width: '30%' }}>Ürün Bilgisi</th> {/* Başlık Değişti */}
+                                                                            <th style={{ padding: 8, width: '35%' }}>Ürün Bilgisi</th>
                                                                             <th style={{ padding: 8, width: '10%' }}>Renk</th>
                                                                             <th style={{ padding: 8, width: '10%' }}>Minder</th>
                                                                             <th style={{ padding: 8, width: '15%' }}>Açıklama</th>
                                                                             <th style={{ padding: 8, width: '10%' }}>Durum</th>
-                                                                            <th style={{ padding: 8, width: '15%', textAlign: 'right' }}>Hesap</th>
-                                                                            <th style={{ padding: 8, width: '10%', textAlign: 'right' }}>Toplam</th>
+                                                                            <th style={{ padding: 8, width: '10%', textAlign: 'right' }}>Hesap</th>
+                                                                            <th style={{ padding: 8, width: '10%', textAlign: 'right' }}>Satır Toplamı</th>
                                                                         </tr>
                                                                     </thead>
                                                                     <tbody>
                                                                         {p.items.map((item, idx) => (
                                                                             <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9' }}>
-                                                                                
-                                                                                {/* GÜNCELLENEN ALAN: Ürün Adı + Ebat + Kategori */}
                                                                                 <td style={{ padding: 8 }}>
-                                                                                    <span style={{ fontWeight: '600', color: '#34495e', marginRight: '5px' }}>
-                                                                                        {item.productName.split('-')[0].trim()}
-                                                                                    </span>
-                                                                                    
-                                                                                    {item.dimensionId && (
-                                                                                        <span style={{ color: '#e67e22', fontWeight: 'bold', marginRight: '5px' }}>
-                                                                                            {getDimensionName(item.dimensionId)}
+                                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                                                                                        <span style={{ fontWeight: '600', color: '#34495e' }}>
+                                                                                            {item.productName.split('-')[0].trim()}
                                                                                         </span>
-                                                                                    )}
-
-                                                                                    <span style={{ color: '#7f8c8d', fontSize: '12px', fontStyle: 'italic' }}>
-                                                                                        {getCatName(item.categoryId)}
-                                                                                    </span>
+                                                                                        {item.dimensionId && (
+                                                                                            <span style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '12px' }}>
+                                                                                                {getDimensionName(item.dimensionId)}
+                                                                                            </span>
+                                                                                        )}
+                                                                                        <span style={{ color: '#7f8c8d', fontSize: '12px', fontStyle: 'italic' }}>
+                                                                                            {getCatName(item.categoryId)}
+                                                                                        </span>
+                                                                                    </div>
                                                                                 </td>
 
-                                                                                <td style={{ padding: 8 }}>
-                                                                                    {getColorName(item.colorId)}
-                                                                                </td>
-                                                                                
-                                                                                <td style={{ padding: 8 }}>
-                                                                                    {getCushionName(item.cushionId)}
-                                                                                </td>
-
-                                                                                <td style={{ padding: 8, fontStyle: 'italic', color: '#999' }}>
-                                                                                    {item.explanation || "-"}
-                                                                                </td>
-
+                                                                                <td style={{ padding: 8 }}>{getColorName(item.colorId)}</td>
+                                                                                <td style={{ padding: 8 }}>{getCushionName(item.cushionId)}</td>
+                                                                                <td style={{ padding: 8, fontStyle: 'italic', color: '#999' }}>{item.explanation || "-"}</td>
                                                                                 <td style={{ padding: 8 }}>
                                                                                     <span style={{
                                                                                         color: item.status === 'Alış' ? 'green' : 'red',
@@ -259,13 +242,11 @@ const PurchaseList = () => {
                                                                                         {item.status}
                                                                                     </span>
                                                                                 </td>
-
                                                                                 <td style={{ padding: 8, textAlign: 'right', color: '#666' }}>
                                                                                     {item.quantity} x {Number(item.amount).toFixed(2)} ₺
                                                                                 </td>
-
                                                                                 <td style={{ padding: 8, textAlign: 'right', fontWeight: 'bold' }}>
-                                                                                    {(item.quantity * Number(item.amount)).toFixed(2)} ₺
+                                                                                    {(Number(item.quantity) * Number(item.amount)).toFixed(2)} ₺
                                                                                 </td>
                                                                             </tr>
                                                                         ))}
@@ -275,7 +256,7 @@ const PurchaseList = () => {
                                                         </td>
                                                     </tr>
                                                 )}
-                                            </>
+                                            </Fragment>
                                         );
                                     })
                                 ) : (

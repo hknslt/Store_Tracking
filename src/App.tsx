@@ -14,12 +14,6 @@ import ProductList from "./pages/products/ProductList";
 import ProductDetail from "./pages/products/ProductDetail";
 import GroupAdd from "./pages/definitions/groups/GroupAdd";
 import DefinitionsPage from "./pages/definitions/groups/DefinitionsPage";
-import ColorList from "./pages/definitions/colors/ColorList";
-import ColorAdd from "./pages/definitions/colors/ColorAdd";
-import CushionAdd from "./pages/definitions/cushions/CushionAdd";
-import CushionList from "./pages/definitions/cushions/CushionList";
-import DimensionList from "./pages/definitions/dimensions/DimensionList";
-import DimensionAdd from "./pages/definitions/dimensions/DimensionAdd";
 import PriceList from "./pages/prices/PriceList";
 import StockList from "./pages/stocks/StockList";
 import PurchaseList from "./pages/purchases/PurchaseList";
@@ -31,6 +25,9 @@ import PersonnelAdd from "./pages/personnel/PersonnelAdd";
 import StoreStockManager from "./pages/stocks/StoreStockManager";
 import SaleList from "./pages/sales/SaleList";
 import SaleAdd from "./pages/sales/SaleAdd";
+import ColorsPage from "./pages/definitions/colors/ColorsPage";
+import DimensionsPage from "./pages/definitions/dimensions/DimensionsPage";
+import CushionsPage from "./pages/definitions/cushions/CushionsPage";
 
 // --- 1. KORUMALI DÜZEN (Sidebar Burada Olacak) ---
 // Giriş yapmış kullanıcılar burayı ve Sidebar'ı görür.
@@ -104,14 +101,11 @@ function App() {
             <Route path="/definitions/general" element={<DefinitionsPage />} />
             <Route path="/definitions/groups/add" element={<GroupAdd />} />
 
-            <Route path="/definitions/dimensions" element={<DimensionList />} />
-            <Route path="/definitions/dimensions/add" element={<DimensionAdd />} />
+            <Route path="/definitions/dimensions" element={<DimensionsPage />} />
 
-            <Route path="/definitions/colors" element={<ColorList />} />
-            <Route path="/definitions/colors/add" element={<ColorAdd />} />
+            <Route path="/definitions/colors" element={<ColorsPage />} />
 
-            <Route path="/definitions/cushions" element={<CushionList />} />
-            <Route path="/definitions/cushions/add" element={<CushionAdd />} />
+            <Route path="/definitions/cushions" element={<CushionsPage />} />
 
             {/* Fiyat & Stok & Alış */}
             <Route path="/prices/list" element={<PriceList />} />

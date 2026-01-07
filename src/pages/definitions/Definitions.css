@@ -1,0 +1,112 @@
+/* src/pages/definitions/Definitions.css */
+
+/* --- MODERN KART GRID YAPISI --- */
+.definitions-grid {
+  display: grid;
+  /* Geniş ekranlarda yan yana 3-4 tane sığar, küçülünce alt alta geçer */
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 15px; /* Kartlar arası boşluk */
+  padding-bottom: 20px;
+}
+
+.definition-card {
+  background-color: white;
+  border: 1px solid #f0f0f0;
+  border-radius: 12px; /* Yuvarlak köşeler */
+  padding: 15px 20px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Sol kenara renkli çizgi efekti */
+.definition-card::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background-color: var(--primary-color, #3498db);
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.definition-card:hover {
+  transform: translateY(-3px); /* Hafif yukarı kalkma */
+  box-shadow: 0 8px 15px rgba(0, 0, 0, 0.08);
+  border-color: #e0e0e0;
+}
+
+/* --- KART İÇERİĞİ --- */
+.card-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.card-icon {
+  font-size: 1.2rem;
+  color: #bdc3c7;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background-color: #f8f9fa;
+  border-radius: 50%;
+}
+
+.card-title {
+  font-weight: 600;
+  color: #2c3e50;
+  font-size: 15px;
+  margin: 0;
+}
+
+/* --- BUTONLAR --- */
+.card-actions {
+  display: flex;
+  gap: 8px;
+  opacity: 0.8; /* Hafif soluk */
+  transition: opacity 0.2s;
+}
+
+.definition-card:hover .card-actions {
+  opacity: 1; /* Üzerine gelince tam görünür */
+}
+
+.action-btn {
+  border: none;
+  border-radius: 8px;
+  padding: 6px 12px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s;
+}
+
+/* Düzenle Butonu (Sarımsı) */
+.action-btn.edit {
+  background-color: #fff7e6;
+  color: #d35400;
+}
+.action-btn.edit:hover {
+  background-color: #ffe8cc;
+}
+
+/* Sil Butonu (Kırmızımsı) */
+.action-btn.delete {
+  background-color: #fceceb;
+  color: #c0392b;
+}
+.action-btn.delete:hover {
+  background-color: #fadbd8;
+}

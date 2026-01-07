@@ -1,7 +1,7 @@
 // src/services/definitionService.ts
 import { db } from "../firebase";
-import { collection, addDoc, getDocs, query, orderBy ,where, updateDoc, doc, deleteDoc } from "firebase/firestore";
-import type { Group ,Category,Color, Cushion, Dimension } from "../types";
+import { collection, addDoc, getDocs, query, orderBy, where, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import type { Group, Category, Color, Cushion, Dimension } from "../types";
 
 const GROUP_COLLECTION = "groups";
 const CATEGORY_COLLECTION = "categories";
@@ -9,6 +9,8 @@ const COLOR_COLLECTION = "colors";
 const DIMENSION_COLLECTION = "dimensions";
 const CUSHION_COLLECTION = "cushions";
 
+
+// --------------Gruplar---------------
 export const addGroup = async (group: Group) => {
     try {
         await addDoc(collection(db, GROUP_COLLECTION), group);
@@ -45,7 +47,7 @@ export const deleteGroup = async (id: string) => {
     await deleteDoc(docRef);
 };
 
-// Kategoriler
+// --------------Kategoriler---------------
 
 export const addCategory = async (category: Category) => {
     try {
@@ -75,8 +77,8 @@ export const getCategories = async (): Promise<Category[]> => {
 export const getCategoriesByGroupId = async (groupId: string): Promise<Category[]> => {
     try {
         const q = query(
-            collection(db, CATEGORY_COLLECTION), 
-            where("groupId", "==", groupId) 
+            collection(db, CATEGORY_COLLECTION),
+            where("groupId", "==", groupId)
         );
         const snapshot = await getDocs(q);
         return snapshot.docs.map(doc => ({
@@ -112,7 +114,7 @@ export const deleteCategory = async (id: string) => {
     }
 };
 
-// Renkler
+// ----------Renkler---------------
 
 export const addColor = async (color: Color) => {
     try {
@@ -138,6 +140,20 @@ export const getColors = async (): Promise<Color[]> => {
     }
 };
 
+
+export const updateColor = async (id: string, colorName: string) => {
+    const docRef = doc(db, "colors", id);
+    await updateDoc(docRef, { colorName });
+};
+
+export const deleteColor = async (id: string) => {
+    const docRef = doc(db, "colors", id);
+    await deleteDoc(docRef);
+};
+
+
+
+//--------------Ebat---------------
 export const addDimension = async (dimension: Dimension) => {
     await addDoc(collection(db, DIMENSION_COLLECTION), dimension);
 };
@@ -148,6 +164,21 @@ export const getDimensions = async (): Promise<Dimension[]> => {
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Dimension[];
 };
 
+
+export const updateDimension = async (id: string, dimensionName: string) => {
+    const docRef = doc(db, "dimensions", id);
+    await updateDoc(docRef, { dimensionName });
+};
+
+export const deleteDimension = async (id: string) => {
+    const docRef = doc(db, "dimensions", id);
+    await deleteDoc(docRef);
+};
+
+
+
+
+//--------------Minder---------------
 export const addCushion = async (cushion: Cushion) => {
     await addDoc(collection(db, CUSHION_COLLECTION), cushion);
 };
@@ -157,3 +188,14 @@ export const getCushions = async (): Promise<Cushion[]> => {
     const snapshot = await getDocs(q);
     return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Cushion[];
 };
+
+export const updateCushion = async (id: string, cushionName: string) => {
+    const docRef = doc(db, "cushions", id);
+    await updateDoc(docRef, { cushionName });
+};
+
+export const deleteCushion = async (id: string) => {
+    const docRef = doc(db, "cushions", id);
+    await deleteDoc(docRef);
+};
+

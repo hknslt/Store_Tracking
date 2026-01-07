@@ -1,6 +1,6 @@
 // src/components/Sidebar.tsx
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; // 1. Auth context'i çektik
+import { useAuth } from "../context/AuthContext"; 
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
 import "./styles/Sidebar.css";
