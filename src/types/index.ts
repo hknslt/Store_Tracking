@@ -1,14 +1,14 @@
 // src/types/index.ts
 
+// --- TEMEL TANIMLAR ---
 export interface Product {
     id?: string;
-    productName: string; // Örn: Roma Masa
-    categoryId: string;  // Örn: Masa Kategorisi ID
-    groupId: string;     // Örn: Mutfak Grubu ID (Filtreleme için gerekli)
+    productName: string;
+    categoryId: string;
+    groupId: string;
     explanation?: string;
     createdAt?: any;
 }
-
 
 export interface Group {
     id?: string;
@@ -36,110 +36,115 @@ export interface Cushion {
     cushionName: string;
 }
 
-export interface Price {
+// --- MAĞAZA & PERSONEL ---
+export interface Store {
     id?: string;
-    productId: string;
-    amount: number;
+    storeName: string;
+    storeCode: string;
+    address?: string;
+    phone?: string;
 }
 
-export interface Stock {
+export interface Personnel {
     id?: string;
-    productId: string;
-    quantity: number;
+    storeId: string;
+    fullName: string;
+    isActive: boolean;
+    role: 'admin' | 'store_admin' | 'staff';
+    startDate: string;
+    endDate?: string;
+    phone: string;
+    address?: string;
+    email?: string;
 }
 
-//-----------Modules----------------
+// --- MAĞAZA STOK MODÜLÜ (4'lü Stok Yapısı) ---
+export interface StoreStock {
+    id: string;          // uniqueStockId (ÜrünID_RenkID_EbatID)
+    productId: string;
+    productName: string; // Birleşik İsim
+    colorId: string;
+    dimensionId?: string | null;
+
+    // 1. Serbest Stok: Depoda var, satılabilir.
+    freeStock: number;
+
+    // 2. Müşteri Rezerve: Depoda var ama satıldı.
+    reservedStock: number;
+
+    // 3. Beklenen Stok (Depo): Merkezden istendi, yolda.
+    incomingStock: number;
+
+    // 4. Beklenen Müşteri (Özel Sipariş): Müşteri için istendi, yolda.
+    incomingReservedStock: number;
+}
+
+// --- ALIŞ / TALEP MODÜLÜ (SİPARİŞ VE STOK GİRİŞİ) ---
+
+// İstenilen Durumlar:
+export type PurchaseStatus = 'Beklemede' | 'Onaylandı' | 'Üretim' | 'Sevkiyat' | 'Tamamlandı' | 'İptal';
+export type PurchaseType = 'Alış' | 'İade' | 'Sipariş'; // Sipariş: Satıştan otomatik düşen
 
 export interface PurchaseItem {
     groupId: string;
     categoryId: string;
     productId: string;
-    productName: string; // Listede ID yerine isim göstermek için saklayalım
+    productName: string;
     colorId: string;
     cushionId: string;
     dimensionId?: string | null;
+
     quantity: number;
     amount: number;
     explanation?: string;
-    status: 'Alış' | 'İade'; // Her satırın durumu ayrı olabilir
+
+    // Ürün bazlı durum takibi (Örn: Biri üretimde, diğeri sevk edildi olabilir)
+    status: PurchaseStatus;
 }
 
-// Fişin Kendisi (Başlık)
 export interface Purchase {
     id?: string;
-    storeId: string;       // Hangi mağazaya yapıldı?
+    storeId: string;
+    type?: PurchaseType; // Fişin türü
+    contactName?: string;
+
     date: string;
     receiptNo: string;
-    personnelId: string;   // Kim yaptı?
+    personnelId: string;
     personnelName: string;
-    items: PurchaseItem[]; // Ürün Listesi
-    totalAmount: number;   // Fiş Genel Toplamı
+
+    items: PurchaseItem[];
+    totalAmount: number;
     createdAt?: any;
 }
 
+// --- SATIŞ MODÜLÜ (SİPARİŞ OLUŞTURMA) ---
 
-
-// 1. MAĞAZA TİPİ
-export interface Store {
-    id?: string;
-    storeName: string;
-    storeCode: string; // Örn: M-001 (Şube Kodu)
-    address?: string;
-    phone?: string;
-}
-
-// 2. PERSONEL TİPİ
-export interface Personnel {
-    id?: string;
-    storeId: string;       // Hangi mağazaya bağlı?
-
-    fullName: string;      // Adı Soyadı
-    isActive: boolean;     // Aktif - Pasif
-    role: 'admin' | 'store_admin' | 'staff'; // Kullanıcı Tipi
-
-    startDate: string;     // İşe Başlama (YYYY-MM-DD)
-    endDate?: string;      // İşten Ayrılma (Boş olabilir)
-
-    phone: string;
-    address?: string;
-
-    email?: string;        // Giriş yaparken lazım olabilir (Opsiyonel şimdilik)
-}
-
-
-//MAĞAZA STOK TİPİ
-export interface StoreProduct {
-    id: string;    // Ürün ID'si (Döküman ID'si ile aynı)
-    stock: number; // Stok Adedi
-}
-
-
-
-
-//-----------SATIŞ MODÜLÜ----------------
-export type SaleStatus = 'Sipariş' | 'Müşteri' | 'Teslim' | 'Stok' | 'İade' | 'İptal';
+export type SupplyMethod = 'Stoktan' | 'Merkezden';
+export type DeliveryStatus = 'Bekliyor' | 'Teslim Edildi';
+// Satış satırının genel durumu
+export type SaleStatus = 'Sipariş' | 'İade' | 'İptal' | 'Tamamlandı';
 
 export interface SaleItem {
-    // Seçim hiyerarşisi için
     groupId: string;
     categoryId: string;
-
     productId: string;
-    // Seçilen varyant (Ad + Renk + Ebat)
-    colorId?: string;
     productName: string;
-    dimensionId?: string | null;  // Listede göstermek için
-
-    cushionId?: string;    // Minder seçimi (Satış anında)
+    colorId: string;
+    dimensionId?: string | null;
+    cushionId?: string;
 
     quantity: number;
-    price: number;         // Birim Fiyat
-    discount: number;      // İskonto Tutar
-    total: number;         // (Fiyat - İskonto) * Adet
+    price: number;
+    discount: number;
+    total: number;
 
-    productNote?: string;  // Ürün Açıklaması
-    deadline?: string;     // Termin Tarihi
-    status: SaleStatus;    // Satır bazlı durum
+    productNote?: string;
+
+    // Stok ve Teslimat Yönetimi
+    supplyMethod: SupplyMethod;     // Stoktan mı düştü, Merkezden mi istendi?
+    deliveryStatus: DeliveryStatus; // Müşteriye gitti mi?
+    status: SaleStatus;             // Satırın genel durumu
 }
 
 export interface Sale {
@@ -148,11 +153,9 @@ export interface Sale {
     personnelId: string;
     personnelName: string;
 
-    // Fiş Başlık Bilgileri
     date: string;
     receiptNo: string;
 
-    // Müşteri Bilgileri
     customerName: string;
     phone: string;
     city: string;
@@ -160,12 +163,9 @@ export interface Sale {
     address: string;
     customerNote?: string;
 
-    // Alt Bilgiler
-    sshNote?: string;
-    shippingNote?: string;
     shippingCost: number;
+    grandTotal: number;
 
-    items: SaleItem[];     // Ürün Listesi
-    grandTotal: number;    // Genel Toplam
+    items: SaleItem[];
     createdAt?: any;
 }

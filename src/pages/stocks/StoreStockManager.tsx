@@ -1,258 +1,127 @@
 // src/pages/stocks/StoreStockManager.tsx
 import { useEffect, useState } from "react";
 import { getStores } from "../../services/storeService";
-import { getStoreStocks, updateStoreStock } from "../../services/storeStockService";
-// Tanımları çekmek için servisler
+import { getStoreStocks } from "../../services/storeStockService";
+// Tanımlar
 import { getProducts } from "../../services/productService";
 import { getCategories, getColors, getDimensions } from "../../services/definitionService";
 
-import type { Store, Product, Category, Color, Dimension } from "../../types";
+import type { Store, Product, Category, Color, Dimension, StoreStock } from "../../types";
 import "../../App.css";
 
-// Veritabanından gelen stok satırı tipi
-interface StockRow {
-    id: string;          // Stock Unique ID
-    productId: string;
-    colorId: string;
-    dimensionId?: string | null;
-    quantity: number;
-    productName: string; // Yedek olarak tutulan birleşik isim
-}
-
 const StoreStockManager = () => {
-    // --- STATE'LER ---
     const [stores, setStores] = useState<Store[]>([]);
     const [selectedStoreId, setSelectedStoreId] = useState("");
 
-    // Tanım Listeleri (Eşleştirme için)
+    // Tanımlar
     const [products, setProducts] = useState<Product[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
 
-    const [stocks, setStocks] = useState<StockRow[]>([]);
-    const [editMap, setEditMap] = useState<Record<string, number>>({});
-
+    const [stocks, setStocks] = useState<StoreStock[]>([]);
     const [loading, setLoading] = useState(true);
-    const [successId, setSuccessId] = useState<string | null>(null);
-    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    const showToast = (type: 'success' | 'error', text: string) => {
-        setMessage({ type, text });
-        setTimeout(() => setMessage(null), 3000);
-    };
-
-    // 1. TÜM TANIMLARI ÇEK
     useEffect(() => {
-        const loadDefinitions = async () => {
+        const loadBase = async () => {
             try {
-                const [sData, pData, cData, colData, dimData] = await Promise.all([
-                    getStores(),
-                    getProducts(),
-                    getCategories(),
-                    getColors(),
-                    getDimensions()
+                const [s, p, c, col, dim] = await Promise.all([
+                    getStores(), getProducts(), getCategories(), getColors(), getDimensions()
                 ]);
-                setStores(sData);
-                setProducts(pData);
-                setCategories(cData);
-                setColors(colData);
-                setDimensions(dimData);
-            } catch (error) {
-                console.error("Veri hatası:", error);
-            } finally {
-                setLoading(false);
-            }
+                setStores(s); setProducts(p); setCategories(c); setColors(col); setDimensions(dim);
+            } catch (err) { console.error(err); }
+            finally { setLoading(false); }
         };
-        loadDefinitions();
+        loadBase();
     }, []);
 
-    // 2. MAĞAZA SEÇİLİNCE STOKLARI ÇEK
     useEffect(() => {
-        if (!selectedStoreId) {
-            setStocks([]);
-            setEditMap({});
-            return;
-        }
-
-        const loadStocks = async () => {
-            try {
-                // Servisten gelen verinin tipini zorluyoruz (cast)
-                const data = await getStoreStocks(selectedStoreId) as unknown as StockRow[];
-                setStocks(data);
-
-                const initialMap: Record<string, number> = {};
-                data.forEach(s => initialMap[s.id] = s.quantity);
-                setEditMap(initialMap);
-
-            } catch (error) {
-                console.error(error);
-                showToast('error', "Stok bilgileri alınamadı.");
-            }
-        };
-
-        loadStocks();
+        if (!selectedStoreId) { setStocks([]); return; }
+        getStoreStocks(selectedStoreId).then(setStocks);
     }, [selectedStoreId]);
 
-    // Input Değişimi
-    const handleStockChange = (stockId: string, val: string) => {
-        setEditMap(prev => ({ ...prev, [stockId]: Number(val) }));
+    // İsim Bulucular
+    const getProdName = (id: string) => products.find(x => x.id === id)?.productName || "-";
+    const getCatName = (prodId: string) => {
+        const p = products.find(x => x.id === prodId);
+        return p ? categories.find(c => c.id === p.categoryId)?.categoryName : "-";
     };
-
-    // Kaydetme İşlemi
-    const handleSave = async (stockId: string) => {
-        const newQuantity = editMap[stockId];
-        if (newQuantity === undefined) return;
-
-        try {
-            await updateStoreStock(selectedStoreId, stockId, newQuantity);
-            setSuccessId(stockId);
-            showToast('success', "Stok güncellendi.");
-            setTimeout(() => setSuccessId(null), 2000);
-        } catch (error) {
-            console.error(error);
-            showToast('error', "Güncelleme hatası.");
-        }
-    };
-
-    // --- YARDIMCI: İSİM BULUCULAR ---
-    const getProductName = (id: string) => products.find(p => p.id === id)?.productName || "-";
-    const getCategoryNameByProdId = (prodId: string) => {
-        const product = products.find(p => p.id === prodId);
-        if (!product) return "";
-        return categories.find(c => c.id === product.categoryId)?.categoryName || "";
-    };
-    const getColorName = (id: string) => colors.find(c => c.id === id)?.colorName || "-";
-    const getDimensionName = (id?: string | null) => id ? (dimensions.find(d => d.id === id)?.dimensionName || "") : "";
+    const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
+    const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
 
     return (
         <div className="page-container">
-            {message && (
-                <div className="toast-container">
-                    <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>
-                        {message.type === 'success' ? '✅' : '⚠️'} {message.text}
-                    </div>
-                </div>
-            )}
-
             <div className="page-header">
                 <div className="page-title">
-                    <h2>Mağaza Stok Yönetimi</h2>
-                    <p>Mağazadaki varyant bazlı stokları inceleyin ve düzenleyin</p>
+                    <h2>Mağaza Stok Durumu</h2>
+                    <p>4 Farklı stok havuzunun detaylı görünümü</p>
                 </div>
             </div>
 
-            {/* MAĞAZA SEÇİMİ */}
             <div className="card" style={{ marginBottom: '20px' }}>
-                <div className="card-body" style={{ padding: '20px', display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <label style={{ fontWeight: 'bold', color: '#2c3e50' }}>Mağaza Seçiniz:</label>
-                    <select
-                        className="form-input"
-                        value={selectedStoreId}
-                        onChange={(e) => setSelectedStoreId(e.target.value)}
-                        style={{ maxWidth: '300px' }}
-                    >
+                <div className="card-body" style={{ padding: '20px' }}>
+                    <label style={{ fontWeight: 'bold', marginRight: '10px' }}>Mağaza:</label>
+                    <select className="form-input" style={{ width: '300px' }} value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}>
                         <option value="">-- Seçiniz --</option>
-                        {stores.map(s => (
-                            <option key={s.id} value={s.id}>{s.storeName}</option>
-                        ))}
+                        {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                     </select>
                 </div>
             </div>
 
-            {/* STOK LİSTESİ */}
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
-                    {selectedStoreId ? (
-                        <>
-                            {stocks.length === 0 ? (
-                                <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-                                    Bu mağazada henüz stok kaydı bulunmuyor.
-                                </div>
-                            ) : (
-                                <table className="data-table dense">
-                                    <thead>
-                                        <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                            <th style={{ width: '50%' }}>Ürün Bilgisi (Ad / Ebat / Kategori)</th>
-                                            <th style={{ width: '20%' }}>Renk</th>
-                                            <th style={{ width: '15%', textAlign: 'center' }}>Mevcut Stok</th>
-                                            <th style={{ width: '15%', textAlign: 'right' }}>İşlem</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {stocks.map((stock) => {
-                                            const prodName = getProductName(stock.productId);
-                                            const catName = getCategoryNameByProdId(stock.productId);
-                                            const dimName = getDimensionName(stock.dimensionId);
-                                            const colName = getColorName(stock.colorId);
+                    {selectedStoreId && stocks.length > 0 ? (
+                        <table className="data-table dense">
+                            <thead>
+                                <tr style={{ backgroundColor: '#f1f2f6' }}>
+                                    <th style={{ width: '30%' }}>Ürün Bilgisi</th>
+                                    <th style={{ width: '15%' }}>Renk</th>
+                                    <th style={{ textAlign: 'center', backgroundColor: '#d4edda', width: '12%' }}>Serbest<br />Stok</th>
+                                    <th style={{ textAlign: 'center', backgroundColor: '#fff3cd', width: '12%' }}>Müşteriye<br />Ayrılan</th>
+                                    <th style={{ textAlign: 'center', backgroundColor: '#d1ecf1', width: '12%' }}>Gelecek<br />(Depo)</th>
+                                    <th style={{ textAlign: 'center', backgroundColor: '#f8d7da', width: '12%' }}>Gelecek<br />(Müşteri)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {stocks.map(stock => (
+                                    <tr key={stock.id}>
+                                        <td style={{ padding: '10px' }}>
+                                            <div style={{ fontWeight: '600', color: '#2c3e50' }}>{getProdName(stock.productId)}</div>
+                                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                                                {getDimName(stock.dimensionId) && <span style={{ color: '#e67e22', marginRight: '5px' }}>{getDimName(stock.dimensionId)}</span>}
+                                                <span>({getCatName(stock.productId)})</span>
+                                            </div>
+                                        </td>
+                                        <td>{getColorName(stock.colorId)}</td>
 
-                                            return (
-                                                <tr key={stock.id}>
+                                        {/* 1. SERBEST STOK (Depoda boşta duran) */}
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#27ae60', fontSize: '15px', backgroundColor: '#f0fff4' }}>
+                                            {stock.freeStock}
+                                        </td>
 
-                                                    {/* 1. SÜTUN: Ürün Adı + Ebat + Kategori (Yan Yana) */}
-                                                    <td style={{ padding: '12px 15px' }}>
-                                                        <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                                        {/* 2. REZERVE STOK (Satılmış, bekliyor) */}
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#f39c12', backgroundColor: '#fffcf5' }}>
+                                            {stock.reservedStock}
+                                        </td>
 
-                                                            {/* Ürün Adı */}
-                                                            <span style={{ fontWeight: '600', color: '#34495e', fontSize: '14px' }}>
-                                                                {prodName}
-                                                            </span>
+                                        {/* 3. BEKLENEN (Depo stoğu için yolda) */}
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#3498db', backgroundColor: '#f0f9ff' }}>
+                                            {stock.incomingStock}
+                                        </td>
 
-                                                            {/* Ebat (Varsa) */}
-                                                            {dimName && dimName !== '' && (
-                                                                <span style={{ color: '#e67e22', fontWeight: 'bold', fontSize: '13px' }}>
-                                                                    {dimName}
-                                                                </span>
-                                                            )}
-
-                                                            {/* Kategori */}
-                                                            <span style={{ fontSize: '14px', color: '#95a5a6', fontStyle: 'italic' }}>
-                                                                {catName}
-                                                            </span>
-
-                                                        </div>
-                                                    </td>
-
-                                                    {/* 2. SÜTUN: Renk */}
-                                                    <td style={{ padding: '12px 15px', color: '#555', fontWeight: '500' }}>
-                                                        {colName}
-                                                    </td>
-
-                                                    {/* 3. SÜTUN: Stok Input */}
-                                                    <td style={{ textAlign: 'center' }}>
-                                                        <input
-                                                            type="number"
-                                                            className="form-input"
-                                                            value={editMap[stock.id] ?? stock.quantity}
-                                                            onChange={(e) => handleStockChange(stock.id, e.target.value)}
-                                                            style={{ width: '80px', textAlign: 'center', margin: '0 auto', fontWeight: 'bold' }}
-                                                            min="0"
-                                                        />
-                                                    </td>
-
-                                                    {/* 4. SÜTUN: Buton */}
-                                                    <td style={{ textAlign: 'right', paddingRight: '15px' }}>
-                                                        <button
-                                                            onClick={() => handleSave(stock.id)}
-                                                            className={successId === stock.id ? "btn btn-success" : "btn btn-primary"}
-                                                            style={{ padding: '6px 12px', fontSize: '13px', minWidth: '90px' }}
-                                                        >
-                                                            {successId === stock.id ? "✔ Tamam" : "Güncelle"}
-                                                        </button>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                    </tbody>
-                                </table>
-                            )}
-                        </>
+                                        {/* 4. BEKLENEN MÜŞTERİ (Özel sipariş yolda) */}
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#e74c3c', backgroundColor: '#fff5f5' }}>
+                                            {stock.incomingReservedStock}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : (
-                        <div style={{ textAlign: 'center', padding: '50px', color: '#95a5a6' }}>
-                            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🏬</div>
-                            <p>Stokları görüntülemek için lütfen yukarıdan bir mağaza seçiniz.</p>
+                        <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                            {selectedStoreId ? "Stok kaydı yok." : "Lütfen mağaza seçiniz."}
                         </div>
                     )}
                 </div>

@@ -1,82 +1,143 @@
 // src/services/purchaseService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction } from "firebase/firestore";
-import type { Purchase } from "../types";
+import { collection, getDocs, orderBy, query, doc, runTransaction, where } from "firebase/firestore";
+import type { Purchase, PurchaseStatus } from "../types";
 
-// Alış Fişini Kaydet ve Stokları Güncelle (Minderden Bağımsız Stok)
+// 1. YENİ ALIŞ / İADE FİŞİ KAYDETME
 export const addPurchase = async (purchase: Purchase) => {
     try {
         await runTransaction(db, async (transaction) => {
-
-            // --- 1. AŞAMA: OKUMA ---
-            const stockUpdates = [];
+            const stockUpdates: { ref: any, data: any }[] = [];
 
             for (const item of purchase.items) {
-                // STOK ID OLUŞTURMA MANTIĞI:
-                // Sadece ÜrünID, RenkID ve EbatID'ye göre stok tutuyoruz.
-                // Minder bilgisi stokta ayırıcı değildir.
-
-                // Benzersiz Stok ID'si: "ÜrünID_RenkID_EbatID"
-                // Eğer ebat yoksa "ÜrünID_RenkID_null" gibi olacak.
+                // Stok ID
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
-
                 const stockRef = doc(db, "stores", purchase.storeId, "stocks", uniqueStockId);
-
                 const stockDoc = await transaction.get(stockRef);
 
-                let currentStock = 0;
+                // Stok kartı yoksa oluştur
+                let currentData = { freeStock: 0, reservedStock: 0, incomingStock: 0, incomingReservedStock: 0, productName: item.productName };
                 if (stockDoc.exists()) {
-                    currentStock = stockDoc.data().quantity || 0;
-                }
-
-                const newStock = currentStock + Number(item.quantity);
-
-                // Stok güncelleme listesine ekle
-                stockUpdates.push({
-                    ref: stockRef,
-                    data: {
+                    currentData = stockDoc.data() as any;
+                } else {
+                    transaction.set(stockRef, {
                         productId: item.productId,
                         colorId: item.colorId,
                         dimensionId: item.dimensionId || null,
-                        quantity: newStock,
-                        // Ürün adını da stokta tutalım ki listede kolay görelim
-                        productName: item.productName // (İsim+Ebat+Renk birleşik hali)
-                    }
-                });
+                        productName: item.productName,
+                        freeStock: 0, reservedStock: 0, incomingStock: 0, incomingReservedStock: 0
+                    });
+                }
+
+                const qty = Number(item.quantity);
+
+                // --- TÜRÜNE GÖRE STOK HAREKETİ ---
+                if (purchase.type === 'İade') {
+                    // Müşteriden iade: Direkt Serbest Stoğa ekle
+                    const newFree = (currentData.freeStock || 0) + qty;
+                    stockUpdates.push({ ref: stockRef, data: { freeStock: newFree } });
+
+                } else if (purchase.type === 'Alış') {
+                    // Merkezden istek: Beklenen Stoğa (Depo) ekle
+                    // Durumu 'Beklemede' olduğu sürece burada durur. 'Tamamlandı' olunca Serbest'e geçer.
+                    const newIncoming = (currentData.incomingStock || 0) + qty;
+                    stockUpdates.push({ ref: stockRef, data: { incomingStock: newIncoming } });
+                }
+                // Not: 'Sipariş' türü (Otomatik oluşan) saleService içinde işlendiği için burada manuel eklenmez.
             }
 
-            // --- 2. AŞAMA: YAZMA ---
-
-            // A) Fişi Kaydet (Minder bilgisi burada saklanıyor)
+            // Fişi Kaydet
             const receiptRef = doc(collection(db, "purchases", purchase.storeId, "receipts"));
             transaction.set(receiptRef, purchase);
 
-            // B) Stokları Güncelle (Minderden bağımsız)
+            // Stokları Güncelle
             for (const update of stockUpdates) {
-                // set(..., {merge: true}) kullanıyoruz ki varsa güncellensin, yoksa oluşsun
                 transaction.set(update.ref, update.data, { merge: true });
             }
         });
     } catch (error) {
-        console.error("Alış işlemi hatası:", error);
+        console.error("Alış kayıt hatası:", error);
         throw error;
     }
 };
 
-// ... (getPurchasesByStore aynı kalacak)
-export const getPurchasesByStore = async (storeId: string): Promise<Purchase[]> => {
+// 2. DURUM GÜNCELLEME (Örn: Sevkiyat -> Tamamlandı)
+export const updatePurchaseItemStatus = async (
+    storeId: string,
+    purchaseId: string,
+    itemIndex: number,
+    newStatus: PurchaseStatus
+) => {
     try {
-        const q = query(
-            collection(db, "purchases", storeId, "receipts"),
-            orderBy("date", "desc")
-        );
-        const snapshot = await getDocs(q);
-        return snapshot.docs.map(doc => ({
-            id: doc.id,
-            ...doc.data()
-        })) as Purchase[];
+        await runTransaction(db, async (transaction) => {
+            const purchaseRef = doc(db, "purchases", storeId, "receipts", purchaseId);
+            const pDoc = await transaction.get(purchaseRef);
+            if (!pDoc.exists()) throw "Fiş bulunamadı";
+
+            const purchase = pDoc.data() as Purchase;
+            const item = purchase.items[itemIndex];
+            const oldStatus = item.status;
+
+            // Eğer durum değişmediyse işlem yapma
+            if (oldStatus === newStatus) return;
+
+            // Stok Referansı
+            const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+            const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+            const stockDoc = await transaction.get(stockRef);
+
+            if (!stockDoc.exists()) throw "Stok kartı bulunamadı";
+            const sData = stockDoc.data();
+            const qty = Number(item.quantity);
+
+            // --- STOK TRANSFER MANTIĞI ---
+            // Sadece 'Tamamlandı'ya geçişte stoklar yer değiştirir.
+            // Diğer durumlar (Onaylandı, Üretim, Sevkiyat) sadece bilgi amaçlıdır, stok hala "Beklenen" havuzundadır.
+
+            const updates: any = {};
+
+            // 1. Eğer yeni durum 'Tamamlandı' ise: Beklenen -> Mevcut'a aktar
+            if (newStatus === 'Tamamlandı' && oldStatus !== 'Tamamlandı') {
+                if (purchase.type === 'Alış') {
+                    // Depo için istenmişti: Incoming -> Free
+                    updates.incomingStock = (sData.incomingStock || 0) - qty;
+                    updates.freeStock = (sData.freeStock || 0) + qty;
+                } else if (purchase.type === 'Sipariş') {
+                    // Müşteri için istenmişti: IncomingReserved -> Reserved
+                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) - qty;
+                    updates.reservedStock = (sData.reservedStock || 0) + qty;
+                }
+            }
+
+            // 2. Eğer eski durum 'Tamamlandı' ise ve geri alınıyorsa (Yanlışlıkla tıklandıysa): Mevcut -> Beklenen
+            else if (oldStatus === 'Tamamlandı' && newStatus !== 'Tamamlandı') {
+                if (purchase.type === 'Alış') {
+                    updates.freeStock = (sData.freeStock || 0) - qty;
+                    updates.incomingStock = (sData.incomingStock || 0) + qty;
+                } else if (purchase.type === 'Sipariş') {
+                    updates.reservedStock = (sData.reservedStock || 0) - qty;
+                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) + qty;
+                }
+            }
+
+            // Veritabanı Güncellemeleri
+            if (Object.keys(updates).length > 0) {
+                transaction.update(stockRef, updates);
+            }
+
+            // Fişteki satırın durumunu güncelle
+            purchase.items[itemIndex].status = newStatus;
+            transaction.update(purchaseRef, { items: purchase.items });
+        });
     } catch (error) {
-        console.error("Hata:", error);
-        return [];
+        console.error("Durum güncelleme hatası:", error);
+        throw error;
     }
+};
+
+// Alışları Getir (İsteğe göre filtreli)
+export const getPurchasesByStore = async (storeId: string) => {
+    const q = query(collection(db, "purchases", storeId, "receipts"), orderBy("date", "desc"));
+    const snapshot = await getDocs(q);
+    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Purchase[];
 };

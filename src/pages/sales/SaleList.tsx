@@ -5,18 +5,11 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 
-import { getSalesByStore } from "../../services/saleService";
+// Servisler
+import { getSalesByStore, updateSaleItemStatus } from "../../services/saleService";
 import { getStores } from "../../services/storeService";
-// Tanımları çekiyoruz (Ebat eklendi)
-import {
-    getCategories,
-    getCushions,
-    getColors,
-    getDimensions,
-    getGroups
-} from "../../services/definitionService";
 
-import type { Sale, Store, Personnel, Category, Cushion, Color, Dimension, Group } from "../../types";
+import type { Sale, Store, Personnel, DeliveryStatus } from "../../types";
 import "../../App.css";
 
 const SaleList = () => {
@@ -25,13 +18,6 @@ const SaleList = () => {
     // --- STATE'LER ---
     const [sales, setSales] = useState<Sale[]>([]);
     const [stores, setStores] = useState<Store[]>([]);
-
-    // Tanımlar
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [cushions, setCushions] = useState<Cushion[]>([]);
-    const [colors, setColors] = useState<Color[]>([]);
-    const [dimensions, setDimensions] = useState<Dimension[]>([]); // YENİ
 
     const [selectedStoreId, setSelectedStoreId] = useState("");
     const [isAdmin, setIsAdmin] = useState(false);
@@ -46,22 +32,8 @@ const SaleList = () => {
             if (!currentUser) return;
 
             try {
-                // Paralel veri çekme
-                const [storesData, grpData, catsData, cushsData, colsData, dimsData] = await Promise.all([
-                    getStores(),
-                    getGroups(),
-                    getCategories(),
-                    getCushions(),
-                    getColors(),
-                    getDimensions() // Ebatları çekiyoruz
-                ]);
-
+                const storesData = await getStores();
                 setStores(storesData);
-                setGroups(grpData);
-                setCategories(catsData);
-                setCushions(cushsData);
-                setColors(colsData);
-                setDimensions(dimsData);
 
                 // Yetki Kontrolü
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -100,18 +72,23 @@ const SaleList = () => {
         loadSales();
     }, [selectedStoreId]);
 
-    // --- YARDIMCILAR ---
-    const formatDate = (dateString: string) => {
-        if (!dateString) return "-";
-        const date = new Date(dateString);
-        return date.toLocaleDateString('tr-TR');
-    };
+    // --- DURUM GÜNCELLEME (Bekliyor <-> Teslim Edildi) ---
+    const handleStatusChange = async (saleId: string, itemIndex: number, newStatus: DeliveryStatus) => {
+        try {
+            await updateSaleItemStatus(selectedStoreId, saleId, itemIndex, newStatus);
 
-    // İsim Bulucular
-    const getCatName = (id?: string) => categories.find(c => c.id === id)?.categoryName || "";
-    const getCushionName = (id?: string) => cushions.find(c => c.id === id)?.cushionName || "-";
-    const getColorName = (id?: string) => colors.find(c => c.id === id)?.colorName || "-";
-    const getDimensionName = (id?: string | null) => id ? (dimensions.find(d => d.id === id)?.dimensionName || "") : "";
+            // Listeyi yerel olarak güncelle (Tekrar çekmeye gerek kalmasın)
+            const updatedSales = [...sales];
+            const saleIndex = updatedSales.findIndex(s => s.id === saleId);
+            if (saleIndex > -1) {
+                updatedSales[saleIndex].items[itemIndex].deliveryStatus = newStatus;
+                setSales(updatedSales);
+            }
+        } catch (error) {
+            console.error(error);
+            alert("Durum güncellenemedi!");
+        }
+    };
 
     const toggleRow = (id: string) => {
         setExpandedRowId(expandedRowId === id ? null : id);
@@ -125,27 +102,29 @@ const SaleList = () => {
             <div className="page-header">
                 <div className="page-title">
                     <h2>Satış Listesi</h2>
-                    <p>Müşteri siparişleri ve satış hareketleri</p>
+                    <p>Müşteri siparişleri ve teslimat takibi</p>
                 </div>
                 <Link to="/sales/add" className="btn btn-primary">
-                    + Yeni Satış Gir
+                    + Yeni Satış
                 </Link>
             </div>
 
-            {/* --- FİLTRE --- */}
+            {/* --- MAĞAZA SEÇİMİ (ADMİN) --- */}
             <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <label style={{ fontWeight: '600', color: '#2c3e50' }}>Mağaza Seçiniz:</label>
                     {isAdmin ? (
-                        <select
-                            className="form-input"
-                            value={selectedStoreId}
-                            onChange={(e) => setSelectedStoreId(e.target.value)}
-                            style={{ maxWidth: '300px' }}
-                        >
-                            <option value="">-- Seçiniz --</option>
-                            {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
-                        </select>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <label style={{ fontWeight: '600', color: '#2c3e50' }}>Mağaza:</label>
+                            <select
+                                className="form-input"
+                                value={selectedStoreId}
+                                onChange={(e) => setSelectedStoreId(e.target.value)}
+                                style={{ maxWidth: '300px' }}
+                            >
+                                <option value="">-- Seçiniz --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                            </select>
+                        </div>
                     ) : (
                         <div style={{ fontWeight: 'bold', color: '#2980b9', padding: '10px', backgroundColor: '#ecf0f1', borderRadius: '5px' }}>
                             📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
@@ -158,158 +137,124 @@ const SaleList = () => {
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
                     {selectedStoreId ? (
-                        <table className="data-table dense">
+                        <table className="data-table">
                             <thead>
                                 <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                    <th style={{ width: '5%' }}>Detay</th>
+                                    <th style={{ width: '5%' }}></th>
                                     <th style={{ width: '10%' }}>Tarih</th>
                                     <th style={{ width: '15%' }}>Fiş No</th>
                                     <th style={{ width: '20%' }}>Müşteri Adı</th>
-                                    <th style={{ width: '15%' }}>İl / İlçe</th>
-                                    <th style={{ width: '15%' }}>Telefon</th>
-                                    <th style={{ width: '20%', textAlign: 'right' }}>Toplam Tutar</th>
+                                    <th style={{ width: '20%' }}>Termin / Not</th>
+                                    <th style={{ width: '15%' }}>Personel</th>
+                                    <th style={{ width: '15%', textAlign: 'right' }}>Toplam</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {sales.length > 0 ? (
-                                    sales.map(s => {
-                                        // Toplam tutarı satış satırlarından hesapla (Nakliye hariç ürün toplamı + Nakliye)
-                                        const itemsTotal = s.items.reduce((acc, item) => acc + ((item.price - (item.discount || 0)) * item.quantity), 0);
-                                        const grandTotal = itemsTotal + (s.shippingCost || 0);
+                                    sales.map(s => (
+                                        <>
+                                            {/* ANA SATIR */}
+                                            <tr
+                                                key={s.id}
+                                                onClick={() => s.id && toggleRow(s.id)}
+                                                className="hover-row"
+                                                style={{
+                                                    cursor: 'pointer',
+                                                    backgroundColor: expandedRowId === s.id ? '#e8f6f3' : 'white',
+                                                    borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee'
+                                                }}
+                                            >
+                                                <td style={{ textAlign: 'center', fontSize: '16px', color: '#3498db' }}>
+                                                    {expandedRowId === s.id ? '▼' : '▶'}
+                                                </td>
+                                                <td>{new Date(s.date).toLocaleDateString('tr-TR')}</td>
+                                                <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
+                                                <td>
+                                                    <div style={{ fontWeight: '500' }}>{s.customerName}</div>
+                                                    <div style={{ fontSize: '11px', color: '#7f8c8d' }}>{s.city} / {s.district}</div>
+                                                </td>
+                                                {/* Termin Notu */}
+                                                <td style={{ color: '#e67e22', fontStyle: 'italic', fontWeight: '500' }}>
+                                                    {s.customerNote || "-"}
+                                                </td>
+                                                <td>{s.personnelName}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>
+                                                    {s.grandTotal.toFixed(2)} ₺
+                                                </td>
+                                            </tr>
 
-                                        return (
-                                            <>
-                                                {/* ANA SATIR */}
-                                                <tr
-                                                    key={s.id}
-                                                    onClick={() => s.id && toggleRow(s.id)}
-                                                    style={{
-                                                        cursor: 'pointer',
-                                                        backgroundColor: expandedRowId === s.id ? '#e8f6f3' : 'white',
-                                                        borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee'
-                                                    }}
-                                                    className="hover-row"
-                                                >
-                                                    <td style={{ textAlign: 'center', fontSize: '16px', color: '#3498db' }}>
-                                                        {expandedRowId === s.id ? '▼' : '▶'}
-                                                    </td>
-                                                    <td>{formatDate(s.date)}</td>
-                                                    <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
-                                                    <td style={{ fontWeight: '500' }}>{s.customerName}</td>
-                                                    <td style={{ fontSize: '12px', color: '#7f8c8d' }}>{s.city} / {s.district}</td>
-                                                    <td>{s.phone}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>
-                                                        {grandTotal.toFixed(2)} ₺
+                                            {/* DETAY SATIRI (AÇILIR KAPANIR) */}
+                                            {expandedRowId === s.id && (
+                                                <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
+                                                    <td colSpan={7} style={{ padding: '20px' }}>
+
+                                                        {/* MÜŞTERİ DETAYLARI */}
+                                                        <div style={{ marginBottom: '15px', paddingBottom: '10px', borderBottom: '1px solid #eee', color: '#555', fontSize: '13px' }}>
+                                                            <div style={{ display: 'flex', gap: '20px' }}>
+                                                                <div><strong>Telefon:</strong> {s.phone}</div>
+                                                                <div style={{ flex: 1 }}><strong>Adres:</strong> {s.address || "Adres girilmemiş."}</div>
+                                                            </div>
+                                                        </div>
+
+                                                        {/* ÜRÜN TABLOSU */}
+                                                        <table className="data-table dense" style={{ border: '1px solid #eee', backgroundColor: 'white' }}>
+                                                            <thead>
+                                                                <tr style={{ backgroundColor: '#f1f2f6' }}>
+                                                                    <th style={{ width: '30%' }}>Ürün Bilgisi</th>
+                                                                    <th style={{ width: '20%' }}>Ürün Notu</th>
+                                                                    <th style={{ textAlign: 'center' }}>Adet</th>
+                                                                    <th style={{ textAlign: 'center' }}>Temin</th>
+                                                                    <th style={{ width: '160px' }}>Teslim Durumu</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {s.items.map((item, idx) => (
+                                                                    <tr key={idx}>
+                                                                        <td style={{ fontWeight: '500' }}>{item.productName}</td>
+
+                                                                        {/* Ürün Notu */}
+                                                                        <td style={{ fontStyle: 'italic', color: '#777' }}>
+                                                                            {item.productNote || "-"}
+                                                                        </td>
+
+                                                                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+
+                                                                        {/* Temin Yöntemi */}
+                                                                        <td style={{ textAlign: 'center' }}>
+                                                                            <span className={`badge ${item.supplyMethod === 'Stoktan' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px' }}>
+                                                                                {item.supplyMethod}
+                                                                            </span>
+                                                                        </td>
+
+                                                                        {/* TESLİM DURUMU SEÇİMİ */}
+                                                                        <td>
+                                                                            <select
+                                                                                value={item.deliveryStatus || 'Bekliyor'}
+                                                                                onChange={(e) => handleStatusChange(s.id!, idx, e.target.value as DeliveryStatus)}
+                                                                                className="form-input input-sm"
+                                                                                style={{
+                                                                                    backgroundColor: item.deliveryStatus === 'Teslim Edildi' ? '#27ae60' : '#f39c12',
+                                                                                    color: 'white',
+                                                                                    border: 'none',
+                                                                                    fontWeight: 'bold',
+                                                                                    cursor: 'pointer',
+                                                                                    height: '28px',
+                                                                                    padding: '0 5px'
+                                                                                }}
+                                                                            >
+                                                                                <option value="Bekliyor" style={{ backgroundColor: 'white', color: 'black' }}>Bekliyor</option>
+                                                                                <option value="Teslim Edildi" style={{ backgroundColor: 'white', color: 'black' }}>Teslim Edildi</option>
+                                                                            </select>
+                                                                        </td>
+                                                                    </tr>
+                                                                ))}
+                                                            </tbody>
+                                                        </table>
                                                     </td>
                                                 </tr>
-
-                                                {/* DETAY SATIRI (AÇILIR KAPANIR) */}
-                                                {expandedRowId === s.id && (
-                                                    <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
-                                                        <td colSpan={7} style={{ padding: '15px 20px' }}>
-                                                            <div style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', backgroundColor: 'white' }}>
-
-                                                                {/* DETAY ÜST BİLGİLER */}
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: '20px', marginBottom: '15px', fontSize: '13px', color: '#555' }}>
-                                                                    <div>
-                                                                        <strong>Adres:</strong> {s.address || "-"}
-                                                                    </div>
-                                                                    <div>
-                                                                        <strong>Müşteri Açıklama:</strong> {s.customerNote || "-"}
-                                                                    </div>
-                                                                    <div>
-                                                                        <strong>Personel:</strong> {s.personnelName}
-                                                                    </div>
-                                                                </div>
-
-                                                                {/* ÜRÜN TABLOSU */}
-                                                                <table style={{ width: '100%', fontSize: '13px', borderCollapse: 'collapse', border: '1px solid #eee' }}>
-                                                                    <thead>
-                                                                        <tr style={{ backgroundColor: '#f1f2f6', color: '#2c3e50', textAlign: 'left' }}>
-                                                                            <th style={{ padding: 8, width: '25%' }}>Ürün Bilgisi</th>
-                                                                            <th style={{ padding: 8 }}>Renk</th>
-                                                                            <th style={{ padding: 8 }}>Minder</th>
-                                                                            <th style={{ padding: 8 }}>Açıklama</th>
-                                                                            <th style={{ padding: 8 }}>Durum</th>
-                                                                            <th style={{ padding: 8, textAlign: 'center' }}>Adet</th>
-                                                                            <th style={{ padding: 8, textAlign: 'right' }}>Fiyat</th>
-                                                                            <th style={{ padding: 8, textAlign: 'right' }}>İsk.</th>
-                                                                            <th style={{ padding: 8, textAlign: 'right' }}>Tutar</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {s.items.map((item, idx) => {
-                                                                            const lineTotal = (item.price - (item.discount || 0)) * item.quantity;
-                                                                            return (
-                                                                                <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9' }}>
-
-                                                                                    {/* Ürün + Ebat + Kategori (YENİ FORMAT) */}
-                                                                                    <td style={{ padding: 8 }}>
-                                                                                        {/* 1. Ürün Adı */}
-                                                                                        <span style={{ fontWeight: '600', color: '#34495e', marginRight: '5px' }}>
-                                                                                            {item.productName.split('-')[0].trim()}
-                                                                                        </span>
-
-                                                                                        {/* 2. Ebat (Varsa) - Turuncu Renk */}
-                                                                                        {item.dimensionId && (
-                                                                                            <span style={{ color: '#e67e22', fontWeight: 'bold', marginRight: '5px' }}>
-                                                                                                {getDimensionName(item.dimensionId)}
-                                                                                            </span>
-                                                                                        )}
-
-                                                                                        {/* 3. Kategori - Gri Renk (Yanına eklendi) */}
-                                                                                        <span style={{ color: '#95a5a6', fontSize: '12px', fontStyle: 'italic' }}>
-                                                                                            {getCatName(item.categoryId)}
-                                                                                        </span>
-                                                                                    </td>
-
-                                                                                    <td style={{ padding: 8 }}>{getColorName(item.colorId)}</td>
-                                                                                    <td style={{ padding: 8 }}>{getCushionName(item.cushionId)}</td>
-                                                                                    <td style={{ padding: 8, fontStyle: 'italic', color: '#999' }}>{item.productNote || "-"}</td>
-
-                                                                                    <td style={{ padding: 8 }}>
-                                                                                        <span className={`badge ${item.status === 'İptal' || item.status === 'İade' ? 'badge-danger' : 'badge-success'}`}>
-                                                                                            {item.status}
-                                                                                        </span>
-                                                                                    </td>
-
-                                                                                    <td style={{ padding: 8, textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
-                                                                                    <td style={{ padding: 8, textAlign: 'right' }}>{item.price} ₺</td>
-                                                                                    <td style={{ padding: 8, textAlign: 'right', color: 'red' }}>{item.discount > 0 ? `-${item.discount}` : '-'}</td>
-
-                                                                                    <td style={{ padding: 8, textAlign: 'right', fontWeight: 'bold' }}>
-                                                                                        {lineTotal.toFixed(2)} ₺
-                                                                                    </td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                </table>
-
-                                                                {/* ALT TOPLAM ALANI */}
-                                                                <div style={{ marginTop: '15px', display: 'flex', justifyContent: 'flex-end' }}>
-                                                                    <div style={{ textAlign: 'right', minWidth: '200px' }}>
-                                                                        <div style={{ marginBottom: '5px', fontSize: '13px', color: '#7f8c8d' }}>
-                                                                            Ürün Toplamı: <b>{itemsTotal.toFixed(2)} ₺</b>
-                                                                        </div>
-                                                                        {s.shippingCost > 0 && (
-                                                                            <div style={{ marginBottom: '5px', fontSize: '13px', color: '#7f8c8d' }}>
-                                                                                Nakliye: <b>+{s.shippingCost} ₺</b>
-                                                                            </div>
-                                                                        )}
-                                                                        <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2c3e50', borderTop: '1px solid #ddd', paddingTop: '5px' }}>
-                                                                            Genel Toplam: {grandTotal.toFixed(2)} ₺
-                                                                        </div>
-                                                                    </div>
-                                                                </div>
-
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </>
-                                        );
-                                    })
+                                            )}
+                                        </>
+                                    ))
                                 ) : (
                                     <tr>
                                         <td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
