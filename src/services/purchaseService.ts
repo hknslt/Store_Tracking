@@ -10,12 +10,10 @@ export const addPurchase = async (purchase: Purchase) => {
             const stockUpdates: { ref: any, data: any }[] = [];
 
             for (const item of purchase.items) {
-                // Stok ID
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                 const stockRef = doc(db, "stores", purchase.storeId, "stocks", uniqueStockId);
                 const stockDoc = await transaction.get(stockRef);
 
-                // Stok kartı yoksa oluştur
                 let currentData = { freeStock: 0, reservedStock: 0, incomingStock: 0, incomingReservedStock: 0, productName: item.productName };
                 if (stockDoc.exists()) {
                     currentData = stockDoc.data() as any;
@@ -31,26 +29,19 @@ export const addPurchase = async (purchase: Purchase) => {
 
                 const qty = Number(item.quantity);
 
-                // --- TÜRÜNE GÖRE STOK HAREKETİ ---
                 if (purchase.type === 'İade') {
-                    // Müşteriden iade: Direkt Serbest Stoğa ekle
                     const newFree = (currentData.freeStock || 0) + qty;
                     stockUpdates.push({ ref: stockRef, data: { freeStock: newFree } });
-
                 } else if (purchase.type === 'Alış') {
-                    // Merkezden istek: Beklenen Stoğa (Depo) ekle
-                    // Durumu 'Beklemede' olduğu sürece burada durur. 'Tamamlandı' olunca Serbest'e geçer.
                     const newIncoming = (currentData.incomingStock || 0) + qty;
                     stockUpdates.push({ ref: stockRef, data: { incomingStock: newIncoming } });
                 }
-                // Not: 'Sipariş' türü (Otomatik oluşan) saleService içinde işlendiği için burada manuel eklenmez.
             }
 
-            // Fişi Kaydet
+            // Fişi Kaydet (contactName alanını zaten tip tanımından opsiyonel yapmıştık, göndermezsek kaydetmez)
             const receiptRef = doc(collection(db, "purchases", purchase.storeId, "receipts"));
             transaction.set(receiptRef, purchase);
 
-            // Stokları Güncelle
             for (const update of stockUpdates) {
                 transaction.set(update.ref, update.data, { merge: true });
             }

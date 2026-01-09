@@ -9,18 +9,18 @@ import {
     updateDoc, 
     doc 
 } from "firebase/firestore";
-import type { Stock } from "../types";
+import type { StoreStock } from "../types";
 
 const STOCK_COLLECTION = "stocks";
 
 // Tüm stokları getir
-export const getAllStocks = async (): Promise<Stock[]> => {
+export const getAllStocks = async (): Promise<StoreStock[]> => {
     try {
         const snapshot = await getDocs(collection(db, STOCK_COLLECTION));
         return snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as Stock[];
+        })) as StoreStock[];
     } catch (error) {
         console.error("Stoklar çekilirken hata:", error);
         return [];

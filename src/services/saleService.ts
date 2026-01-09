@@ -1,7 +1,7 @@
 // src/services/saleService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction ,   } from "firebase/firestore";
-import type { Sale, Purchase, PurchaseItem } from "../types";
+import { collection, getDocs, orderBy, query, doc, runTransaction, } from "firebase/firestore";
+import type { Sale, Purchase, PurchaseItem, DeliveryStatus } from "../types";
 
 export const addSale = async (sale: Sale) => {
     try {
@@ -82,7 +82,7 @@ export const addSale = async (sale: Sale) => {
                         dimensionId: item.dimensionId,
                         quantity: qty,
                         amount: 0,
-                        explanation: `Satış Siparişi: ${sale.receiptNo} - ${sale.customerName}`,
+                        explanation: `Müşteri Adı: ${sale.customerName}`,
                         status: 'Beklemede'
                     });
                 }
@@ -111,9 +111,9 @@ export const addSale = async (sale: Sale) => {
                     storeId: sale.storeId,
                     type: 'Sipariş',
                     date: sale.date,
-                    receiptNo: `OTO-${sale.receiptNo}`,
+                    receiptNo: `SAT-${sale.receiptNo}`,
                     personnelId: sale.personnelId,
-                    personnelName: "Sistem (Otomatik)",
+                    personnelName: "Sistem",
                     items: orderItemsForPurchase,
                     totalAmount: 0,
                     createdAt: new Date()
@@ -140,28 +140,70 @@ export const getSalesByStore = async (storeId: string): Promise<Sale[]> => {
 
 
 export const updateSaleItemStatus = async (
-    storeId: string, 
-    saleId: string, 
-    itemIndex: number, 
-    newDeliveryStatus: 'Bekliyor' | 'Teslim Edildi'
+    storeId: string,
+    saleId: string,
+    itemIndex: number,
+    newDeliveryStatus: DeliveryStatus
 ) => {
     try {
-        const saleRef = doc(db, "sales", storeId, "receipts", saleId);
-        
-        // Transaction ile yapmak daha güvenli ama basitlik için direct update yapalım
-        // (Çünkü burada stok hareketi yok, sadece durum değişiyor)
         await runTransaction(db, async (transaction) => {
+            // 1. Satışı Oku
+            const saleRef = doc(db, "sales", storeId, "receipts", saleId);
             const saleDoc = await transaction.get(saleRef);
             if (!saleDoc.exists()) throw "Satış bulunamadı";
-            
-            const sale = saleDoc.data() as Sale;
-            
-            // Durumu güncelle
-            sale.items[itemIndex].deliveryStatus = newDeliveryStatus;
-            
-            // Eğer hepsi teslim edildiyse, genel satışı da 'Tamamlandı' yapabiliriz (Opsiyonel)
-            // if (sale.items.every(i => i.deliveryStatus === 'Teslim Edildi')) { sale.status = 'Tamamlandı'; }
 
+            const sale = saleDoc.data() as Sale;
+            const item = sale.items[itemIndex];
+            const oldDeliveryStatus = item.deliveryStatus;
+
+            // Durum değişmediyse çık
+            if (oldDeliveryStatus === newDeliveryStatus) return;
+
+            // 2. Stok Kartını Oku
+            const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+            const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+            const stockDoc = await transaction.get(stockRef);
+
+            if (!stockDoc.exists()) {
+                // Stok kartı yoksa bile sadece durumu güncelle, stok işlemi yapma (Veri bütünlüğü için uyarı verilebilir)
+                sale.items[itemIndex].deliveryStatus = newDeliveryStatus;
+                transaction.update(saleRef, { items: sale.items });
+                return;
+            }
+
+            const sData = stockDoc.data();
+            const qty = Number(item.quantity);
+            const updates: any = {};
+
+            // --- SENARYO 1: ÜRÜN TESLİM EDİLDİ YAPILIYORSA ---
+            if (newDeliveryStatus === 'Teslim Edildi' && oldDeliveryStatus !== 'Teslim Edildi') {
+                if (item.supplyMethod === 'Stoktan') {
+                    // Rezerve stoktan düş (Çünkü satış anında Free -> Reserved yapmıştık)
+                    updates.reservedStock = (sData.reservedStock || 0) - qty;
+                } else if (item.supplyMethod === 'Merkezden') {
+                    // Gelecek (Müşteri) stoktan düş (Çünkü satış anında oraya eklemiştik)
+                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) - qty;
+                }
+                // Not: Ürün fiziksel olarak mağazadan çıktığı için stok miktarı azalır.
+            }
+
+            // --- SENARYO 2: YANLIŞLIKLA TESLİM EDİLDİ DENMİŞ, GERİ ALINIYORSA ---
+            else if (oldDeliveryStatus === 'Teslim Edildi' && newDeliveryStatus !== 'Teslim Edildi') {
+                if (item.supplyMethod === 'Stoktan') {
+                    // Rezerve stoğa geri ekle
+                    updates.reservedStock = (sData.reservedStock || 0) + qty;
+                } else if (item.supplyMethod === 'Merkezden') {
+                    // Gelecek (Müşteri) stoğa geri ekle
+                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) + qty;
+                }
+            }
+
+            // 3. Yazma İşlemleri
+            if (Object.keys(updates).length > 0) {
+                transaction.update(stockRef, updates);
+            }
+
+            sale.items[itemIndex].deliveryStatus = newDeliveryStatus;
             transaction.update(saleRef, { items: sale.items });
         });
     } catch (error) {

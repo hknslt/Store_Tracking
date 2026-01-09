@@ -40,8 +40,6 @@ const StoreStockManager = () => {
         getStoreStocks(selectedStoreId).then(setStocks);
     }, [selectedStoreId]);
 
-    // İsim Bulucular
-    const getProdName = (id: string) => products.find(x => x.id === id)?.productName || "-";
     const getCatName = (prodId: string) => {
         const p = products.find(x => x.id === prodId);
         return p ? categories.find(c => c.id === p.categoryId)?.categoryName : "-";
@@ -88,12 +86,11 @@ const StoreStockManager = () => {
                                 {stocks.map(stock => (
                                     <tr key={stock.id}>
                                         <td style={{ padding: '10px' }}>
-                                            <div style={{ fontWeight: '600', color: '#2c3e50' }}>{getProdName(stock.productId)}</div>
-                                            <div style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                                                {getDimName(stock.dimensionId) && <span style={{ color: '#e67e22', marginRight: '5px' }}>{getDimName(stock.dimensionId)}</span>}
-                                                <span>({getCatName(stock.productId)})</span>
-                                            </div>
+                                            <span style={{ fontWeight: '600', color: '#34495e', marginRight: '6px' }}>{stock.productName.split('-')[0].trim()}</span>
+                                            {stock.dimensionId && <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>{getDimName(stock.dimensionId)}</span>}
+                                            <span style={{ color: '#34495e', fontWeight: '600' }}>{getCatName(stock.productId)}</span>
                                         </td>
+
                                         <td>{getColorName(stock.colorId)}</td>
 
                                         {/* 1. SERBEST STOK (Depoda boşta duran) */}
