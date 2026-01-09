@@ -169,3 +169,24 @@ export interface Sale {
     items: SaleItem[];
     createdAt?: any;
 }
+
+
+
+
+// --- PERSONEL DEVAM MODÜLÜ ---
+export type AttendanceType = 
+    | 'Geldi' 
+    | 'Raporlu' 
+    | 'İzinli (Haftalık)' 
+    | 'İzinli (Yıllık)' 
+    | 'Ücretsiz İzin';
+
+export interface Attendance {
+    id?: string;
+    storeId: string;
+    personnelId: string;
+    personnelName: string; // Listede hızlı göstermek için
+    date: string;          // YYYY-MM-DD formatında
+    type: AttendanceType;
+    note?: string;         // Ekstra not (Örn: Yarım gün geldi)
+}

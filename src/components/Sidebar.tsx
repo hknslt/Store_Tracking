@@ -61,6 +61,11 @@ const Sidebar = () => {
           <span className="nav-icon">🧾</span>
           Satışlar
         </NavLink>
+        
+        <NavLink to="/attendance" className="nav-item">
+          <span className="nav-icon">📅</span>
+          Puantaj Yönetimi
+        </NavLink>
 
         <div className="nav-section">TANIMLAMALAR</div>
 

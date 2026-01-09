@@ -28,6 +28,7 @@ import SaleAdd from "./pages/sales/SaleAdd";
 import ColorsPage from "./pages/definitions/colors/ColorsPage";
 import DimensionsPage from "./pages/definitions/dimensions/DimensionsPage";
 import CushionsPage from "./pages/definitions/cushions/CushionsPage";
+import AttendanceManager from "./pages/personnel/AttendanceManager";
 
 // --- 1. KORUMALI DÜZEN (Sidebar Burada Olacak) ---
 // Giriş yapmış kullanıcılar burayı ve Sidebar'ı görür.
@@ -125,6 +126,9 @@ function App() {
             {/* Satış Modülü */}
             <Route path="/sales" element={<SaleList />} />
             <Route path="/sales/add" element={<SaleAdd />} />
+            
+            {/* Puantaj Yönetimi */}
+            <Route path="/attendance" element={<AttendanceManager />} />
           </Route>
 
           {/* Hatalı Rota */}
