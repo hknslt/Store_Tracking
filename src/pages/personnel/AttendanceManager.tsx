@@ -2,14 +2,14 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
-import { doc, getDoc, collection, query, where, getDocs, setDoc } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
+import { getMonthlyAttendance, saveBulkAttendance } from "../../services/attendanceService";
 
 import type { Store, Personnel, AttendanceType } from "../../types";
 import "../../App.css";
 
-// Puantaj Verisi Yapısı (Matrix için optimize edilmiş)
-// Key: "personnelId_YYYY-MM-DD", Value: AttendanceType
+// Puantaj Verisi Yapısı
 type AttendanceMap = Record<string, AttendanceType>;
 
 const AttendanceManager = () => {
@@ -18,22 +18,25 @@ const AttendanceManager = () => {
     // State'ler
     const [stores, setStores] = useState<Store[]>([]);
     const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
-    const [attendanceMap, setAttendanceMap] = useState<AttendanceMap>({});
+
+    const [localMap, setLocalMap] = useState<AttendanceMap>({});
+    const [originalMap, setOriginalMap] = useState<AttendanceMap>({});
 
     const [selectedStoreId, setSelectedStoreId] = useState("");
 
-    // Varsayılan olarak bugünün ayı
+    // Tarih Seçimi
     const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
-    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1); // 1-12
+    const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [hasChanges, setHasChanges] = useState(false);
 
-    // Ayın günlerini hesapla
+    // Ayın günleri
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
     const daysArray = Array.from({ length: daysInMonth }, (_, i) => i + 1);
 
-    // --- 1. BAŞLANGIÇ ---
+    // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
             if (!currentUser) return;
@@ -51,183 +54,193 @@ const AttendanceManager = () => {
         init();
     }, [currentUser]);
 
-    // --- 2. VERİLERİ YÜKLE ---
-    useEffect(() => {
-        const loadData = async () => {
-            if (!selectedStoreId) {
-                setPersonnelList([]);
-                setAttendanceMap({});
-                return;
+    // --- VERİLERİ YÜKLE ---
+    const loadData = async () => {
+        if (!selectedStoreId) {
+            setPersonnelList([]);
+            setLocalMap({});
+            setOriginalMap({});
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const pQuery = query(collection(db, "personnel"), where("storeId", "==", selectedStoreId), where("isActive", "==", true));
+            const pSnap = await getDocs(pQuery);
+            const pData = pSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Personnel[];
+            setPersonnelList(pData);
+
+            const monthlyData = await getMonthlyAttendance(selectedStoreId, selectedYear, selectedMonth);
+
+            if (monthlyData && monthlyData.records) {
+                setLocalMap(monthlyData.records);
+                setOriginalMap(monthlyData.records);
+            } else {
+                setLocalMap({});
+                setOriginalMap({});
             }
+            setHasChanges(false);
 
-            setLoading(true);
-            try {
-                // A) Personelleri Çek
-                const pQuery = query(collection(db, "personnel"), where("storeId", "==", selectedStoreId), where("isActive", "==", true));
-                const pSnap = await getDocs(pQuery);
-                const pData = pSnap.docs.map(d => ({ id: d.id, ...d.data() })) as Personnel[];
-                setPersonnelList(pData);
-
-                // B) Seçili AYIN Tüm Puantajını Çek
-                // Not: Burada 'date' string karşılaştırması yapıyoruz. YYYY-MM ile başlayanları çekmek için.
-                // Firestore'da 'startAt' ve 'endAt' kullanabiliriz ama basitlik için tüm mağaza verisini çekip filtreleyelim (Veri azsa)
-                // Veya daha iyisi: 'month' alanı ekleyip ona göre sorgu atmak.
-                // Şimdilik client-side filtreleme yapalım (Performans sorunu olursa sorguyu iyileştiririz)
-
-                const startStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-01`;
-                const endStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${daysInMonth}`;
-
-                const attQuery = query(
-                    collection(db, "attendance"),
-                    where("storeId", "==", selectedStoreId),
-                    where("date", ">=", startStr),
-                    where("date", "<=", endStr)
-                );
-
-                const attSnap = await getDocs(attQuery);
-                const mapping: AttendanceMap = {};
-
-                attSnap.docs.forEach(doc => {
-                    const data = doc.data();
-                    const key = `${data.personnelId}_${data.date}`;
-                    mapping[key] = data.type as AttendanceType;
-                });
-
-                setAttendanceMap(mapping);
-
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        loadData();
-    }, [selectedStoreId, selectedMonth, selectedYear]);
-
-    // --- DURUM DEĞİŞTİRME (TIKLAYINCA DÖNGÜ) ---
-    const cycleStatus = async (personnelId: string, day: number) => {
-        const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const key = `${personnelId}_${dateStr}`;
-        const currentType = attendanceMap[key];
-
-        // Döngü Sırası: Boş -> Geldi -> Raporlu -> İzinli -> Boş
-        let nextType: AttendanceType | null = null;
-
-        if (!currentType) nextType = 'Geldi';
-        else if (currentType === 'Geldi') nextType = 'İzinli (Haftalık)';
-        else if (currentType === 'İzinli (Haftalık)') nextType = 'Raporlu';
-        else if (currentType === 'Raporlu') nextType = 'Ücretsiz İzin';
-        else nextType = null; // Sil (Boş)
-
-        // Optimistik Güncelleme
-        const newMap = { ...attendanceMap };
-        if (nextType) newMap[key] = nextType;
-        else delete newMap[key];
-        setAttendanceMap(newMap);
-
-        // Veritabanına Yaz
-        const docId = `att_${personnelId}_${dateStr}`;
-        const ref = doc(db, "attendance", docId);
-
-        if (nextType) {
-            await setDoc(ref, {
-                storeId: selectedStoreId,
-                personnelId,
-                date: dateStr,
-                type: nextType
-            }, { merge: true });
-        } else {
-            // Silmek yerine 'type' alanını boşaltabiliriz veya dökümanı silebiliriz.
-            // Kayıt kalsın ama tipi null olsun diyebiliriz, ya da deleteDoc.
-            // Basitlik için deleteDoc yapalım veya boş string atayalım.
-            // await deleteDoc(ref); // import deleteDoc from firestore
-            // Şimdilik boş tip set edelim
-            await setDoc(ref, { type: null }, { merge: true });
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
         }
     };
 
-    // Renk ve İçerik Yardımcısı
+    useEffect(() => { loadData(); }, [selectedStoreId, selectedMonth, selectedYear]);
+
+    // --- HÜCRE TIKLAMA (YENİ SIRA) ---
+    const cycleStatus = (personnelId: string, day: number) => {
+        const key = `${personnelId}_${String(day).padStart(2, '0')}`;
+        const currentType = localMap[key];
+
+        // Yeni Sıralama: Geldi -> Haftalık -> Yıllık -> Raporlu -> Ücretsiz -> (Boş)
+        let nextType: AttendanceType | undefined = undefined;
+
+        if (!currentType) nextType = 'Geldi';
+        else if (currentType === 'Geldi') nextType = 'Haftalık İzin';
+        else if (currentType === 'Haftalık İzin') nextType = 'Yıllık İzin';
+        else if (currentType === 'Yıllık İzin') nextType = 'Raporlu';
+        else if (currentType === 'Raporlu') nextType = 'Ücretsiz İzin';
+        else nextType = undefined; // Sil
+
+        const newMap = { ...localMap };
+        if (nextType) newMap[key] = nextType;
+        else delete newMap[key];
+
+        setLocalMap(newMap);
+        setHasChanges(true);
+    };
+
+    // --- KAYDETME ---
+    const handleSave = async () => {
+        if (!hasChanges) return;
+        setLoading(true);
+        try {
+            await saveBulkAttendance(selectedStoreId, selectedYear, selectedMonth, localMap);
+            setOriginalMap(localMap);
+            setHasChanges(false);
+            alert("✅ Kayıt Başarılı!");
+        } catch (error) {
+            alert("Kayıt sırasında hata oluştu!");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    // --- ÖZET HESAPLAMA ---
+    const calculateSummary = (personId: string) => {
+        const summary = { geldi: 0, raporlu: 0, ucretsiz: 0, haftalik: 0, yillik: 0 };
+        Object.entries(localMap).forEach(([key, type]) => {
+            if (key.startsWith(personId + '_')) {
+                if (type === 'Geldi') summary.geldi++;
+                else if (type === 'Raporlu') summary.raporlu++;
+                else if (type === 'Ücretsiz İzin') summary.ucretsiz++;
+                else if (type === 'Haftalık İzin') summary.haftalik++;
+                else if (type === 'Yıllık İzin') summary.yillik++;
+            }
+        });
+        return summary;
+    };
+
+    // RENK AYARLARI (İstenilen Renkler)
     const getCellContent = (type?: AttendanceType) => {
         switch (type) {
-            case 'Geldi': return { text: '✔', bg: '#d4edda', color: '#155724' };
-            case 'Raporlu': return { text: 'R', bg: '#f8d7da', color: '#721c24' };
-            case 'İzinli (Haftalık)': return { text: 'İ', bg: '#d6eaf8', color: '#0c5460' };
-            case 'İzinli (Yıllık)': return { text: 'Y', bg: '#e8daef', color: '#6c3483' };
-            case 'Ücretsiz İzin': return { text: 'Ü', bg: '#fcf3cf', color: '#856404' };
+            case 'Geldi': return { text: '✔', bg: '#2ecc71', color: 'white' };       // Yeşil
+            case 'Haftalık İzin': return { text: 'H', bg: '#3498db', color: 'white' }; // Mavi
+            case 'Yıllık İzin': return { text: 'Y', bg: '#e67e22', color: 'white' };   // Turuncu
+            case 'Raporlu': return { text: 'R', bg: '#f1c40f', color: 'black' };       // Sarı
+            case 'Ücretsiz İzin': return { text: 'Ü', bg: '#e74c3c', color: 'white' }; // Kırmızı
             default: return { text: '', bg: 'white', color: 'black' };
         }
     };
+
+    const yearOptions = Array.from({ length: 11 }, (_, i) => 2026 + i);
 
     return (
         <div className="page-container">
             <div className="page-header">
                 <div className="page-title">
-                    <h2>Aylık Puantaj Tablosu</h2>
+                    <h2>Personel Puantaj</h2>
                 </div>
+                {hasChanges && (
+                    <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 25px', fontSize: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
+                        💾 DEĞİŞİKLİKLERİ KAYDET
+                    </button>
+                )}
             </div>
 
-            {/* FİLTRELER */}
-            <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
+            <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-
-                    {/* Yıl Seçimi */}
-                    <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '100px' }}>
-                        <option value={2025}>2025</option>
-                        <option value={2026}>2026</option>
+                    <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '80px' }}>
+                        {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
-
-                    {/* Ay Seçimi */}
-                    <select className="form-input" value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ width: '150px' }}>
+                    <select className="form-input" value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ width: '120px' }}>
                         {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
                             <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('tr-TR', { month: 'long' })}</option>
                         ))}
                     </select>
-
-                    {/* Mağaza Seçimi */}
                     {isAdmin && (
                         <select className="form-input" value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)} style={{ minWidth: '200px' }}>
-                            <option value="">-- Mağaza Seç --</option>
-                            {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                            <option value="">-- Mağaza Seç --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                         </select>
                     )}
                 </div>
             </div>
 
-            {/* MATRIX TABLO */}
+            {selectedStoreId && personnelList.length > 0 && (
+                <div className="card" style={{ marginBottom: '15px' }}>
+                    <div className="card-header" style={{ backgroundColor: '#fdfdfd' }}>
+                        <h3 className="card-title" style={{ fontSize: '14px' }}>📊 {selectedMonth}. Ay Özeti</h3>
+                    </div>
+                    <div className="card-body" style={{ padding: '0', overflowX: 'auto' }}>
+                        <table className="data-table dense">
+                            <thead>
+                                <tr style={{ backgroundColor: '#f8f9fa', fontSize: '11px' }}>
+                                    <th>Personel</th>
+                                    <th style={{ textAlign: 'center', color: '#2ecc71' }}>Geldi</th>
+                                    <th style={{ textAlign: 'center', color: '#3498db' }}>Haftalık</th>
+                                    <th style={{ textAlign: 'center', color: '#e67e22' }}>Yıllık</th>
+                                    <th style={{ textAlign: 'center', color: '#f1c40f' }}>Raporlu</th>
+                                    <th style={{ textAlign: 'center', color: '#e74c3c' }}>Ücretsiz</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {personnelList.map(p => {
+                                    const stats = calculateSummary(p.id!);
+                                    return (
+                                        <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
+                                            <td style={{ fontWeight: '600', fontSize: '12px' }}>{p.fullName}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{stats.geldi || '-'}</td>
+                                            <td style={{ textAlign: 'center' }}>{stats.haftalik || '-'}</td>
+                                            <td style={{ textAlign: 'center' }}>{stats.yillik || '-'}</td>
+                                            <td style={{ textAlign: 'center' }}>{stats.raporlu || '-'}</td>
+                                            <td style={{ textAlign: 'center' }}>{stats.ucretsiz || '-'}</td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
             <div className="card">
                 <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
                     {selectedStoreId ? (
-                        <table className="data-table dense" style={{ borderCollapse: 'collapse', width: '100%' }}>
+                        <table className="data-table dense" style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
                             <thead>
                                 <tr style={{ backgroundColor: '#f1f2f6' }}>
-                                    <th style={{
-                                        position: 'sticky',
-                                        left: 0,
-                                        zIndex: 10,
-                                        backgroundColor: '#f1f2f6',
-                                        borderRight: '2px solid #ddd',
-                                        minWidth: '200px',
-                                        padding: '10px'
-                                    }}>
+                                    <th style={{ position: 'sticky', left: 0, zIndex: 10, backgroundColor: '#f1f2f6', borderRight: '2px solid #ddd', minWidth: '150px', padding: '8px' }}>
                                         Personel
                                     </th>
                                     {daysArray.map(day => {
-                                        // Hafta sonu kontrolü (Cumartesi/Pazar renklendirme)
                                         const date = new Date(selectedYear, selectedMonth - 1, day);
-                                        const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+                                        const isWeekend = date.getDay() === 0;
                                         return (
-                                            <th key={day} style={{
-                                                minWidth: '35px',
-                                                textAlign: 'center',
-                                                fontSize: '12px',
-                                                backgroundColor: isWeekend ? '#e9ecef' : 'inherit',
-                                                color: isWeekend ? '#c0392b' : 'inherit'
-                                            }}>
-                                                {day}<br />
-                                                <span style={{ fontSize: '9px', fontWeight: 'normal' }}>
-                                                    {date.toLocaleDateString('tr-TR', { weekday: 'short' })}
-                                                </span>
+                                            <th key={day} style={{ minWidth: '28px', textAlign: 'center', padding: '4px', backgroundColor: isWeekend ? '#ffebee' : 'inherit', color: isWeekend ? '#c0392b' : 'inherit', borderLeft: '1px solid #eee' }}>
+                                                {day}<br /><span style={{ fontSize: '9px', fontWeight: 'normal', opacity: 0.7 }}>{date.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2)}</span>
                                             </th>
                                         );
                                     })}
@@ -236,44 +249,19 @@ const AttendanceManager = () => {
                             <tbody>
                                 {personnelList.map(person => (
                                     <tr key={person.id}>
-                                        {/* Sabit Personel Kolonu */}
-                                        <td style={{
-                                            position: 'sticky',
-                                            left: 0,
-                                            zIndex: 5,
-                                            backgroundColor: 'white',
-                                            borderRight: '2px solid #ddd',
-                                            fontWeight: '600',
-                                            color: '#2c3e50',
-                                            padding: '8px 12px'
-                                        }}>
+                                        <td style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: 'white', borderRight: '2px solid #ddd', fontWeight: '600', color: '#2c3e50', padding: '6px 10px' }}>
                                             {person.fullName}
                                         </td>
-
-                                        {/* Gün Hücreleri */}
                                         {daysArray.map(day => {
-                                            const dateStr = `${selectedYear}-${String(selectedMonth).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                            const key = `${person.id}_${dateStr}`;
-                                            const status = attendanceMap[key];
+                                            const key = `${person.id}_${String(day).padStart(2, '0')}`;
+                                            const status = localMap[key];
                                             const style = getCellContent(status);
                                             const date = new Date(selectedYear, selectedMonth - 1, day);
-                                            const isWeekend = date.getDay() === 0 || date.getDay() === 6;
-
+                                            const isWeekend = date.getDay() === 0;
                                             return (
-                                                <td
-                                                    key={day}
-                                                    onClick={() => cycleStatus(person.id!, day)}
-                                                    style={{
-                                                        textAlign: 'center',
-                                                        cursor: 'pointer',
-                                                        backgroundColor: status ? style.bg : (isWeekend ? '#f8f9fa' : 'white'),
-                                                        color: style.color,
-                                                        fontWeight: 'bold',
-                                                        fontSize: '14px',
-                                                        border: '1px solid #eee',
-                                                        userSelect: 'none'
-                                                    }}
-                                                    title={status || "Boş (Tıkla Değiştir)"}
+                                                <td key={day} onClick={() => cycleStatus(person.id!, day)}
+                                                    style={{ textAlign: 'center', cursor: 'pointer', backgroundColor: status ? style.bg : (isWeekend ? '#fafafa' : 'white'), color: style.color, fontWeight: 'bold', fontSize: '13px', borderLeft: '1px solid #eee', borderBottom: '1px solid #eee', userSelect: 'none', height: '35px', padding: 0 }}
+                                                    title={status || "Boş"}
                                                 >
                                                     {style.text}
                                                 </td>
@@ -284,19 +272,17 @@ const AttendanceManager = () => {
                             </tbody>
                         </table>
                     ) : (
-                        <div style={{ padding: '50px', textAlign: 'center', color: '#999' }}>
-                            Lütfen mağaza seçiniz.
-                        </div>
+                        <div style={{ padding: '50px', textAlign: 'center', color: '#999' }}>Lütfen mağaza seçiniz.</div>
                     )}
                 </div>
             </div>
 
-            {/* LEJANT (AÇIKLAMA) */}
-            <div style={{ marginTop: '15px', display: 'flex', gap: '15px', fontSize: '12px', color: '#555', flexWrap: 'wrap' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '15px', height: '15px', background: '#d4edda', border: '1px solid #ccc', display: 'inline-block' }}></span> ✔ Geldi</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '15px', height: '15px', background: '#d6eaf8', border: '1px solid #ccc', display: 'inline-block' }}></span> İ (Haftalık İzin)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '15px', height: '15px', background: '#f8d7da', border: '1px solid #ccc', display: 'inline-block' }}></span> R (Raporlu)</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '15px', height: '15px', background: '#fcf3cf', border: '1px solid #ccc', display: 'inline-block' }}></span> Ü (Ücretsiz İzin)</div>
+            <div style={{ marginTop: '15px', display: 'flex', gap: '15px', fontSize: '11px', color: '#555', flexWrap: 'wrap', justifyContent: 'center' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#2ecc71' }}></span> Geldi</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#3498db' }}></span> Haftalık İzin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#e67e22' }}></span> Yıllık İzin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#f1c40f' }}></span> Raporlu</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#e74c3c' }}></span> Ücretsiz İzin</div>
             </div>
         </div>
     );

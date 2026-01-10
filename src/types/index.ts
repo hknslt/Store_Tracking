@@ -173,20 +173,21 @@ export interface Sale {
 
 
 
-// --- PERSONEL DEVAM MODÜLÜ ---
-export type AttendanceType = 
-    | 'Geldi' 
-    | 'Raporlu' 
-    | 'İzinli (Haftalık)' 
-    | 'İzinli (Yıllık)' 
-    | 'Ücretsiz İzin';
+// --- PUANTAJ ---
+export type AttendanceType =
+    | 'Geldi'
+    | 'Raporlu'
+    | 'Ücretsiz İzin'
+    | 'Haftalık İzin'
+    | 'Yıllık İzin';
 
-export interface Attendance {
-    id?: string;
+// Veritabanında bir ayın tamamını tutan belge yapısı
+export interface MonthlyAttendance {
+    id?: string; // Belge ID'si (Örn: 2024_05)
     storeId: string;
-    personnelId: string;
-    personnelName: string; // Listede hızlı göstermek için
-    date: string;          // YYYY-MM-DD formatında
-    type: AttendanceType;
-    note?: string;         // Ekstra not (Örn: Yarım gün geldi)
+    month: string; // "2024-05" formatında
+
+    // Kayıtlar: "PERSONELID_GUN" -> "DURUM"
+    // Örn: "personel123_01": "Geldi"
+    records: Record<string, AttendanceType>;
 }
