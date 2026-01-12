@@ -90,12 +90,20 @@ const AttendanceManager = () => {
 
     useEffect(() => { loadData(); }, [selectedStoreId, selectedMonth, selectedYear]);
 
-    // --- HÜCRE TIKLAMA (YENİ SIRA) ---
+    // --- HÜCRE TIKLAMA (DÜZENLEME) ---
     const cycleStatus = (personnelId: string, day: number) => {
         const key = `${personnelId}_${String(day).padStart(2, '0')}`;
+
+        // 🔒 KİLİT KONTROLÜ: Eğer bu kayıt veritabanında zaten varsa (originalMap), değiştirilemez.
+        if (originalMap[key]) {
+            // İsteğe bağlı: Kullanıcıya uyarı verilebilir
+            // alert("Kaydedilmiş puantaj değiştirilemez!"); 
+            return;
+        }
+
         const currentType = localMap[key];
 
-        // Yeni Sıralama: Geldi -> Haftalık -> Yıllık -> Raporlu -> Ücretsiz -> (Boş)
+        // Döngü: Boş -> Geldi -> Haftalık -> Yıllık -> Raporlu -> Ücretsiz -> Boş
         let nextType: AttendanceType | undefined = undefined;
 
         if (!currentType) nextType = 'Geldi';
@@ -103,7 +111,7 @@ const AttendanceManager = () => {
         else if (currentType === 'Haftalık İzin') nextType = 'Yıllık İzin';
         else if (currentType === 'Yıllık İzin') nextType = 'Raporlu';
         else if (currentType === 'Raporlu') nextType = 'Ücretsiz İzin';
-        else nextType = undefined; // Sil
+        else nextType = undefined; // Sil (Boş)
 
         const newMap = { ...localMap };
         if (nextType) newMap[key] = nextType;
@@ -119,7 +127,7 @@ const AttendanceManager = () => {
         setLoading(true);
         try {
             await saveBulkAttendance(selectedStoreId, selectedYear, selectedMonth, localMap);
-            setOriginalMap(localMap);
+            setOriginalMap(localMap); // Başarılı kayıttan sonra local veriyi original yap (artık kilitli olur)
             setHasChanges(false);
             alert("✅ Kayıt Başarılı!");
         } catch (error) {
@@ -144,7 +152,7 @@ const AttendanceManager = () => {
         return summary;
     };
 
-    // RENK AYARLARI (İstenilen Renkler)
+    // RENK AYARLARI
     const getCellContent = (type?: AttendanceType) => {
         switch (type) {
             case 'Geldi': return { text: '✔', bg: '#2ecc71', color: 'white' };       // Yeşil
@@ -258,12 +266,30 @@ const AttendanceManager = () => {
                                             const style = getCellContent(status);
                                             const date = new Date(selectedYear, selectedMonth - 1, day);
                                             const isWeekend = date.getDay() === 0;
+
+                                            // Kilit Kontrolü
+                                            const isLocked = !!originalMap[key];
+
                                             return (
-                                                <td key={day} onClick={() => cycleStatus(person.id!, day)}
-                                                    style={{ textAlign: 'center', cursor: 'pointer', backgroundColor: status ? style.bg : (isWeekend ? '#fafafa' : 'white'), color: style.color, fontWeight: 'bold', fontSize: '13px', borderLeft: '1px solid #eee', borderBottom: '1px solid #eee', userSelect: 'none', height: '35px', padding: 0 }}
-                                                    title={status || "Boş"}
+                                                <td key={day}
+                                                    onClick={() => cycleStatus(person.id!, day)}
+                                                    style={{
+                                                        textAlign: 'center',
+                                                        cursor: isLocked ? 'not-allowed' : 'pointer', // Kilitliyse imleç değişir
+                                                        backgroundColor: status ? style.bg : (isWeekend ? '#fafafa' : 'white'),
+                                                        color: style.color,
+                                                        fontWeight: 'bold',
+                                                        fontSize: '13px',
+                                                        borderLeft: '1px solid #eee',
+                                                        borderBottom: '1px solid #eee',
+                                                        userSelect: 'none',
+                                                        height: '35px',
+                                                        padding: 0,
+                                                        opacity: isLocked ? 0.8 : 1 // Kilitli olduğunu görsel olarak da hissettir
+                                                    }}
+                                                    title={isLocked ? "🔒 Kayıtlı Veri Değiştirilemez" : (status || "Boş")}
                                                 >
-                                                    {style.text}
+                                                    {status ? style.text : (isLocked ? '' : '')}
                                                 </td>
                                             );
                                         })}

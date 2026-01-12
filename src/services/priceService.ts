@@ -1,51 +1,38 @@
-// src/services/priceService.ts
 import { db } from "../firebase";
-import { 
-    collection, 
-    addDoc, 
-    getDocs, 
-    query, 
-    where, 
-    updateDoc, 
-    doc 
-} from "firebase/firestore";
+import { collection, getDocs, doc, setDoc } from "firebase/firestore";
 import type { Price } from "../types";
 
 const PRICE_COLLECTION = "prices";
 
 // Tüm fiyatları getir
 export const getAllPrices = async (): Promise<Price[]> => {
-    const snapshot = await getDocs(collection(db, PRICE_COLLECTION));
-    return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    })) as Price[];
+    try {
+        const snapshot = await getDocs(collection(db, PRICE_COLLECTION));
+        return snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        })) as Price[];
+    } catch (error) {
+        console.error("Fiyat çekme hatası:", error);
+        return [];
+    }
 };
 
-// Fiyat Kaydet veya Güncelle (Upsert Mantığı)
-export const saveProductPrice = async (productId: string, amount: number) => {
+// Fiyat Kaydet (Tekil veya Ebatlı)
+export const saveProductPrice = async (productId: string, dimensionId: string | null, amount: number) => {
     try {
-        // 1. Önce bu ürünün fiyatı var mı diye kontrol et
-        const q = query(
-            collection(db, PRICE_COLLECTION), 
-            where("productId", "==", productId)
-        );
-        const snapshot = await getDocs(q);
+        // ID Formatı: "URUNID_EBATID" veya "URUNID_std"
+        const docId = dimensionId ? `${productId}_${dimensionId}` : `${productId}_std`;
+        const priceRef = doc(db, PRICE_COLLECTION, docId);
 
-        if (!snapshot.empty) {
-            // VARSA: Güncelle
-            const priceDocId = snapshot.docs[0].id;
-            const priceRef = doc(db, PRICE_COLLECTION, priceDocId);
-            await updateDoc(priceRef, { amount });
-        } else {
-            // YOKSA: Yeni Ekle
-            await addDoc(collection(db, PRICE_COLLECTION), {
-                productId,
-                amount
-            });
-        }
+        await setDoc(priceRef, {
+            productId,
+            dimensionId: dimensionId || null,
+            amount: Number(amount)
+        }, { merge: true });
+
     } catch (error) {
-        console.error("Fiyat işlemi hatası:", error);
+        console.error("Fiyat kaydetme hatası:", error);
         throw error;
     }
 };

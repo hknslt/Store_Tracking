@@ -251,7 +251,7 @@ const SaleAdd = () => {
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 1fr', gap: '10px' }}>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Açık Adres</label><textarea name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" rows={1} style={{ resize: 'vertical', height: '32px', padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Notu</label><input name="customerNote" value={headerData.customerNote} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} placeholder="Örn: 20 Mayıs" /></div>
+                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Notu</label><input name="customerNote" value={headerData.customerNote} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} placeholder="Örn: 15 gün sonra teslim" /></div>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Nakliye</label><input type="number" name="shippingCost" value={headerData.shippingCost} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
                 </div>
             </div>

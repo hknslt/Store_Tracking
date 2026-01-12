@@ -29,6 +29,10 @@ import ColorsPage from "./pages/definitions/colors/ColorsPage";
 import DimensionsPage from "./pages/definitions/dimensions/DimensionsPage";
 import CushionsPage from "./pages/definitions/cushions/CushionsPage";
 import AttendanceManager from "./pages/personnel/AttendanceManager";
+import PriceManager from "./pages/prices/PriceManager";
+import SSHList from "./pages/ssh/SSHList";
+import SSHAdd from "./pages/ssh/SSHAdd";
+import SaleDetail from "./pages/sales/SaleDetail";
 
 // --- 1. KORUMALI DÜZEN (Sidebar Burada Olacak) ---
 // Giriş yapmış kullanıcılar burayı ve Sidebar'ı görür.
@@ -110,6 +114,8 @@ function App() {
 
             {/* Fiyat & Stok & Alış */}
             <Route path="/prices/list" element={<PriceList />} />
+            <Route path="/prices/manage" element={<PriceManager />} />
+
             <Route path="/stocks" element={<StockList />} />
             <Route path="/store-stocks" element={<StoreStockManager />} />
 
@@ -126,10 +132,17 @@ function App() {
             {/* Satış Modülü */}
             <Route path="/sales" element={<SaleList />} />
             <Route path="/sales/add" element={<SaleAdd />} />
+            <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
             
             {/* Puantaj Yönetimi */}
             <Route path="/attendance" element={<AttendanceManager />} />
+
+          {/* SSH Kayıtları */}
+          <Route path="/ssh/list" element={<SSHList />} />
+          <Route path="/ssh/add" element={<SSHAdd />} />
           </Route>
+
+          
 
           {/* Hatalı Rota */}
           <Route path="*" element={<Navigate to="/" />} />

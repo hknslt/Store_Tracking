@@ -1,86 +1,226 @@
-/* src/App.css içine ekleyin */
+/* src/components/styles/Sidebar.css */
 
-/* --- SIDEBAR (YAN MENÜ) --- */
-.sidebar {
-  width: 260px;
-  background-color: var(--secondary-color); /* Koyu Lacivert */
-  color: #ecf0f1;
-  display: flex;
-  flex-direction: column;
-  height: 100vh; /* Ekran boyu kadar */
-  position: sticky; /* Sayfa kaydığında sabit kalsın */
-  top: 0;
-  overflow-y: auto; /* Menü çok uzarsa scroll olsun */
-  flex-shrink: 0;
-  border-right: 1px solid rgba(255,255,255,0.05);
-  box-shadow: 4px 0 10px rgba(0,0,0,0.1);
+:root {
+  --sidebar-bg: #1e293b;
+  /* Koyu Gri-Mavi */
+  --sidebar-width: 280px;
+  --sidebar-text: #94a3b8;
+  /* Soluk Gri Metin */
+  --sidebar-text-active: #ffffff;
+  /* Aktif Beyaz */
+  --primary-glow: rgba(56, 189, 248, 0.15);
+  /* Mavi Işıltı */
+  --primary-accent: #38bdf8;
+  /* Açık Mavi */
+  --danger-color: #ef4444;
+  /* Kırmızı */
 }
 
+/* --- ANA KONTEYNER --- */
+.sidebar {
+  width: var(--sidebar-width);
+  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+  /* Hafif dikey geçiş */
+  color: var(--sidebar-text);
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  position: sticky;
+  top: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  flex-shrink: 0;
+  z-index: 100;
+  font-family: 'Inter', sans-serif;
+}
+
+/* --- HEADER --- */
 .sidebar-header {
-  padding: 20px;
-  border-bottom: 1px solid rgba(255,255,255,0.1);
+  padding: 25px 20px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-icon {
+  font-size: 1.5rem;
+  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
 }
 
 .sidebar-header h2 {
   margin: 0;
-  font-size: 1.2rem;
+  font-size: 1.3rem;
   font-weight: 700;
-  letter-spacing: 0.5px;
   color: #fff;
+  letter-spacing: -0.5px;
 }
 
+/* --- NAVİGASYON --- */
 .sidebar-nav {
-  padding: 15px;
+  padding: 20px 12px;
+  flex: 1;
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 5px;
+  gap: 4px;
 }
 
+/* Scrollbar'ı Güzelleştir */
+.sidebar-nav::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar-nav::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* Başlıklar (YÖNETİM, MODÜLLER vb.) */
 .nav-section {
-  color: #95a5a6;
-  font-size: 11px;
+  font-size: 0.75rem;
   font-weight: 700;
+  color: #64748b;
+  margin: 20px 0 8px 12px;
   text-transform: uppercase;
-  letter-spacing: 1px;
-  margin: 20px 0 10px 10px;
+  letter-spacing: 1.2px;
 }
 
-/* NavLink Stilleri */
+/* Menü Öğeleri */
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 12px 15px;
-  color: #bdc3c7;
+  padding: 12px 16px;
+  color: var(--sidebar-text);
   text-decoration: none;
   border-radius: 8px;
-  font-size: 14px;
-  transition: all 0.2s ease;
+  font-size: 0.95rem;
   font-weight: 500;
-}
-
-.nav-item:hover {
-  background-color: rgba(255,255,255,0.1);
-  color: #fff;
-  transform: translateX(3px);
-}
-
-/* Aktif Sayfa Stili (React Router NavLink otomatik ekler) */
-.nav-item.active {
-  background-color: var(--primary-color);
-  color: white;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.2);
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
 .nav-icon {
-  margin-right: 12px;
-  font-size: 1.1rem;
+  margin-right: 14px;
+  font-size: 1.2rem;
+  opacity: 0.8;
+  transition: transform 0.2s;
 }
 
+/* Hover Durumu */
+.nav-item:hover {
+  background-color: rgba(255, 255, 255, 0.03);
+  color: #fff;
+}
+
+.nav-item:hover .nav-icon {
+  opacity: 1;
+  transform: translateX(2px);
+}
+
+/* Aktif (Seçili) Durum */
+.nav-item.active {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%);
+  color: var(--sidebar-text-active);
+}
+
+/* Aktif olduğunda soldaki mavi çizgi */
+.nav-item.active::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 3px;
+  background-color: var(--primary-accent);
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 0 10px var(--primary-accent);
+}
+
+.nav-item.active .nav-icon {
+  color: var(--primary-accent);
+  opacity: 1;
+}
+
+/* --- FOOTER (KULLANICI KARTI) --- */
 .sidebar-footer {
-  margin-top: auto;
-  padding: 20px;
-  font-size: 12px;
-  color: #7f8c8d;
-  text-align: center;
-  border-top: 1px solid rgba(255,255,255,0.05);
+  padding: 16px;
+  background-color: rgba(0, 0, 0, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.user-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.user-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  font-size: 14px;
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.user-email {
+  font-size: 0.85rem;
+  color: #fff;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 140px;
+}
+
+.user-role {
+  font-size: 0.7rem;
+  color: #64748b;
+}
+
+/* Çıkış Butonu */
+.logout-btn {
+  width: 100%;
+  padding: 10px;
+  background-color: transparent;
+  color: #f87171;
+  /* Soluk Kırmızı */
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  font-weight: 600;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.logout-btn:hover {
+  background-color: rgba(239, 68, 68, 0.1);
+  border-color: var(--danger-color);
+  color: #fff;
 }

@@ -1,134 +1,145 @@
 // src/components/Sidebar.tsx
 import { NavLink, useNavigate } from "react-router-dom";
-import { useAuth } from "../context/AuthContext"; 
+import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import "./styles/Sidebar.css";
+import "./styles/Sidebar.css"; // CSS dosyasını buradan çağırıyoruz
 
 const Sidebar = () => {
-  const { currentUser } = useAuth(); // 2. Aktif kullanıcıyı al
+  const { currentUser } = useAuth();
   const navigate = useNavigate();
 
-  // 3. Çıkış Yapma Fonksiyonu
   const handleLogout = async () => {
     try {
       await signOut(auth);
-      navigate("/login"); // Çıkış yapınca login'e at
+      navigate("/login");
     } catch (error) {
       console.error("Çıkış hatası:", error);
     }
   };
 
+  // E-postanın baş harfini almak için
+  const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
+
   return (
     <div className="sidebar">
+      {/* HEADER */}
       <div className="sidebar-header">
-        <h2>Flexy Mağaza</h2>
-        {/* Kullanıcı rolünü veya e-postasını burada veya footerda gösterebiliriz */}
+        <span className="brand-icon">⚡</span>
+        <h2>Flexy Panel</h2>
       </div>
 
+      {/* NAVIGASYON LİSTESİ */}
       <nav className="sidebar-nav">
 
         <NavLink to="/" className="nav-item" end>
           <span className="nav-icon">🏠</span>
-          Ana Sayfa
+          <span>Ana Sayfa</span>
         </NavLink>
 
-        <div className="nav-section">YÖNETİM</div>
+        <div className="nav-section">Yönetim</div>
 
         <NavLink to="/stores" className="nav-item">
           <span className="nav-icon">🏢</span>
-          Mağazalar
+          <span>Mağazalar</span>
         </NavLink>
 
         <NavLink to="/personnel" className="nav-item">
           <span className="nav-icon">👥</span>
-          Personeller
+          <span>Personeller</span>
         </NavLink>
 
         <NavLink to="/store-stocks" className="nav-item">
           <span className="nav-icon">🏪</span>
-          Mağaza Stokları
+          <span>Mağaza Stokları</span>
         </NavLink>
 
-        <div className="nav-section">MODÜLLER</div>
+        <div className="nav-section">Modüller</div>
 
-        <NavLink to="/purchases" className="nav-item">
-          <span className="nav-icon">🛒</span>
-          Alışlar
+        <NavLink to="/sales/add" className="nav-item">
+          <span className="nav-icon">➕</span>
+          <span>Hızlı Satış</span>
         </NavLink>
 
         <NavLink to="/sales" className="nav-item">
           <span className="nav-icon">🧾</span>
-          Satışlar
-        </NavLink>
-        
-        <NavLink to="/attendance" className="nav-item">
-          <span className="nav-icon">📅</span>
-          Puantaj Yönetimi
+          <span>Satış Listesi</span>
         </NavLink>
 
-        <div className="nav-section">TANIMLAMALAR</div>
+        <NavLink to="/purchases" className="nav-item">
+          <span className="nav-icon">🛒</span>
+          <span>Alışlar</span>
+        </NavLink>
+
+        <NavLink to="/attendance" className="nav-item">
+          <span className="nav-icon">📅</span>
+          <span>Puantaj</span>
+        </NavLink>
+        <NavLink to="/ssh/list" className="nav-item">
+          <span className="nav-icon">🛠️</span>
+          <span>SSH Kayıtları</span>
+        </NavLink>
+
+        <div className="nav-section">Katalog & Stok</div>
 
         <NavLink to="/products" className="nav-item">
           <span className="nav-icon">📦</span>
-          Ürün Listesi
-        </NavLink>
-
-        <NavLink to="/prices/list" className="nav-item">
-          <span className="nav-icon">💲</span>
-          Fiyat Yönetimi
+          <span>Ürün Listesi</span>
         </NavLink>
 
         <NavLink to="/stocks" className="nav-item">
           <span className="nav-icon">📊</span>
-          Merkez Stok
+          <span>Merkez Stok</span>
         </NavLink>
 
-        {/* Grup ve Kategori rotaları ayrıydı, onları ayırdık */}
+        <NavLink to="/prices/list" className="nav-item">
+          <span className="nav-icon">💲</span>
+          <span>Fiyat Listesi</span>
+        </NavLink>
+
+        <div className="nav-section">Tanımlamalar</div>
+
+        {/* Tanımlamaları tek tek listelemek yerine daha kompakt */}
         <NavLink to="/definitions/general" className="nav-item">
           <span className="nav-icon">📂</span>
-          Gruplar/Kategoriler
+          <span>Gruplar</span>
         </NavLink>
 
         <NavLink to="/definitions/colors" className="nav-item">
           <span className="nav-icon">🎨</span>
-          Renkler
+          <span>Renkler</span>
         </NavLink>
 
         <NavLink to="/definitions/dimensions" className="nav-item">
           <span className="nav-icon">📏</span>
-          Ebatlar
+          <span>Ebatlar</span>
         </NavLink>
 
         <NavLink to="/definitions/cushions" className="nav-item">
           <span className="nav-icon">🛋️</span>
-          Minderler
+          <span>Minderler</span>
         </NavLink>
 
       </nav>
 
-      {/* FOOTER: Kullanıcı Bilgisi ve Çıkış */}
+      {/* FOOTER - KULLANICI KARTI */}
       <div className="sidebar-footer">
-        <div style={{ marginBottom: '10px', fontSize: '12px', color: '#bdc3c7' }}>
-          Giriş Yapan: <br />
-          <span style={{ color: 'white' }}>{currentUser?.email}</span>
-        </div>
+        <div className="user-card">
+          <div className="user-info">
+            <div className="user-avatar">
+              {userInitial}
+            </div>
+            <div className="user-details">
+              <span className="user-email">{currentUser?.email}</span>
+              <span className="user-role">Aktif Kullanıcı</span>
+            </div>
+          </div>
 
-        <button
-          onClick={handleLogout}
-          style={{
-            width: '100%',
-            padding: '8px',
-            backgroundColor: '#c0392b',
-            color: 'white',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-          }}
-        >
-          Çıkış Yap
-        </button>
+          <button onClick={handleLogout} className="logout-btn">
+            <span>Çıkış Yap</span>
+            <span>➜</span>
+          </button>
+        </div>
       </div>
     </div>
   );

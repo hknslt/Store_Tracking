@@ -212,3 +212,33 @@ export interface PendingRequest {
     requestDate: string; // Talep tarihi
     productNote?: string;
 }
+
+export interface Price {
+    id?: string;        // Firebase Doc ID (örn: "prod123_dim456")
+    productId: string;
+    dimensionId: string | null; // null ise standart fiyat, dolu ise o ebata ait fiyat
+    amount: number;
+}
+
+
+// --- SSH (SATIŞ SONRASI HİZMETLER) ---
+export interface SSHItem {
+    description: string; // Yapılan işlem (Örn: Ayak değişimi)
+    price: number;       // İşlem tutarı
+}
+
+export interface SSHRecord {
+    id?: string;
+    storeId: string;
+    saleId: string;        // Hangi satışa ait olduğu
+    saleReceiptNo: string; // Fiş No
+    customerName: string;  // Müşteri Adı
+    phone: string;         // İletişim
+
+    items: SSHItem[];      // Yapılan işlemler listesi
+    totalCost: number;     // Toplam Servis Ücreti
+    
+    shippingMethod: string; // Sevkiyat (Mağazadan, Nakliye, Kargo)
+    status: 'Açık' | 'Kapalı'; // Servis durumu
+    createdAt: string;     // Kayıt tarihi
+}

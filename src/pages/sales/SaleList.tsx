@@ -1,6 +1,6 @@
 // src/pages/sales/SaleList.tsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom"; // useNavigate eklendi
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -20,28 +20,23 @@ import "../../App.css";
 
 const SaleList = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate(); // Yönlendirme için
 
-    // --- STATE'LER ---
+    // ... (State'ler aynı) ...
     const [sales, setSales] = useState<Sale[]>([]);
     const [stores, setStores] = useState<Store[]>([]);
-
-    // Tanımlar
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
-
     const [selectedStoreId, setSelectedStoreId] = useState("");
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
-
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-
-    // Açılan satırdaki ürünlerin güncel stok durumlarını tutmak için
     const [rowStockStatus, setRowStockStatus] = useState<Record<string, number>>({});
 
-    // --- 1. BAŞLANGIÇ VERİLERİ ---
+    // ... (useEffect ve refreshSales aynı) ...
     useEffect(() => {
         const initData = async () => {
             if (!currentUser) return;
@@ -62,7 +57,6 @@ const SaleList = () => {
         initData();
     }, [currentUser]);
 
-    // --- 2. SATIŞLARI ÇEK ---
     const refreshSales = async () => {
         if (!selectedStoreId) return;
         const data = await getSalesByStore(selectedStoreId);
@@ -72,14 +66,13 @@ const SaleList = () => {
 
     useEffect(() => { refreshSales(); }, [selectedStoreId]);
 
-    // --- YARDIMCILAR ---
+    // ... (Yardımcı fonksiyonlar aynı) ...
     const formatDate = (dateString: string) => { if (!dateString) return "-"; return new Date(dateString).toLocaleDateString('tr-TR'); };
     const getCatName = (id?: string) => categories.find(c => c.id === id)?.categoryName || "";
     const getCushionName = (id?: string) => cushions.find(c => c.id === id)?.cushionName || "-";
     const getColorName = (id?: string) => colors.find(c => c.id === id)?.colorName || "-";
     const getDimensionName = (id?: string | null) => id ? (dimensions.find(d => d.id === id)?.dimensionName || "") : "";
 
-    // --- SATIR AÇMA VE STOK KONTROLÜ ---
     const toggleRow = async (saleId: string) => {
         if (expandedRowId === saleId) {
             setExpandedRowId(null);
@@ -93,29 +86,30 @@ const SaleList = () => {
                     const uniqueId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                     const stockRef = doc(db, "stores", selectedStoreId, "stocks", uniqueId);
                     const snap = await getDoc(stockRef);
-                    if (snap.exists()) {
-                        stocks[uniqueId] = snap.data().reservedStock || 0;
-                    } else {
-                        stocks[uniqueId] = 0;
-                    }
+                    stocks[uniqueId] = snap.exists() ? snap.data().reservedStock || 0 : 0;
                 }));
                 setRowStockStatus(stocks);
             }
         }
     };
 
-    // --- DURUM GÜNCELLEME (Butona basınca) ---
     const handleStatusClick = async (saleId: string, itemIndex: number, currentStatus: DeliveryStatus) => {
-        // Eğer şu an 'Bekliyor' ise 'Teslim Edildi' yap.
-        // Eğer 'Teslim Edildi' ise 'Bekliyor' yap (Geri alma).
         const newStatus: DeliveryStatus = currentStatus === 'Teslim Edildi' ? 'Bekliyor' : 'Teslim Edildi';
-
         try {
             await updateSaleItemStatus(selectedStoreId, saleId, itemIndex, newStatus);
             await refreshSales();
             if (expandedRowId === saleId) toggleRow(saleId);
         } catch (error: any) {
             alert("Hata: " + error.message);
+        }
+    };
+
+    // Detay Sayfasına Gitme Fonksiyonu
+    const goToDetail = (sale: Sale) => {
+        // ID varsa yönlendir. URL yapınıza göre burayı düzenleyin.
+        // Örn: /sales/STORE_ID/SALE_ID
+        if (sale.id && selectedStoreId) {
+            navigate(`/sales/${selectedStoreId}/${sale.id}`, { state: { sale } });
         }
     };
 
@@ -169,12 +163,7 @@ const SaleList = () => {
                                         return (
                                             <>
                                                 {/* ANA SATIR */}
-                                                <tr
-                                                    key={s.id}
-                                                    onClick={() => s.id && toggleRow(s.id)}
-                                                    className="hover-row"
-                                                    style={{ cursor: 'pointer', backgroundColor: expandedRowId === s.id ? '#f0fdf4' : 'white', borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee' }}
-                                                >
+                                                <tr key={s.id} onClick={() => s.id && toggleRow(s.id)} className="hover-row" style={{ cursor: 'pointer', backgroundColor: expandedRowId === s.id ? '#f0fdf4' : 'white', borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee' }}>
                                                     <td style={{ textAlign: 'center', fontSize: '18px' }}>{isAllDelivered ? <span style={{ color: '#27ae60' }}>●</span> : <span style={{ color: '#e74c3c' }}>●</span>}</td>
                                                     <td>{formatDate(s.date)}</td>
                                                     <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
@@ -191,11 +180,21 @@ const SaleList = () => {
                                                         <td colSpan={8} style={{ padding: '20px' }}>
                                                             <div style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', backgroundColor: 'white' }}>
 
-                                                                {/* DETAY BİLGİLER */}
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '20px', marginBottom: '15px', fontSize: '13px', color: '#555', borderBottom: '1px solid #eee', paddingBottom: '10px' }}>
+                                                                {/* DETAY BİLGİLER + BUTON YERLEŞİMİ */}
+                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '20px', marginBottom: '15px', fontSize: '13px', color: '#555', borderBottom: '1px solid #eee', paddingBottom: '10px', alignItems: 'center' }}>
                                                                     <div><strong>Telefon:</strong> {s.phone}</div>
                                                                     <div><strong>Adres:</strong> {s.address || "-"}</div>
-                                                                    <div style={{ textAlign: 'right', color: '#e67e22' }}><strong>Nakliye:</strong> {s.shippingCost} ₺</div>
+
+                                                                    {/* 👇 YENİ: BUTON BURADA */}
+                                                                    <div style={{ textAlign: 'right' }}>
+                                                                        <button
+                                                                            onClick={(e) => { e.stopPropagation(); goToDetail(s); }}
+                                                                            className="btn btn-sm btn-info"
+                                                                            style={{ fontSize: '12px', padding: '5px 10px' }}
+                                                                        >
+                                                                            🔍 Satış Detayına Git
+                                                                        </button>
+                                                                    </div>
                                                                 </div>
 
                                                                 {/* ÜRÜN TABLOSU */}
@@ -216,15 +215,9 @@ const SaleList = () => {
                                                                         {s.items.map((item, idx) => {
                                                                             const uniqueId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                                                                             const availableReserved = rowStockStatus[uniqueId] || 0;
-
                                                                             const isSupplyFromCenter = item.supplyMethod === 'Merkezden';
-                                                                            // Merkezden ise: Rezerve stok (gelen stok) adet kadar var mı?
                                                                             const isArrived = availableReserved >= item.quantity;
                                                                             const isDelivered = item.deliveryStatus === 'Teslim Edildi';
-
-                                                                            // Buton Aktif mi?
-                                                                            // Eğer 'Teslim Edildi' ise her zaman aktif (Geri almak için)
-                                                                            // Değilse: Stoktansa aktif, Merkezdense sadece gelince aktif.
                                                                             const isActionEnabled = isDelivered || !isSupplyFromCenter || isArrived;
 
                                                                             return (
@@ -239,45 +232,14 @@ const SaleList = () => {
                                                                                     <td style={{ fontStyle: 'italic', color: '#777' }}>{item.productNote || "-"}</td>
                                                                                     <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
                                                                                     <td style={{ textAlign: 'right' }}>{item.price} ₺</td>
-
-                                                                                    {/* TEMİN SÜTUNU */}
                                                                                     <td style={{ textAlign: 'center' }}>
-                                                                                        {item.supplyMethod === 'Stoktan' ? (
-                                                                                            <span className="badge badge-success" style={{ fontSize: '10px' }}>Stoktan</span>
-                                                                                        ) : (
-                                                                                            <span
-                                                                                                className="badge"
-                                                                                                style={{
-                                                                                                    fontSize: '10px',
-                                                                                                    backgroundColor: isArrived ? '#27ae60' : '#e74c3c', // Gelince Yeşil, Yoksa Kırmızı
-                                                                                                    color: 'white'
-                                                                                                }}
-                                                                                            >
-                                                                                                {isArrived ? 'Merkez' : 'Merkez'}
-                                                                                            </span>
-                                                                                        )}
+                                                                                        <span className="badge" style={{ fontSize: '10px', backgroundColor: (item.supplyMethod === 'Stoktan' || isArrived) ? '#27ae60' : '#e74c3c', color: 'white' }}>
+                                                                                            {item.supplyMethod === 'Stoktan' ? 'Stoktan' : (isArrived ? 'Merkez' : 'Merkez')}
+                                                                                        </span>
                                                                                     </td>
-
-                                                                                    {/* TESLİM BUTONU */}
                                                                                     <td style={{ textAlign: 'center' }}>
-                                                                                        <button
-                                                                                            onClick={() => handleStatusClick(s.id!, idx, item.deliveryStatus!)}
-                                                                                            disabled={!isActionEnabled}
-                                                                                            className={`btn ${isDelivered ? 'btn-success' : 'btn-primary'}`}
-                                                                                            style={{
-                                                                                                width: '100%',
-                                                                                                padding: '5px 8px',
-                                                                                                fontSize: '11px',
-                                                                                                opacity: isActionEnabled ? 1 : 0.5,
-                                                                                                cursor: isActionEnabled ? 'pointer' : 'not-allowed',
-                                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px'
-                                                                                            }}
-                                                                                        >
-                                                                                            {isDelivered ? (
-                                                                                                <>✔ Teslim Edildi</>
-                                                                                            ) : (
-                                                                                                <>{isActionEnabled ? 'Teslim Et' : 'Stok Bekleniyor'}</>
-                                                                                            )}
+                                                                                        <button onClick={() => handleStatusClick(s.id!, idx, item.deliveryStatus!)} disabled={!isActionEnabled} className={`btn ${isDelivered ? 'btn-success' : 'btn-primary'}`} style={{ width: '100%', padding: '5px 8px', fontSize: '11px', opacity: isActionEnabled ? 1 : 0.5, cursor: isActionEnabled ? 'pointer' : 'not-allowed', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
+                                                                                            {isDelivered ? <>✔ Teslim Edildi</> : <>{isActionEnabled ? 'Teslim Et' : 'Stok Bekleniyor'}</>}
                                                                                         </button>
                                                                                     </td>
                                                                                 </tr>
@@ -285,7 +247,18 @@ const SaleList = () => {
                                                                         })}
                                                                     </tbody>
                                                                 </table>
-                                                                <div style={{ marginTop: '10px', textAlign: 'right', fontSize: '14px', fontWeight: 'bold', color: '#2c3e50' }}>Genel Toplam: {grandTotal.toFixed(2)} ₺</div>
+
+                                                                {/* 👇 YENİ: NAKLİYE VE TOPLAM YERLEŞİMİ */}
+                                                                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', gap: '30px', alignItems: 'center', fontSize: '14px', color: '#2c3e50', borderTop: '1px solid #eee', paddingTop: '10px' }}>
+                                                                    <div>
+                                                                        <span style={{ color: '#7f8c8d', marginRight: '5px' }}>Nakliye:</span>
+                                                                        <b>{s.shippingCost} ₺</b>
+                                                                    </div>
+                                                                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>
+                                                                        Genel Toplam: {grandTotal.toFixed(2)} ₺
+                                                                    </div>
+                                                                </div>
+
                                                             </div>
                                                         </td>
                                                     </tr>
