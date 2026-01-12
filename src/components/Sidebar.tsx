@@ -3,7 +3,10 @@ import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
-import "./styles/Sidebar.css"; // CSS dosyasını buradan çağırıyoruz
+import "./styles/Sidebar.css";
+
+// 👇 LOGO IMPORT
+import logo from "../assets/logo/Bahçemo_white.png";
 
 const Sidebar = () => {
   const { currentUser } = useAuth();
@@ -18,15 +21,31 @@ const Sidebar = () => {
     }
   };
 
-  // E-postanın baş harfini almak için
   const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
 
   return (
     <div className="sidebar">
-      {/* HEADER */}
-      <div className="sidebar-header">
-        <span className="brand-icon">⚡</span>
-        <h2>Flexy Panel</h2>
+      {/* HEADER (Logo Güncellendi) */}
+      <div
+        className="sidebar-header"
+        style={{
+          display: 'flex',
+          flexDirection: 'column', // Alt alta diz (Logo üstte, yazı altta olsun isterseniz)
+          justifyContent: 'center', // Yatayda ortala
+          alignItems: 'center',     // Dikeyde ortala
+          padding: '20px',
+          gap: '10px' // Logo ile alttaki yazı arasındaki boşluk
+        }}
+      >
+        <img
+          src={logo}
+          alt="Flexy Logo"
+          style={{
+            width: '150px',       // İstediğiniz genişlik
+            height: '80px',       // İstediğiniz yükseklik
+            objectFit: 'contain'  // Resim bozulmasın diye (Alternatifleri aşağıda)
+          }}
+        />
       </div>
 
       {/* NAVIGASYON LİSTESİ */}
@@ -99,7 +118,6 @@ const Sidebar = () => {
 
         <div className="nav-section">Tanımlamalar</div>
 
-        {/* Tanımlamaları tek tek listelemek yerine daha kompakt */}
         <NavLink to="/definitions/general" className="nav-item">
           <span className="nav-icon">📂</span>
           <span>Gruplar</span>
@@ -122,7 +140,7 @@ const Sidebar = () => {
 
       </nav>
 
-      {/* FOOTER - KULLANICI KARTI */}
+      {/* FOOTER */}
       <div className="sidebar-footer">
         <div className="user-card">
           <div className="user-info">
