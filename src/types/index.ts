@@ -100,6 +100,7 @@ export interface PurchaseItem {
 
     // Ürün bazlı durum takibi (Örn: Biri üretimde, diğeri sevk edildi olabilir)
     status: PurchaseStatus;
+    itemType: 'Stok' | 'Sipariş';
 }
 
 export interface Purchase {
@@ -186,8 +187,28 @@ export interface MonthlyAttendance {
     id?: string; // Belge ID'si (Örn: 2024_05)
     storeId: string;
     month: string; // "2024-05" formatında
-
-    // Kayıtlar: "PERSONELID_GUN" -> "DURUM"
-    // Örn: "personel123_01": "Geldi"
     records: Record<string, AttendanceType>;
+}
+
+
+// --- BEKLEYEN TALEP (Pending Request) ---
+export interface PendingRequest {
+    id?: string;
+    storeId: string;
+    saleId: string;      // Hangi satıştan geldi
+    saleReceiptNo: string;
+    customerName: string;
+    
+    // Ürün Bilgileri
+    groupId: string;
+    categoryId: string;
+    productId: string;
+    productName: string;
+    colorId: string;
+    cushionId: string;
+    dimensionId?: string | null;
+    
+    quantity: number;
+    requestDate: string; // Talep tarihi
+    productNote?: string;
 }

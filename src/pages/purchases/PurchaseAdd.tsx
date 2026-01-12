@@ -1,19 +1,20 @@
 // src/pages/purchases/PurchaseAdd.tsx
 import { useState, useEffect, useRef } from "react";
-// ... (Importlar aynı)
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { addPurchase } from "../../services/purchaseService";
-import { getGroups, getCategoriesByGroupId, getColors, getDimensions, getCushions } from "../../services/definitionService";
-import { getProductsByCategoryId } from "../../services/productService";
+import { addPurchase, getPendingRequests, deletePendingRequests } from "../../services/purchaseService";
 import { getStores } from "../../services/storeService";
-import type { PurchaseItem, Store, Personnel, Group, Category, Product, Color, Dimension, Cushion, PurchaseType } from "../../types";
+import { getGroups, getCategoriesByGroupId, getCushions, getColors, getDimensions } from "../../services/definitionService";
+import { getProductsByCategoryId } from "../../services/productService";
+
+import type { Purchase, PurchaseItem, Store, Personnel, Group, Category, Product, Color, Dimension, Cushion, PendingRequest } from "../../types";
 import "../../App.css";
 
 const PurchaseAdd = () => {
     const { currentUser } = useAuth();
-    // ... (Listeler ve Tanımlar State'leri aynı)
+
+    // --- LİSTELER ---
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
@@ -21,26 +22,31 @@ const PurchaseAdd = () => {
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
+
     const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // --- BAŞLIK STATE ---
-    const [transactionType, setTransactionType] = useState<PurchaseType>('Alış');
+    // --- BEKLEYEN TALEPLER ---
+    const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
+    const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
+
+    // --- BAŞLIK STATE (Sadece Alış) ---
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
-        storeId: "",
-        contactName: "" // İade ise Müşteri Adı, Alış ise Boş
+        storeId: ""
     });
 
-    // ... (Satır Item State'leri aynı)
+    // --- SATIR STATE ---
     const [selectedProductId, setSelectedProductId] = useState("");
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
+
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "", colorId: "", cushionId: "", dimensionId: null,
         quantity: 1, amount: 0, explanation: "", status: 'Beklemede'
     });
+
     const [addedItems, setAddedItems] = useState<PurchaseItem[]>([]);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const quantityInputRef = useRef<HTMLInputElement>(null);
@@ -50,11 +56,12 @@ const PurchaseAdd = () => {
         setTimeout(() => setMessage(null), 3000);
     };
 
-    // ... (useEffect ve Veri Çekme aynı)
+    // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
             const [g, c, col, dim] = await Promise.all([getGroups(), getCushions(), getColors(), getDimensions()]);
             setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim);
+
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                 if (userDoc.exists()) {
@@ -68,23 +75,26 @@ const PurchaseAdd = () => {
         init();
     }, [currentUser]);
 
+    // --- TALEPLERİ ÇEK ---
+    useEffect(() => {
+        if (headerData.storeId) {
+            getPendingRequests(headerData.storeId).then(setPendingRequests);
+        } else {
+            setPendingRequests([]);
+        }
+    }, [headerData.storeId]);
+
+    // --- HANDLERS ---
     const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    useEffect(() => {
-        // Alış ise Beklemede, İade ise Tamamlandı olarak başlar
-        setLineItem(prev => ({
-            ...prev,
-            status: transactionType === 'İade' ? 'Tamamlandı' : 'Beklemede'
-        }));
-    }, [transactionType]);
-
-    // ... (Grup, Kategori, Ürün seçim handlers aynı)
+    // ... (Seçim Zinciri Aynı) ...
     const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); setProductsInCat([]); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
     const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
     const handleProductChange = (pid: string) => { setSelectedProductId(pid); updateItemName(pid, selectedColorId, selectedDimensionId); };
     const handleColorChange = (cid: string) => { setSelectedColorId(cid); updateItemName(selectedProductId, cid, selectedDimensionId); };
     const handleDimensionChange = (did: string) => { setSelectedDimensionId(did); updateItemName(selectedProductId, selectedColorId, did); if (did) setTimeout(() => quantityInputRef.current?.focus(), 100); };
+
     const updateItemName = (pid: string, cid: string, did: string) => {
         const p = productsInCat.find(x => x.id === pid); const c = allColors.find(x => x.id === cid); const d = allDimensions.find(x => x.id === did);
         if (p) {
@@ -94,26 +104,51 @@ const PurchaseAdd = () => {
     };
 
     const addLineItem = () => {
-        if (!lineItem.productId || !selectedColorId || !lineItem.quantity || !lineItem.amount) { showToast('error', "Ürün, Renk, Miktar ve Tutar zorunludur."); return; }
-        setAddedItems([...addedItems, lineItem as PurchaseItem]);
+        if (!lineItem.productId || !selectedColorId || !lineItem.quantity) { showToast('error', "Ürün ve Renk seçimi zorunludur."); return; }
+
+        const newItem: PurchaseItem = {
+            ...(lineItem as PurchaseItem),
+            itemType: 'Stok',
+            status: 'Beklemede'
+        };
+
+        setAddedItems([...addedItems, newItem]);
         setLineItem(prev => ({ ...prev, cushionId: "", quantity: 1, amount: 0, explanation: "", productId: "", productName: "", colorId: "", dimensionId: null }));
         setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
     };
 
+    const addRequestToReceipt = (req: PendingRequest) => {
+        const newItem: PurchaseItem = {
+            groupId: req.groupId,
+            categoryId: req.categoryId,
+            productId: req.productId,
+            productName: req.productName,
+            colorId: req.colorId,
+            cushionId: req.cushionId,
+            dimensionId: req.dimensionId,
+            quantity: req.quantity,
+            amount: 0,
+            explanation: req.productNote || "",
+            status: 'Beklemede',
+            itemType: 'Sipariş'
+        };
+
+        setAddedItems([...addedItems, newItem]);
+        setPendingRequests(prev => prev.filter(p => p.id !== req.id));
+        if (req.id) setSelectedRequestIds(prev => [...prev, req.id!]);
+    };
+
     const saveReceipt = async () => {
         if (!headerData.storeId) return showToast('error', "Mağaza seçimi zorunludur!");
-        // İade işleminde isim zorunlu olsun, Alışta olmasın
-        if (transactionType === 'İade' && !headerData.contactName) return showToast('error', "İade eden müşteri adı zorunludur!");
         if (addedItems.length === 0) return showToast('error', "Ürün ekleyiniz.");
 
-        const purchaseData = {
+        const purchaseData: Purchase = {
             storeId: headerData.storeId,
-            type: transactionType,
-            contactName: transactionType === 'İade' ? headerData.contactName : "Merkez", // Alış ise "Merkez" yazabiliriz veya boş bırakabiliriz
+            type: 'Alış', // Artık her şey Alış
             date: headerData.date,
             receiptNo: headerData.receiptNo,
-            personnelId: currentUser?.uid || "unknown",
-            personnelName: currentPersonnel?.fullName || "Bilinmiyor",
+            personnelId: currentUser?.uid || "",
+            personnelName: currentPersonnel?.fullName || "",
             items: addedItems,
             totalAmount: addedItems.reduce((sum, item) => sum + Number(item.amount), 0),
             createdAt: new Date()
@@ -121,9 +156,14 @@ const PurchaseAdd = () => {
 
         try {
             await addPurchase(purchaseData);
-            showToast('success', "İşlem kaydedildi!");
+            if (selectedRequestIds.length > 0) {
+                await deletePendingRequests(headerData.storeId, selectedRequestIds);
+            }
+            showToast('success', "Alış Fişi Kaydedildi!");
             setAddedItems([]);
-            setHeaderData(prev => ({ ...prev, receiptNo: "", contactName: "" }));
+            setSelectedRequestIds([]);
+            setHeaderData(prev => ({ ...prev, receiptNo: "" }));
+            getPendingRequests(headerData.storeId).then(setPendingRequests);
         } catch (error: any) {
             showToast('error', error.message);
         }
@@ -134,65 +174,40 @@ const PurchaseAdd = () => {
             {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
 
             <div className="page-header">
-                <div className="page-title">
-                    <h2>Stok Giriş / Talep Oluştur</h2>
-                </div>
-                {addedItems.length > 0 && (
-                    <button onClick={saveReceipt} className="btn btn-success">
-                        KAYDET ({addedItems.reduce((a, b) => a + Number(b.amount), 0)} ₺)
-                    </button>
-                )}
+                <div className="page-title"><h2>Alış / Stok Giriş</h2></div>
+                {addedItems.length > 0 && <button onClick={saveReceipt} className="btn btn-success">KAYDET ({addedItems.reduce((a, b) => a + Number(b.amount), 0)} ₺)</button>}
             </div>
 
-            <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-                <div style={{ display: 'flex', gap: '30px', marginBottom: '15px' }}>
-                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#2980b9' }}>
-                        <input type="radio" checked={transactionType === 'Alış'} onChange={() => setTransactionType('Alış')} />
-                        📦 ALIŞ (Merkezden)
-                    </label>
-                    <label style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 'bold', color: '#c0392b' }}>
-                        <input type="radio" checked={transactionType === 'İade'} onChange={() => setTransactionType('İade')} />
-                        ↩️ İADE (Müşteriden)
-                    </label>
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '15px' }}>
+            {/* BAŞLIK */}
+            <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
                     <div><label className="form-label">Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" /></div>
-                    <div><label className="form-label">Mağaza</label>
-                        {isAdmin ? <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input"><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select>
-                            : <input disabled value={currentPersonnel ? "📍 Mağazam" : ""} className="form-input" style={{ backgroundColor: '#eee' }} />}
-                    </div>
-
-                    {/* SADECE İADE İSE GÖSTER */}
-                    {transactionType === 'İade' && (
-                        <div>
-                            <label className="form-label">İade Eden Müşteri</label>
-                            <input name="contactName" value={headerData.contactName} onChange={handleHeaderChange} className="form-input" placeholder="Müşteri Adı..." />
-                        </div>
-                    )}
-
-                    <div><label className="form-label">Fiş / Belge No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" /></div>
+                    <div><label className="form-label">Mağaza</label>{isAdmin ? <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input"><option value="">Seç...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select> : <input disabled value="Mağazam" className="form-input" />}</div>
+                    <div><label className="form-label">Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" /></div>
                 </div>
             </div>
 
-            {/* Ürün Giriş Tablosu (Aynı) */}
+            {/* ÜRÜN EKLEME */}
             <div className="card">
+                <div className="card-header"><h3>Manuel Ürün Ekle</h3></div>
                 <div className="card-body" style={{ padding: 0 }}>
-                    <table className="data-table dense" style={{ width: '100%' }}>
-                        <thead style={{ backgroundColor: transactionType === 'Alış' ? '#eaf2f8' : '#fdedec' }}>
+                    <table className="data-table dense">
+                        <thead style={{ backgroundColor: '#eaf2f8' }}>
                             <tr>
-                                <th style={{ width: '20%' }}>Ürün</th>
+                                <th style={{ width: '25%' }}>Ürün Seçimi</th>
                                 <th style={{ width: '10%' }}>Renk</th>
                                 <th style={{ width: '10%' }}>Ebat</th>
                                 <th style={{ width: '10%' }}>Minder</th>
-                                <th style={{ width: '10%' }}>Adet</th>
-                                <th style={{ width: '10%' }}>Birim Fiyat</th>
+                                <th style={{ width: '8%' }}>Adet</th>
+                                <th style={{ width: '10%' }}>Fiyat</th>
                                 <th>Açıklama</th>
                                 <th style={{ width: '5%' }}>+</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr>
+                                {/* ... Select inputları (Önceki kodun aynısı) ... */}
+                                {/* Yer kazanmak için detayları atlıyorum, önceki versiyonla aynı */}
                                 <td>
                                     <div style={{ display: 'flex', gap: '2px', marginBottom: '5px' }}>
                                         <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="form-input input-sm" style={{ flex: 1 }}><option value="">Grup</option>{groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}</select>
@@ -208,22 +223,63 @@ const PurchaseAdd = () => {
                                 <td><input type="text" name="explanation" value={lineItem.explanation} onChange={handleLineChange} className="form-input input-sm" onKeyDown={e => e.key === 'Enter' && addLineItem()} /></td>
                                 <td><button onClick={addLineItem} className="btn btn-primary" style={{ padding: '4px 8px' }}>+</button></td>
                             </tr>
-                            {addedItems.map((item, idx) => (
-                                <tr key={idx}>
-                                    <td style={{ padding: '8px 12px' }}><span style={{ fontWeight: '600' }}>{item.productName}</span></td>
-                                    <td>{allColors.find(c => c.id === item.colorId)?.colorName}</td>
-                                    <td>{allDimensions.find(d => d.id === item.dimensionId)?.dimensionName || "-"}</td>
-                                    <td>{cushions.find(c => c.id === item.cushionId)?.cushionName || "-"}</td>
-                                    <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
-                                    <td>{item.amount} ₺</td>
-                                    <td>{item.explanation}</td>
-                                    <td><button onClick={() => { const n = [...addedItems]; n.splice(idx, 1); setAddedItems(n) }} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer' }}>×</button></td>
-                                </tr>
-                            ))}
                         </tbody>
                     </table>
                 </div>
             </div>
+
+            {/* SEPET */}
+            {addedItems.length > 0 && (
+                <div className="card" style={{ marginTop: '20px' }}>
+                    <div className="card-header" style={{ backgroundColor: '#e8f8f5' }}><h3>🛒 Fişe Eklenecek Ürünler</h3></div>
+                    <div className="card-body" style={{ padding: 0 }}>
+                        <table className="data-table">
+                            <thead><tr><th>Ürün</th><th>Renk / Ebat</th><th>Miktar</th><th>Fiyat</th><th>Açıklama</th><th>Sil</th></tr></thead>
+                            <tbody>
+                                {addedItems.map((item, idx) => (
+                                    <tr key={idx}>
+                                        <td style={{ fontWeight: '600' }}>{item.productName}</td>
+                                        <td>{allColors.find(c => c.id === item.colorId)?.colorName} {item.dimensionId && ` / ${allDimensions.find(d => d.id === item.dimensionId)?.dimensionName}`}</td>
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                                        <td>{item.amount} ₺</td>
+                                        <td style={{ fontStyle: 'italic', color: '#555' }}>{item.explanation}</td>
+                                        <td><button onClick={() => { const n = [...addedItems]; n.splice(idx, 1); setAddedItems(n) }} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px' }}>×</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
+            {/* BEKLEYEN TALEPLER */}
+            {pendingRequests.length > 0 && (
+                <div className="card" style={{ marginTop: '20px', border: '2px solid #f39c12' }}>
+                    <div className="card-header" style={{ backgroundColor: '#fef9e7', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <h3 style={{ color: '#d35400', margin: 0 }}>⏳ Satışlardan Gelen Bekleyen Talepler</h3>
+                        <span className="badge badge-warning">{pendingRequests.length} Adet</span>
+                    </div>
+                    <div className="card-body" style={{ padding: 0 }}>
+                        <table className="data-table dense">
+                            <thead>
+                                <tr><th style={{ width: '15%' }}>Sipariş No</th><th style={{ width: '20%' }}>Müşteri</th><th style={{ width: '25%' }}>Ürün</th><th style={{ width: '20%' }}>Renk / Ebat</th><th style={{ width: '10%', textAlign: 'center' }}>Adet</th><th style={{ width: '10%' }}>İşlem</th></tr>
+                            </thead>
+                            <tbody>
+                                {pendingRequests.map(req => (
+                                    <tr key={req.id}>
+                                        <td style={{ fontWeight: 'bold' }}>{req.saleReceiptNo}</td>
+                                        <td>{req.customerName}</td>
+                                        <td>{req.productName.split('-')[0]}</td>
+                                        <td>{allColors.find(c => c.id === req.colorId)?.colorName} {req.dimensionId && ` / ${allDimensions.find(d => d.id === req.dimensionId)?.dimensionName}`}</td>
+                                        <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{req.quantity}</td>
+                                        <td><button onClick={() => addRequestToReceipt(req)} className="btn btn-sm btn-primary" style={{ width: '100%', fontSize: '11px', padding: '4px' }}>⬇️ Fişe Ekle</button></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

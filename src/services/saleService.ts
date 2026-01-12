@@ -1,24 +1,20 @@
 // src/services/saleService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction, } from "firebase/firestore";
-import type { Sale, Purchase, PurchaseItem, DeliveryStatus } from "../types";
+import { collection, getDocs, orderBy, query, doc, runTransaction } from "firebase/firestore";
+import type { Sale, DeliveryStatus, PendingRequest } from "../types";
 
 export const addSale = async (sale: Sale) => {
     try {
         await runTransaction(db, async (transaction) => {
 
             // --- 1. AŞAMA: TÜM OKUMALAR (READS) ---
-            // Döngü içinde yazma yapmamak için önce tüm stok verilerini okuyup hafızaya alıyoruz.
-
-            const stockReads = []; // Okunan verileri burada tutacağız
+            const stockReads = [];
 
             for (const item of sale.items) {
                 if (item.status === 'İptal' || item.status === 'İade') continue;
 
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                 const stockRef = doc(db, "stores", sale.storeId, "stocks", uniqueStockId);
-
-                // Transaction içindeki okuma
                 const stockDoc = await transaction.get(stockRef);
 
                 stockReads.push({
@@ -28,15 +24,14 @@ export const addSale = async (sale: Sale) => {
                 });
             }
 
-            // --- 2. AŞAMA: HESAPLAMALAR VE YAZMA HAZIRLIĞI ---
-            // Artık okuma yapmayacağız, elimizdeki verilerle ne yazacağımızı hesaplıyoruz.
-
+            // --- 2. AŞAMA: HESAPLAMALAR ---
             const stockWrites: { ref: any, data: any }[] = [];
-            const orderItemsForPurchase: PurchaseItem[] = [];
+            const pendingRequests: PendingRequest[] = []; // Bekleyen Talepler Listesi
+
+            // Satış ID'sini şimdiden belirliyoruz
+            const saleRef = doc(collection(db, "sales", sale.storeId, "receipts"));
 
             for (const { item, ref, doc } of stockReads) {
-
-                // Stok kartı var mı kontrolü, yoksa varsayılan değerler
                 let currentData = {
                     freeStock: 0,
                     reservedStock: 0,
@@ -47,7 +42,6 @@ export const addSale = async (sale: Sale) => {
                 if (doc.exists()) {
                     currentData = doc.data() as any;
                 }
-                // Not: Doc yoksa bile 'currentData'yı 0 kabul ettik, yazma aşamasında 'merge: true' ile oluşturacağız.
 
                 const qty = Number(item.quantity);
                 const updates: any = {
@@ -58,67 +52,57 @@ export const addSale = async (sale: Sale) => {
                 };
 
                 if (item.supplyMethod === 'Stoktan') {
-                    // SENARYO A: Stoktan Karşıla
-                    const newFree = (currentData.freeStock || 0) - qty;
-                    const newReserved = (currentData.reservedStock || 0) + qty;
-
-                    updates.freeStock = newFree;
-                    updates.reservedStock = newReserved;
+                    // Depodan verildiyse: Serbest düşer, Rezerve artar
+                    updates.freeStock = (currentData.freeStock || 0) - qty;
+                    updates.reservedStock = (currentData.reservedStock || 0) + qty;
 
                 } else if (item.supplyMethod === 'Merkezden') {
-                    // SENARYO B: Merkezden İste
-                    const newIncomingReserved = (currentData.incomingReservedStock || 0) + qty;
+                    // Merkezden istendiyse: Gelecek Rezerve (Müşteri için) artar.
+                    updates.incomingReservedStock = (currentData.incomingReservedStock || 0) + qty;
 
-                    updates.incomingReservedStock = newIncomingReserved;
+                    // "Bekleyen Talep" (PendingRequest) oluştur.
+                    const request: PendingRequest = {
+                        storeId: sale.storeId,
+                        saleId: saleRef.id,          // Bu talebin hangi satışa ait olduğu
+                        saleReceiptNo: sale.receiptNo, // Fiş Numarası
+                        customerName: sale.customerName, // Müşteri Adı
 
-                    // Otomatik Alış Fişi Listesine Ekle
-                    orderItemsForPurchase.push({
+                        // Ürün Detayları
                         groupId: item.groupId,
                         categoryId: item.categoryId,
                         productId: item.productId,
                         productName: item.productName,
                         colorId: item.colorId,
                         cushionId: item.cushionId || "",
-                        dimensionId: item.dimensionId,
+                        dimensionId: item.dimensionId || null,
+
                         quantity: qty,
-                        amount: 0,
-                        explanation: `Müşteri Adı: ${sale.customerName}`,
-                        status: 'Beklemede'
-                    });
+                        requestDate: new Date().toISOString(),
+
+                        // 👇 GÜNCELLEME: Ürün notunu buraya taşıyoruz
+                        productNote: item.productNote
+                    };
+
+                    pendingRequests.push(request);
                 }
 
-                // Hazırlanan güncellemeyi listeye ekle
                 stockWrites.push({ ref: ref, data: updates });
             }
 
             // --- 3. AŞAMA: TÜM YAZMALAR (WRITES) ---
-            // Artık güvenle tüm yazma işlemlerini art arda yapabiliriz.
 
             // A) Satış Fişini Kaydet
-            const saleRef = doc(collection(db, "sales", sale.storeId, "receipts"));
             transaction.set(saleRef, sale);
 
             // B) Stokları Güncelle
             for (const w of stockWrites) {
-                // merge: true sayesinde belge yoksa oluşturur, varsa sadece ilgili alanları günceller
                 transaction.set(w.ref, w.data, { merge: true });
             }
 
-            // C) Otomatik Sipariş (Alış) Fişi Oluştur (Varsa)
-            if (orderItemsForPurchase.length > 0) {
-                const purchaseRef = doc(collection(db, "purchases", sale.storeId, "receipts"));
-                const newPurchase: Purchase = {
-                    storeId: sale.storeId,
-                    type: 'Sipariş',
-                    date: sale.date,
-                    receiptNo: `SAT-${sale.receiptNo}`,
-                    personnelId: sale.personnelId,
-                    personnelName: "Sistem",
-                    items: orderItemsForPurchase,
-                    totalAmount: 0,
-                    createdAt: new Date()
-                };
-                transaction.set(purchaseRef, newPurchase);
+            // C) Bekleyen Talepleri Kaydet
+            for (const req of pendingRequests) {
+                const reqRef = doc(collection(db, "stores", sale.storeId, "pending_requests"));
+                transaction.set(reqRef, req);
             }
         });
     } catch (error) {
@@ -138,7 +122,7 @@ export const getSalesByStore = async (storeId: string): Promise<Sale[]> => {
     }
 };
 
-
+// Bu fonksiyon zaten doğru mantıkta (Reserved stoktan düşüyor), aynen koruyoruz.
 export const updateSaleItemStatus = async (
     storeId: string,
     saleId: string,
@@ -147,7 +131,6 @@ export const updateSaleItemStatus = async (
 ) => {
     try {
         await runTransaction(db, async (transaction) => {
-            // 1. Satışı Oku
             const saleRef = doc(db, "sales", storeId, "receipts", saleId);
             const saleDoc = await transaction.get(saleRef);
             if (!saleDoc.exists()) throw "Satış bulunamadı";
@@ -156,49 +139,29 @@ export const updateSaleItemStatus = async (
             const item = sale.items[itemIndex];
             const oldDeliveryStatus = item.deliveryStatus;
 
-            // Durum değişmediyse çık
             if (oldDeliveryStatus === newDeliveryStatus) return;
 
-            // 2. Stok Kartını Oku
             const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
             const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
             const stockDoc = await transaction.get(stockRef);
 
-            if (!stockDoc.exists()) {
-                // Stok kartı yoksa bile sadece durumu güncelle, stok işlemi yapma (Veri bütünlüğü için uyarı verilebilir)
-                sale.items[itemIndex].deliveryStatus = newDeliveryStatus;
-                transaction.update(saleRef, { items: sale.items });
-                return;
-            }
-
-            const sData = stockDoc.data();
+            const sData = stockDoc.exists() ? stockDoc.data() : { reservedStock: 0 };
             const qty = Number(item.quantity);
             const updates: any = {};
 
-            // --- SENARYO 1: ÜRÜN TESLİM EDİLDİ YAPILIYORSA ---
+            // TESLİM EDİLDİ (Müşteriye gitti, Rezerve stoktan düşer)
             if (newDeliveryStatus === 'Teslim Edildi' && oldDeliveryStatus !== 'Teslim Edildi') {
-                if (item.supplyMethod === 'Stoktan') {
-                    // Rezerve stoktan düş (Çünkü satış anında Free -> Reserved yapmıştık)
-                    updates.reservedStock = (sData.reservedStock || 0) - qty;
-                } else if (item.supplyMethod === 'Merkezden') {
-                    // Gelecek (Müşteri) stoktan düş (Çünkü satış anında oraya eklemiştik)
-                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) - qty;
+                if ((sData.reservedStock || 0) < qty) {
+                    throw new Error("Stok hatası: Teslim edilecek rezerve ürün bulunamadı. (Ürün 'Merkezden' ise henüz depoya girişi yapılmamış olabilir).");
                 }
-                // Not: Ürün fiziksel olarak mağazadan çıktığı için stok miktarı azalır.
+                updates.reservedStock = (sData.reservedStock || 0) - qty;
             }
 
-            // --- SENARYO 2: YANLIŞLIKLA TESLİM EDİLDİ DENMİŞ, GERİ ALINIYORSA ---
+            // GERİ ALMA
             else if (oldDeliveryStatus === 'Teslim Edildi' && newDeliveryStatus !== 'Teslim Edildi') {
-                if (item.supplyMethod === 'Stoktan') {
-                    // Rezerve stoğa geri ekle
-                    updates.reservedStock = (sData.reservedStock || 0) + qty;
-                } else if (item.supplyMethod === 'Merkezden') {
-                    // Gelecek (Müşteri) stoğa geri ekle
-                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) + qty;
-                }
+                updates.reservedStock = (sData.reservedStock || 0) + qty;
             }
 
-            // 3. Yazma İşlemleri
             if (Object.keys(updates).length > 0) {
                 transaction.update(stockRef, updates);
             }
