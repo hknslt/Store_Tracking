@@ -1,73 +1,79 @@
-// src/pages/auth/Login.tsx
 import { useState } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebase";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
+import "./Auth.css"; 
+
+// 1. Logonuzu buraya import edin (Dosya yolunu kendi projenize göre düzeltin)
+// Eğer assets klasörünüz yoksa src altına açıp logoyu oraya koyabilirsiniz.
+import appLogo from "../../assets/logo/Bahçemo_green.png"; 
 
 const Login = () => {
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [error, setError] = useState("");
+    const [loading, setLoading] = useState(false);
     const navigate = useNavigate();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
+        setLoading(true);
         
         try {
             await signInWithEmailAndPassword(auth, email, password);
-            navigate("/"); // Başarılıysa ana sayfaya git
+            navigate("/"); 
         } catch (err) {
             setError("Giriş başarısız! E-posta veya şifre hatalı.");
+        } finally {
+            setLoading(false);
         }
     };
 
     return (
-        <div style={containerStyle}>
-            <div style={cardStyle}>
-                <h2 style={{ textAlign: 'center', color: '#2c3e50' }}>Flexy Mağaza Giriş</h2>
+        <div className="login-container">
+            <div className="login-card">
+                <div className="login-header">
+                    {/* 2. Emoji yerine img etiketini kullanıyoruz */}
+                    <img src={appLogo} alt="Flexy Logo" className="login-logo" />
+                    
+                    <h2>Hoş Geldiniz</h2>
+                    <p>Flexy Mağaza Yönetim Paneli</p>
+                </div>
                 
-                {error && <div style={errorStyle}>{error}</div>}
+                {error && <div className="auth-alert alert-error">{error}</div>}
 
-                <form onSubmit={handleLogin} style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
-                    <div>
-                        <label style={labelStyle}>E-Posta Adresi</label>
+                <form onSubmit={handleLogin}>
+                    <div className="form-group">
+                        <label className="form-label">E-Posta Adresi</label>
                         <input 
                             type="email" 
                             required
+                            className="form-input"
+                            placeholder="ornek@flexy.com"
                             value={email} 
                             onChange={(e) => setEmail(e.target.value)}
-                            style={inputStyle}
                         />
                     </div>
-                    <div>
-                        <label style={labelStyle}>Şifre</label>
+                    <div className="form-group">
+                        <label className="form-label">Şifre</label>
                         <input 
                             type="password" 
                             required
+                            className="form-input"
+                            placeholder="••••••••"
                             value={password} 
                             onChange={(e) => setPassword(e.target.value)}
-                            style={inputStyle}
                         />
                     </div>
                     
-                    <button type="submit" style={buttonStyle}>Giriş Yap</button>
+                    <button type="submit" className="btn-auth" disabled={loading}>
+                        {loading ? "Giriş Yapılıyor..." : "Giriş Yap"}
+                    </button>
                 </form>
-
-                <div style={{ marginTop: '20px', textAlign: 'center', fontSize: '13px' }}>
-                    Yönetici hesabı oluşturmak için <Link to="/register-admin">tıklayın</Link>
-                </div>
             </div>
         </div>
     );
 };
-
-// Basit CSS stilleri
-const containerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#ecf0f1' };
-const cardStyle = { width: '400px', padding: '40px', backgroundColor: 'white', borderRadius: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.1)' };
-const labelStyle = { display: 'block', marginBottom: '5px', fontSize: '14px', color: '#555', fontWeight: 'bold' };
-const inputStyle = { width: '100%', padding: '12px', borderRadius: '5px', border: '1px solid #ddd', fontSize: '16px' };
-const buttonStyle = { padding: '12px', backgroundColor: '#3498db', color: 'white', border: 'none', borderRadius: '5px', fontSize: '16px', fontWeight: 'bold', cursor: 'pointer', marginTop: '10px' };
-const errorStyle = { padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', borderRadius: '5px', marginBottom: '15px', fontSize: '14px', textAlign: 'center' as 'center' };
 
 export default Login;

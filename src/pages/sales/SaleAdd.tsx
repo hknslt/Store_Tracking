@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { addSale } from "../../services/saleService";
-import { getStores } from "../../services/storeService";
+import { getStores, getPersonnelByStore } from "../../services/storeService"; // getPersonnelByStore eklendi
 import { getStoreStocks } from "../../services/storeStockService";
 import {
     getGroups,
@@ -15,7 +15,7 @@ import {
 } from "../../services/definitionService";
 import { getProductsByCategoryId } from "../../services/productService";
 
-import type { Sale, SaleItem, Store, Personnel, Group, Category, Product, Cushion, Color, Dimension, StoreStock } from "../../types";
+import type { Sale, SaleItem, Store, SystemUser, Personnel, Group, Category, Product, Cushion, Color, Dimension, StoreStock } from "../../types";
 import "../../App.css";
 
 const SaleAdd = () => {
@@ -29,8 +29,12 @@ const SaleAdd = () => {
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
+    
     const [storeStocks, setStoreStocks] = useState<StoreStock[]>([]);
-    const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
+    const [storePersonnel, setStorePersonnel] = useState<Personnel[]>([]); // Mağaza Personelleri
+
+    // Kullanıcı Bilgisi
+    const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
     // Header
@@ -38,6 +42,8 @@ const SaleAdd = () => {
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
         storeId: "",
+        personnelId: "", // Seçilen personel ID
+        personnelName: "", // Seçilen personel Adı
         customerName: "",
         phone: "",
         city: "",
@@ -47,7 +53,7 @@ const SaleAdd = () => {
         shippingCost: 0
     });
 
-    // Satır State
+    // Satır State (Değişmedi)
     const [selectedProductId, setSelectedProductId] = useState("");
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
@@ -77,9 +83,9 @@ const SaleAdd = () => {
     const requestedQty = lineItem.quantity || 0;
 
     const getStockStatusColor = () => {
-        if (currentFreeStock === 0) return '#fff5f5'; // Çok açık kırmızı
-        if (currentFreeStock < requestedQty) return '#fffbf0'; // Çok açık sarı
-        return '#f0fff4'; // Çok açık yeşil
+        if (currentFreeStock === 0) return '#fff5f5'; 
+        if (currentFreeStock < requestedQty) return '#fffbf0'; 
+        return '#f0fff4'; 
     };
 
     // Veri Yükleme
@@ -93,139 +99,111 @@ const SaleAdd = () => {
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                 if (userDoc.exists()) {
-                    const u = userDoc.data() as Personnel;
-                    setCurrentPersonnel(u);
-                    if (u.role === 'admin') { setIsAdmin(true); getStores().then(setStores); }
-                    else { setIsAdmin(false); setHeaderData(p => ({ ...p, storeId: u.storeId })); }
+                    const u = userDoc.data() as SystemUser;
+                    setCurrentUserData(u);
+                    
+                    if (u.role === 'admin' || u.role === 'control') { 
+                        setIsAdmin(true); 
+                        getStores().then(setStores); 
+                    } else { 
+                        setIsAdmin(false); 
+                        if(u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! })); 
+                    }
                 }
             }
         };
         initData();
     }, [currentUser]);
 
+    // Mağaza değişince Stokları ve Personelleri Çek
     useEffect(() => {
-        if (headerData.storeId) { getStoreStocks(headerData.storeId).then(setStoreStocks); }
+        if (headerData.storeId) { 
+            getStoreStocks(headerData.storeId).then(setStoreStocks);
+            getPersonnelByStore(headerData.storeId).then(setStorePersonnel); // Personelleri getir
+        } else {
+            setStorePersonnel([]);
+            setStoreStocks([]);
+        }
     }, [headerData.storeId]);
 
-    const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
-    const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
-
-    // Seçim Zinciri
-    const handleGroupChange = async (groupId: string) => {
-        setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
-        setSelectedProductId("");
-        if (groupId) setCategories(await getCategoriesByGroupId(groupId));
-        else setCategories([]);
-    };
-
-    const handleCategoryChange = async (categoryId: string) => {
-        setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
-        setSelectedProductId("");
-        if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId));
-        else setProductsInCat([]);
-    };
-
-    const updateLineItem = (prodId: string, colId: string, dimId: string) => {
-        const prod = productsInCat.find(p => p.id === prodId);
-        const col = allColors.find(c => c.id === colId);
-        const dim = allDimensions.find(d => d.id === dimId);
-
-        if (prod) {
-            let name = prod.productName;
-            if (col) name += ` - ${col.colorName}`;
-            if (dim) name += ` ${dim.dimensionName}`;
-
-            setLineItem(prev => ({
-                ...prev,
-                productId: prodId,
-                colorId: colId,
-                dimensionId: dimId || null,
-                productName: name
+    const handleHeaderChange = (e: any) => {
+        const { name, value } = e.target;
+        
+        if (name === 'personnelId') {
+            // Personel seçilince adını da bulup set et
+            const p = storePersonnel.find(per => per.id === value);
+            setHeaderData(prev => ({ 
+                ...prev, 
+                personnelId: value, 
+                personnelName: p ? p.fullName : "" 
             }));
+        } else {
+            setHeaderData({ ...headerData, [name]: value });
         }
     };
 
+    const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
+
+    // ... (Seçim Zinciri ve Stok kontrol fonksiyonları AYNI) ...
+    const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
+    const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
+    const updateLineItem = (prodId: string, colId: string, dimId: string) => { const prod = productsInCat.find(p => p.id === prodId); const col = allColors.find(c => c.id === colId); const dim = allDimensions.find(d => d.id === dimId); if (prod) { let name = prod.productName; setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name })); } };
     const handleProductChange = (val: string) => { setSelectedProductId(val); updateLineItem(val, selectedColorId, selectedDimensionId); };
     const handleColorChange = (val: string) => { setSelectedColorId(val); updateLineItem(selectedProductId, val, selectedDimensionId); };
     const handleDimensionChange = (val: string) => { setSelectedDimensionId(val); updateLineItem(selectedProductId, selectedColorId, val); };
-
-    useEffect(() => {
-        if (selectedProductId && selectedColorId) {
-            if (currentFreeStock <= 0) { setLineItem(prev => ({ ...prev, supplyMethod: 'Merkezden' })); }
-            else { setLineItem(prev => ({ ...prev, supplyMethod: 'Stoktan' })); }
-        }
-    }, [selectedProductId, selectedColorId, selectedDimensionId, currentFreeStock]);
+    useEffect(() => { if (selectedProductId && selectedColorId) { if (currentFreeStock <= 0) { setLineItem(prev => ({ ...prev, supplyMethod: 'Merkezden' })); } else { setLineItem(prev => ({ ...prev, supplyMethod: 'Stoktan' })); } } }, [selectedProductId, selectedColorId, selectedDimensionId, currentFreeStock]);
 
     const addLineItem = () => {
         if (!lineItem.productId || !selectedColorId || !lineItem.quantity || !lineItem.price) {
             setMessage({ type: 'error', text: 'Ürün, Renk, Adet ve Fiyat zorunludur.' }); return;
         }
-
         const total = (Number(lineItem.price) - Number(lineItem.discount || 0)) * Number(lineItem.quantity);
         setAddedItems([{ ...lineItem, total } as SaleItem, ...addedItems]);
-
-        setLineItem(prev => ({
-            ...prev,
-            cushionId: "", quantity: 1, price: 0, discount: 0, productNote: "",
-            productId: "", productName: "", colorId: "", dimensionId: null
-        }));
+        setLineItem(prev => ({ ...prev, cushionId: "", quantity: 1, price: 0, discount: 0, productNote: "", productId: "", productName: "", colorId: "", dimensionId: null }));
         setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
     };
 
     const saveSale = async () => {
         if (!headerData.storeId || !headerData.customerName) { setMessage({ type: 'error', text: 'Mağaza ve Müşteri bilgileri zorunludur.' }); return; }
+        if (!headerData.personnelId) { setMessage({ type: 'error', text: 'Lütfen Satış Personeli seçiniz.' }); return; } // Personel Kontrolü
         if (addedItems.length === 0) { setMessage({ type: 'error', text: 'Ürün ekleyiniz.' }); return; }
+        
         const grandTotal = addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost);
-        const saleData: Sale = { ...headerData, shippingCost: Number(headerData.shippingCost), personnelId: currentUser?.uid || "", personnelName: currentPersonnel?.fullName || "", items: addedItems, grandTotal, createdAt: new Date() };
+        
+        const saleData: Sale = { 
+            ...headerData, 
+            shippingCost: Number(headerData.shippingCost), 
+            // Seçilen personeli kullanıyoruz (Login olanı değil)
+            personnelId: headerData.personnelId, 
+            personnelName: headerData.personnelName, 
+            items: addedItems, 
+            grandTotal, 
+            createdAt: new Date() 
+        };
+        
         try {
-            await addSale(saleData); setMessage({ type: 'success', text: 'Sipariş oluşturuldu!' }); setAddedItems([]); setHeaderData(prev => ({ ...prev, receiptNo: "", customerName: "", phone: "", city: "", district: "", address: "", customerNote: "", shippingCost: 0 })); getStoreStocks(headerData.storeId).then(setStoreStocks);
-        } catch (error: any) { setMessage({ type: 'error', text: error.message }); }
+            await addSale(saleData); 
+            setMessage({ type: 'success', text: 'Sipariş oluşturuldu!' }); 
+            setAddedItems([]); 
+            // Formu sıfırla ama mağazayı ve tarihi koru
+            setHeaderData(prev => ({ 
+                ...prev, 
+                receiptNo: "", 
+                personnelId: "", personnelName: "", 
+                customerName: "", phone: "", city: "", district: "", address: "", customerNote: "", shippingCost: 0 
+            })); 
+            getStoreStocks(headerData.storeId).then(setStoreStocks);
+        } catch (error: any) { 
+            setMessage({ type: 'error', text: error.message }); 
+        }
     };
 
-    // --- YENİ STİL NESNELERİ (DAHA KOMPAKT) ---
+    // --- STİL NESNELERİ ---
     const cellStyle = { padding: '4px', verticalAlign: 'middle' };
-
-    // Küçük input (Adet vb.)
-    const smallInput = {
-        width: '60px',
-        padding: '4px',
-        fontSize: '13px',
-        height: '28px',
-        textAlign: 'center' as const,
-        borderRadius: '4px',
-        border: '1px solid #ccc'
-    };
-
-    // Orta input (Fiyat vb.)
-    const mediumInput = {
-        width: '80px',
-        padding: '4px',
-        fontSize: '13px',
-        height: '28px',
-        borderRadius: '4px',
-        border: '1px solid #ccc'
-    };
-
-    // Select (Normal)
-    const selectStyle = {
-        width: '100%',
-        padding: '4px',
-        fontSize: '12px',
-        height: '28px',
-        borderRadius: '4px',
-        border: '1px solid #ccc'
-    };
-
-    // Filtre Select (Grup/Kat - Daha dar)
-    const filterSelectStyle = {
-        width: '80px',
-        padding: '4px',
-        fontSize: '11px',
-        height: '28px',
-        borderRadius: '4px',
-        border: '1px solid #ccc',
-        backgroundColor: '#fdfdfd'
-    };
+    const smallInput = { width: '60px', padding: '4px', fontSize: '13px', height: '28px', textAlign: 'center' as const, borderRadius: '4px', border: '1px solid #ccc' };
+    const mediumInput = { width: '80px', padding: '4px', fontSize: '13px', height: '28px', borderRadius: '4px', border: '1px solid #ccc' };
+    const selectStyle = { width: '100%', padding: '4px', fontSize: '12px', height: '28px', borderRadius: '4px', border: '1px solid #ccc' };
+    const filterSelectStyle = { width: '80px', padding: '4px', fontSize: '11px', height: '28px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fdfdfd' };
 
     return (
         <div className="page-container">
@@ -238,11 +216,43 @@ const SaleAdd = () => {
 
             {/* MÜŞTERİ BİLGİLERİ */}
             <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+                    
+                    {/* TARİH */}
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Mağaza</label>{isAdmin ? <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select> : <input disabled value={currentPersonnel?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee', padding: '6px' }} />}</div>
+                    
+                    {/* MAĞAZA SEÇİMİ */}
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Mağaza</label>
+                        {isAdmin ? 
+                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select> 
+                            : <input disabled value={currentUserData?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee', padding: '6px' }} />
+                        }
+                    </div>
+
+                    {/* FİŞ NO */}
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
+
+                    {/* PERSONEL SEÇİMİ (YENİ) */}
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Satış Personeli</label>
+                        <select 
+                            name="personnelId" 
+                            value={headerData.personnelId} 
+                            onChange={handleHeaderChange} 
+                            className="form-input" 
+                            style={{ padding: '6px'}}
+                            disabled={!headerData.storeId} // Mağaza seçilmeden personel seçilemez
+                        >
+                            <option value="">-- Personel Seç --</option>
+                            {storePersonnel.map(p => (
+                                <option key={p.id} value={p.id}>{p.fullName}</option>
+                            ))}
+                        </select>
+                    </div>
+
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Müşteri Adı</label><input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Telefon</label><input name="phone" value={headerData.phone} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
@@ -276,7 +286,6 @@ const SaleAdd = () => {
                         <tbody>
                             {/* --- GİRİŞ SATIRI 1 --- */}
                             <tr style={{ backgroundColor: getStockStatusColor(), borderTop: '2px solid #3498db' }}>
-                                {/* GRUP, KATEGORİ, ÜRÜN ADI - YAN YANA */}
                                 <td style={cellStyle}>
                                     <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
                                         <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} style={filterSelectStyle}>

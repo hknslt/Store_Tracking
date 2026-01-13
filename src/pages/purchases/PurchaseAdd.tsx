@@ -8,7 +8,7 @@ import { getStores } from "../../services/storeService";
 import { getGroups, getCategoriesByGroupId, getCushions, getColors, getDimensions } from "../../services/definitionService";
 import { getProductsByCategoryId } from "../../services/productService";
 
-import type { Purchase, PurchaseItem, Store, Personnel, Group, Category, Product, Color, Dimension, Cushion, PendingRequest } from "../../types";
+import type { Purchase, PurchaseItem, Store, SystemUser, Group, Category, Product, Color, Dimension, Cushion, PendingRequest } from "../../types";
 import "../../App.css";
 
 const PurchaseAdd = () => {
@@ -23,14 +23,14 @@ const PurchaseAdd = () => {
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
 
-    const [currentPersonnel, setCurrentPersonnel] = useState<Personnel | null>(null);
+    const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
     // --- BEKLEYEN TALEPLER ---
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
     const [selectedRequestIds, setSelectedRequestIds] = useState<string[]>([]);
 
-    // --- BAŞLIK STATE (Sadece Alış) ---
+    // --- BAŞLIK STATE ---
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
@@ -65,15 +65,25 @@ const PurchaseAdd = () => {
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                 if (userDoc.exists()) {
-                    const u = userDoc.data() as Personnel;
-                    setCurrentPersonnel(u);
-                    if (u.role === 'admin') { setIsAdmin(true); getStores().then(setStores); }
-                    else { setIsAdmin(false); setHeaderData(p => ({ ...p, storeId: u.storeId })); }
+                    // TİP DÜZELTMESİ: Verinin SystemUser olduğunu belirtiyoruz
+                    const u = userDoc.data() as SystemUser;
+                    setCurrentUserData(u);
+
+                    if (u.role === 'admin' || u.role === 'control') {
+                        setIsAdmin(true);
+                        getStores().then(setStores);
+                    } else {
+                        setIsAdmin(false);
+                        if (u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! }));
+                    }
                 }
             }
         };
         init();
     }, [currentUser]);
+
+    // ... (Diğer useEffect ve handler'lar AYNI KALACAK) ...
+    // Aşağısı önceki kodun aynısıdır.
 
     // --- TALEPLERİ ÇEK ---
     useEffect(() => {
@@ -88,7 +98,6 @@ const PurchaseAdd = () => {
     const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    // ... (Seçim Zinciri Aynı) ...
     const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); setProductsInCat([]); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
     const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
     const handleProductChange = (pid: string) => { setSelectedProductId(pid); updateItemName(pid, selectedColorId, selectedDimensionId); };
@@ -144,11 +153,11 @@ const PurchaseAdd = () => {
 
         const purchaseData: Purchase = {
             storeId: headerData.storeId,
-            type: 'Alış', // Artık her şey Alış
+            type: 'Alış',
             date: headerData.date,
             receiptNo: headerData.receiptNo,
             personnelId: currentUser?.uid || "",
-            personnelName: currentPersonnel?.fullName || "",
+            personnelName: currentUserData?.fullName || "",
             items: addedItems,
             totalAmount: addedItems.reduce((sum, item) => sum + Number(item.amount), 0),
             createdAt: new Date()
@@ -206,8 +215,6 @@ const PurchaseAdd = () => {
                         </thead>
                         <tbody>
                             <tr>
-                                {/* ... Select inputları (Önceki kodun aynısı) ... */}
-                                {/* Yer kazanmak için detayları atlıyorum, önceki versiyonla aynı */}
                                 <td>
                                     <div style={{ display: 'flex', gap: '2px', marginBottom: '5px' }}>
                                         <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="form-input input-sm" style={{ flex: 1 }}><option value="">Grup</option>{groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}</select>

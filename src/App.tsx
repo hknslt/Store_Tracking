@@ -8,10 +8,9 @@ import Sidebar from "./components/Sidebar";
 // Sayfalar
 import Home from "./pages/Home";
 import Login from "./pages/auth/Login";
-import RegisterAdmin from "./pages/auth/RegisterAdmin";
+import Register from "./pages/auth/Register";
 import ProductAdd from "./pages/products/ProductAdd";
 import ProductList from "./pages/products/ProductList";
-import ProductDetail from "./pages/products/ProductDetail";
 import GroupAdd from "./pages/definitions/groups/GroupAdd";
 import DefinitionsPage from "./pages/definitions/groups/DefinitionsPage";
 import PriceList from "./pages/prices/PriceList";
@@ -90,7 +89,6 @@ function App() {
           {/* A) GİRİŞ YAPILMAMIŞ ALAN (Sidebar Yok) */}
           <Route element={<PublicLayout />}>
             <Route path="/login" element={<Login />} />
-            <Route path="/register-admin" element={<RegisterAdmin />} />
           </Route>
 
           {/* B) KORUMALI ALAN (Sidebar Var) */}
@@ -100,7 +98,6 @@ function App() {
             {/* Ürünler */}
             <Route path="/products" element={<ProductList />} />
             <Route path="/products/add" element={<ProductAdd />} />
-            <Route path="/products/detail/:id" element={<ProductDetail />} />
 
             {/* Tanımlamalar */}
             <Route path="/definitions/general" element={<DefinitionsPage />} />
@@ -136,6 +133,8 @@ function App() {
             
             {/* Puantaj Yönetimi */}
             <Route path="/attendance" element={<AttendanceManager />} />
+
+             <Route path="/register" element={<Register />} />
 
           {/* SSH Kayıtları */}
           <Route path="/ssh/list" element={<SSHList />} />

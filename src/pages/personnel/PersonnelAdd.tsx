@@ -1,29 +1,55 @@
 // src/pages/personnel/PersonnelAdd.tsx
 import { useState, useEffect } from "react";
-import { createStaffUser, getStores } from "../../services/storeService"; // 👈 createStaffUser import edildi
-import type { Personnel, Store } from "../../types";
+import { db } from "../../firebase";
+import { collection, addDoc, doc, getDoc } from "firebase/firestore"; // addDoc kullanacağız
+import { getStores } from "../../services/storeService";
+import { useAuth } from "../../context/AuthContext";
+import type { Store, Personnel } from "../../types";
 
 const PersonnelAdd = () => {
+    const { currentUser } = useAuth();
     const [stores, setStores] = useState<Store[]>([]);
-    const [message, setMessage] = useState("");
-    const [error, setError] = useState(""); // Hata mesajı için
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [userStoreId, setUserStoreId] = useState(""); // Müdürün mağazası
 
-    // Form verisine email ve password ekledik
+    const [message, setMessage] = useState("");
+    const [error, setError] = useState("");
+
+    // Form Verileri (Email/Şifre YOK)
     const [formData, setFormData] = useState({
         fullName: "",
         storeId: "",
-        role: "staff",
+        role: "staff", // Sabit
         isActive: true,
         startDate: new Date().toISOString().split('T')[0],
         phone: "",
-        address: "",
-        email: "",    // 👈 YENİ
-        password: ""  // 👈 YENİ
+        address: ""
     });
 
     useEffect(() => {
-        getStores().then(setStores);
-    }, []);
+        const init = async () => {
+            // Mağazaları çek
+            const sData = await getStores();
+            setStores(sData);
+
+            // Mevcut kullanıcının rolünü kontrol et
+            if (currentUser) {
+                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                if (userDoc.exists()) {
+                    const uData = userDoc.data();
+                    if (uData.role === 'admin') {
+                        setIsAdmin(true);
+                    } else if (uData.role === 'store_admin') {
+                        setIsAdmin(false);
+                        setUserStoreId(uData.storeId);
+                        // Formdaki mağazayı otomatik seç
+                        setFormData(prev => ({ ...prev, storeId: uData.storeId }));
+                    }
+                }
+            }
+        };
+        init();
+    }, [currentUser]);
 
     const handleChange = (e: any) => {
         const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
@@ -35,126 +61,100 @@ const PersonnelAdd = () => {
         setError("");
         setMessage("");
 
-        // Basit validasyon
-        if (!formData.fullName || !formData.storeId || !formData.email || !formData.password) {
-            return setError("İsim, Mağaza, E-posta ve Şifre zorunludur!");
-        }
-
-        if (formData.password.length < 6) {
-            return setError("Şifre en az 6 karakter olmalıdır.");
+        if (!formData.fullName || !formData.storeId) {
+            return setError("İsim ve Mağaza seçimi zorunludur!");
         }
 
         try {
-            // Servis fonksiyonunu çağır (Password'ü ayrıca gönderiyoruz)
-            // formData'yı Personnel tipine uygun hale getirip gönderiyoruz
-            const personnelData: Personnel = {
-                fullName: formData.fullName,
-                storeId: formData.storeId,
-                role: formData.role as any,
-                isActive: formData.isActive,
-                startDate: formData.startDate,
-                phone: formData.phone,
-                address: formData.address,
-                email: formData.email
-            };
+            // Veritabanına Ekle (Auth yok)
+            // 'personnel' koleksiyonuna ekliyoruz ama ID otomatik oluşacak
+            await addDoc(collection(db, "personnel"), {
+                ...formData,
+                role: 'staff', // Kesinlikle staff
+                createdAt: new Date().toISOString()
+            });
 
-            await createStaffUser(personnelData, formData.password);
-
-            setMessage("✅ Personel ve Giriş Hesabı Oluşturuldu!");
-
-            // Formu temizle
+            setMessage("✅ Personel başarıyla kaydedildi!");
+            
+            // Temizle (Mağaza ID admin değilse sabit kalsın)
             setFormData(prev => ({
                 ...prev,
                 fullName: "",
                 phone: "",
                 address: "",
-                email: "",
-                password: ""
+                storeId: isAdmin ? "" : userStoreId 
             }));
 
             setTimeout(() => setMessage(""), 3000);
+
         } catch (err: any) {
             console.error(err);
-            if (err.code === 'auth/email-already-in-use') {
-                setError("Bu e-posta adresi zaten kullanımda!");
-            } else {
-                setError("Hata oluştu: " + err.message);
-            }
+            setError("Hata oluştu: " + err.message);
         }
     };
 
     return (
-        <div style={{ maxWidth: '700px' }}>
-            <h2>Yeni Personel Girişi</h2>
+        <div style={{ maxWidth: '700px', margin:'0 auto' }}>
+            <div className="card" style={{padding:'30px'}}>
+                <h2 style={{marginTop:0, borderBottom:'1px solid #eee', paddingBottom:'10px'}}>Yeni Personel Ekle</h2>
+                <p style={{color:'#7f8c8d', fontSize:'13px', marginBottom:'20px'}}>
+                    Buradan eklenen personeller sisteme <b>giriş yapamazlar</b>. Sadece puantaj ve satış işlemlerinde seçilebilirler.
+                </p>
 
-            {message && <div style={successStyle}>{message}</div>}
-            {error && <div style={errorStyle}>{error}</div>}
+                {message && <div style={successStyle}>{message}</div>}
+                {error && <div style={errorStyle}>{error}</div>}
 
-            <form onSubmit={handleSave} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                <form onSubmit={handleSave} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
-                {/* --- HESAP BİLGİLERİ (YENİ) --- */}
-                <div style={{ gridColumn: 'span 2', backgroundColor: '#f8f9fa', padding: '15px', borderRadius: '5px' }}>
-                    <h4 style={{ margin: '0 0 15px 0', color: '#2c3e50' }}>Giriş Bilgileri</h4>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
-                        <div>
-                            <label style={labelStyle}>E-Posta (Giriş İçin)</label>
-                            <input type="email" name="email" value={formData.email} onChange={handleChange} style={inputStyle} placeholder="ornek@flexy.com" required />
-                        </div>
-                        <div>
-                            <label style={labelStyle}>Şifre</label>
-                            <input type="password" name="password" value={formData.password} onChange={handleChange} style={inputStyle} placeholder="******" required />
-                        </div>
+                    {/* MAĞAZA SEÇİMİ */}
+                    <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Çalışacağı Mağaza</label>
+                        {isAdmin ? (
+                            <select name="storeId" value={formData.storeId} onChange={handleChange} style={inputStyle} required>
+                                <option value="">-- Mağaza Seçiniz --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                            </select>
+                        ) : (
+                            // Müdür ise sadece kendi mağazası görünür (Readonly input)
+                            <input 
+                                type="text" 
+                                value={stores.find(s => s.id === userStoreId)?.storeName || "Mağazam"} 
+                                disabled 
+                                style={{...inputStyle, backgroundColor:'#eee'}} 
+                            />
+                        )}
                     </div>
-                </div>
 
-                {/* MAĞAZA SEÇİMİ */}
-                <div style={{ gridColumn: 'span 2' }}>
-                    <label style={labelStyle}>Bağlı Olduğu Mağaza</label>
-                    <select name="storeId" value={formData.storeId} onChange={handleChange} style={inputStyle}>
-                        <option value="">-- Mağaza Seçiniz --</option>
-                        {stores.map(s => <option key={s.id} value={s.id}>{s.storeName} ({s.storeCode})</option>)}
-                    </select>
-                </div>
+                    <div>
+                        <label style={labelStyle}>Adı Soyadı</label>
+                        <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} style={inputStyle} required />
+                    </div>
 
-                <div>
-                    <label style={labelStyle}>Adı Soyadı</label>
-                    <input type="text" name="fullName" value={formData.fullName} onChange={handleChange} style={inputStyle} />
-                </div>
+                    <div>
+                        <label style={labelStyle}>İşe Başlama Tarihi</label>
+                        <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} style={inputStyle} />
+                    </div>
 
-                <div>
-                    <label style={labelStyle}>Görevi / Yetkisi</label>
-                    <select name="role" value={formData.role} onChange={handleChange} style={inputStyle}>
-                        <option value="staff">Personel (Satış Danışmanı)</option>
-                        <option value="store_admin">Mağaza Admini (Müdür)</option>
-                        {/* ⚠️ ADMIN ROLÜ KALDIRILDI */}
-                    </select>
-                </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Telefon</label>
+                        <input type="text" name="phone" value={formData.phone} onChange={handleChange} style={inputStyle} />
+                    </div>
 
-                <div>
-                    <label style={labelStyle}>İşe Başlama Tarihi</label>
-                    <input type="date" name="startDate" value={formData.startDate} onChange={handleChange} style={inputStyle} />
-                </div>
+                    <div style={{ gridColumn: 'span 2' }}>
+                        <label style={labelStyle}>Adres</label>
+                        <textarea name="address" rows={2} value={formData.address} onChange={handleChange} style={inputStyle} />
+                    </div>
 
-                <div>
-                    <label style={labelStyle}>Telefon</label>
-                    <input type="text" name="phone" value={formData.phone} onChange={handleChange} style={inputStyle} />
-                </div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleChange} style={{ width: '20px', height: '20px' }} />
+                        <label style={{ fontSize: '14px', fontWeight: 'bold' }}>Aktif Çalışan</label>
+                    </div>
 
-                <div style={{ gridColumn: 'span 2' }}>
-                    <label style={labelStyle}>Adres</label>
-                    <textarea name="address" rows={2} value={formData.address} onChange={handleChange} style={inputStyle} />
-                </div>
-
-                {/* Aktiflik Durumu */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input type="checkbox" name="isActive" checked={formData.isActive} onChange={handleChange} style={{ width: '20px', height: '20px' }} />
-                    <label style={{ fontSize: '14px', fontWeight: 'bold' }}>Aktif Çalışan</label>
-                </div>
-
-                <div style={{ gridColumn: 'span 2' }}>
-                    <button type="submit" style={btnStyle}>Personeli Kaydet</button>
-                </div>
-            </form>
+                    <div style={{ gridColumn: 'span 2', marginTop:'10px' }}>
+                        <button type="submit" style={btnStyle}>Personeli Kaydet</button>
+                    </div>
+                </form>
+            </div>
         </div>
     );
 };
@@ -162,7 +162,7 @@ const PersonnelAdd = () => {
 // Stiller
 const labelStyle = { display: 'block', marginBottom: '5px', fontWeight: 'bold', fontSize: '13px', color: '#555' };
 const inputStyle = { width: '100%', padding: '10px', borderRadius: '5px', border: '1px solid #ccc' };
-const btnStyle = { width: '100%', padding: '12px', backgroundColor: '#2980b9', color: 'white', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer' };
+const btnStyle = { width: '100%', padding: '12px', backgroundColor: '#27ae60', color: 'white', border: 'none', borderRadius: '5px', fontWeight: 'bold', cursor: 'pointer', fontSize:'16px' };
 const successStyle = { padding: '10px', backgroundColor: '#d4edda', color: '#155724', marginBottom: '10px', borderRadius: '5px' };
 const errorStyle = { padding: '10px', backgroundColor: '#f8d7da', color: '#721c24', marginBottom: '10px', borderRadius: '5px' };
 

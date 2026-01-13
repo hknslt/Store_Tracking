@@ -138,6 +138,11 @@ const Sidebar = () => {
           <span>Minderler</span>
         </NavLink>
 
+        <NavLink to="/register" className="nav-item">
+          <span className="nav-icon">➕</span>
+          <span>Yeni Kullanıcı</span>
+        </NavLink>
+
       </nav>
 
       {/* FOOTER */}

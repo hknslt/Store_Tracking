@@ -6,7 +6,7 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { getStores } from "../../services/storeService";
 import { getMonthlyAttendance, saveBulkAttendance } from "../../services/attendanceService";
 
-import type { Store, Personnel, AttendanceType } from "../../types";
+import type { Store, Personnel, AttendanceType, SystemUser } from "../../types";
 import "../../App.css";
 
 // Puantaj Verisi Yapısı
@@ -45,11 +45,15 @@ const AttendanceManager = () => {
 
             const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
             if (userDoc.exists()) {
-                const u = userDoc.data() as Personnel;
-                if (u.role === 'admin') { setIsAdmin(true); }
-                else { setIsAdmin(false); setSelectedStoreId(u.storeId); }
+                const u = userDoc.data() as SystemUser;
+                if (u.role === 'admin' || u.role === 'control') { // Admin veya Kontrol yetkilisi
+                    setIsAdmin(true);
+                } else if (u.role === 'store_admin') {
+                    setIsAdmin(false);
+                    if (u.storeId) setSelectedStoreId(u.storeId);
+                }
             }
-            setLoading(false);
+            setLoading(false)
         };
         init();
     }, [currentUser]);

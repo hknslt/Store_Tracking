@@ -11,7 +11,7 @@ import {
     orderBy,
     setDoc
 } from "firebase/firestore";
-import type { Store, Personnel } from "../types";
+import type { Store, Personnel, SystemUser } from "../types";
 import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
 import { deleteApp, getApp, initializeApp } from "firebase/app";
 
@@ -33,7 +33,7 @@ export const getStores = async (): Promise<Store[]> => {
 // --- PERSONEL İŞLEMLERİ ---
 
 
-export const createStaffUser = async (personnelData: Personnel, password: string) => {
+export const createStaffUser = async (SystemUserData: SystemUser, password: string) => {
     let secondaryApp;
     try {
         // 1. Mevcut Firebase ayarlarını al
@@ -44,7 +44,7 @@ export const createStaffUser = async (personnelData: Personnel, password: string
         const secondaryAuth = getAuth(secondaryApp);
 
         // 3. Yeni kullanıcıyı bu ikincil uygulama üzerinden oluştur
-        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, personnelData.email!, password);
+        const userCredential = await createUserWithEmailAndPassword(secondaryAuth, SystemUserData.email!, password);
         const newUser = userCredential.user;
 
         // 4. Oluşan kullanıcının oturumunu hemen kapat (Garanti olsun)
@@ -53,7 +53,7 @@ export const createStaffUser = async (personnelData: Personnel, password: string
         // 5. Şimdi asıl veritabanımıza (Firestore) personel bilgisini kaydet
         // ÖNEMLİ: Auth ID'si (uid) ile Firestore ID'si aynı olsun diye setDoc kullanıyoruz
         await setDoc(doc(db, PERSONNEL_COLLECTION, newUser.uid), {
-            ...personnelData,
+            ...SystemUserData,
             id: newUser.uid // ID'yi de içine yazalım
         });
 
@@ -74,19 +74,35 @@ export const addPersonnel = async (personnel: Personnel) => {
 };
 
 // Tüm Personelleri Getir (Süper Admin için)
-export const getAllPersonnel = async (): Promise<Personnel[]> => {
-    const snapshot = await getDocs(collection(db, PERSONNEL_COLLECTION));
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Personnel[];
+export const getAllPersonnel = async (): Promise<(Personnel | SystemUser)[]> => {
+    try {
+        // Hem 'staff' hem de 'store_admin' olanları getir
+        const q = query(
+            collection(db, "personnel"),
+            where("role", "in", ["staff", "store_admin"])
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as (Personnel | SystemUser)[];
+    } catch (error) {
+        console.error("Personel çekme hatası:", error);
+        return [];
+    }
 };
 
 // Sadece Belirli Mağazanın Personelini Getir (Mağaza Admini için)
 export const getPersonnelByStore = async (storeId: string): Promise<Personnel[]> => {
-    const q = query(
-        collection(db, PERSONNEL_COLLECTION),
-        where("storeId", "==", storeId)
-    );
-    const snapshot = await getDocs(q);
-    return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Personnel[];
+    try {
+        const q = query(
+            collection(db, "personnel"), 
+            where("storeId", "==", storeId),
+            where("role", "in", ["staff", "store_admin"])
+        );
+        const snapshot = await getDocs(q);
+        return snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as Personnel[];
+    } catch (error) {
+        console.error(error);
+        return [];
+    }
 };
 
 // Personel Durumu Güncelle (Aktif/Pasif Yapma veya İşten Çıkarma)

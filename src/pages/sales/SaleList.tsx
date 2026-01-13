@@ -1,6 +1,6 @@
 // src/pages/sales/SaleList.tsx
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // useNavigate eklendi
+import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
@@ -15,12 +15,13 @@ import {
     getGroups
 } from "../../services/definitionService";
 
-import type { Sale, Store, Personnel, Category, Cushion, Color, Dimension, Group, DeliveryStatus } from "../../types";
+// TİP DÜZELTMESİ: SystemUser eklendi
+import type { Sale, Store, SystemUser, Category, Cushion, Color, Dimension, Group, DeliveryStatus } from "../../types";
 import "../../App.css";
 
 const SaleList = () => {
     const { currentUser } = useAuth();
-    const navigate = useNavigate(); // Yönlendirme için
+    const navigate = useNavigate();
 
     // ... (State'ler aynı) ...
     const [sales, setSales] = useState<Sale[]>([]);
@@ -48,9 +49,15 @@ const SaleList = () => {
 
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                 if (userDoc.exists()) {
-                    const userData = userDoc.data() as Personnel;
-                    if (userData.role === 'admin') { setIsAdmin(true); }
-                    else { setIsAdmin(false); setSelectedStoreId(userData.storeId); }
+                    // TİP DÜZELTMESİ: Veriyi SystemUser olarak alıyoruz
+                    const userData = userDoc.data() as SystemUser;
+
+                    if (userData.role === 'admin' || userData.role === 'control') {
+                        setIsAdmin(true);
+                    } else if (userData.role === 'store_admin') {
+                        setIsAdmin(false);
+                        if (userData.storeId) setSelectedStoreId(userData.storeId);
+                    }
                 }
             } catch (error) { console.error(error); } finally { setLoading(false); }
         };
@@ -106,8 +113,6 @@ const SaleList = () => {
 
     // Detay Sayfasına Gitme Fonksiyonu
     const goToDetail = (sale: Sale) => {
-        // ID varsa yönlendir. URL yapınıza göre burayı düzenleyin.
-        // Örn: /sales/STORE_ID/SALE_ID
         if (sale.id && selectedStoreId) {
             navigate(`/sales/${selectedStoreId}/${sale.id}`, { state: { sale } });
         }
@@ -234,7 +239,7 @@ const SaleList = () => {
                                                                                     <td style={{ textAlign: 'right' }}>{item.price} ₺</td>
                                                                                     <td style={{ textAlign: 'center' }}>
                                                                                         <span className="badge" style={{ fontSize: '10px', backgroundColor: (item.supplyMethod === 'Stoktan' || isArrived) ? '#27ae60' : '#e74c3c', color: 'white' }}>
-                                                                                            {item.supplyMethod === 'Stoktan' ? 'Stoktan' : (isArrived ? 'Merkez' : 'Merkez')}
+                                                                                            {item.supplyMethod === 'Stoktan' ? 'Stoktan' : (isArrived ? 'Merkez (Geldi)' : 'Merkez (Yolda)')}
                                                                                         </span>
                                                                                     </td>
                                                                                     <td style={{ textAlign: 'center' }}>

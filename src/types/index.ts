@@ -45,17 +45,28 @@ export interface Store {
     phone?: string;
 }
 
+
+export interface SystemUser {
+    id: string; // Auth UID
+    fullName: string;
+    email: string;
+    role: 'admin' | 'store_admin' | 'control' | 'report';
+    storeId?: string; // Sadece store_admin için dolu olur
+    phone?: string;
+    address?: string;
+    isActive: boolean;
+}
 export interface Personnel {
     id?: string;
     storeId: string;
     fullName: string;
-    isActive: boolean;
-    role: 'admin' | 'store_admin' | 'staff';
+    role: 'staff'; // Sabit rol
     startDate: string;
     endDate?: string;
     phone: string;
     address?: string;
-    email?: string;
+    isActive: boolean;
+    // Email ve Password YOK
 }
 
 // --- MAĞAZA STOK MODÜLÜ (4'lü Stok Yapısı) ---
@@ -198,7 +209,7 @@ export interface PendingRequest {
     saleId: string;      // Hangi satıştan geldi
     saleReceiptNo: string;
     customerName: string;
-    
+
     // Ürün Bilgileri
     groupId: string;
     categoryId: string;
@@ -207,7 +218,7 @@ export interface PendingRequest {
     colorId: string;
     cushionId: string;
     dimensionId?: string | null;
-    
+
     quantity: number;
     requestDate: string; // Talep tarihi
     productNote?: string;
@@ -237,7 +248,7 @@ export interface SSHRecord {
 
     items: SSHItem[];      // Yapılan işlemler listesi
     totalCost: number;     // Toplam Servis Ücreti
-    
+
     shippingMethod: string; // Sevkiyat (Mağazadan, Nakliye, Kargo)
     status: 'Açık' | 'Kapalı'; // Servis durumu
     createdAt: string;     // Kayıt tarihi
