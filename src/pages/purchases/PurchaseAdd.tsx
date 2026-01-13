@@ -150,7 +150,9 @@ const PurchaseAdd = () => {
     const saveReceipt = async () => {
         if (!headerData.storeId) return showToast('error', "Mağaza seçimi zorunludur!");
         if (addedItems.length === 0) return showToast('error', "Ürün ekleyiniz.");
-
+        if (!headerData.receiptNo.trim()) {
+            return showToast('error', "Lütfen Fiş No giriniz!");
+        }
         const purchaseData: Purchase = {
             storeId: headerData.storeId,
             type: 'Alış',
@@ -192,7 +194,10 @@ const PurchaseAdd = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
                     <div><label className="form-label">Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" /></div>
                     <div><label className="form-label">Mağaza</label>{isAdmin ? <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input"><option value="">Seç...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select> : <input disabled value="Mağazam" className="form-input" />}</div>
-                    <div><label className="form-label">Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" /></div>
+                    <div>
+                        <label className="form-label">Fiş No <span style={{ color: 'red' }}>*</span></label>
+                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" />
+                    </div>
                 </div>
             </div>
 

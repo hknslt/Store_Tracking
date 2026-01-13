@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { addSale } from "../../services/saleService";
-import { getStores, getPersonnelByStore } from "../../services/storeService"; // getPersonnelByStore eklendi
+import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getStoreStocks } from "../../services/storeStockService";
 import {
     getGroups,
@@ -14,6 +14,9 @@ import {
     getDimensions
 } from "../../services/definitionService";
 import { getProductsByCategoryId } from "../../services/productService";
+
+// 👇 ŞEHİR VERİSİNİ IMPORT ETTİK
+import { iller } from "../../constants/cities";
 
 import type { Sale, SaleItem, Store, SystemUser, Personnel, Group, Category, Product, Cushion, Color, Dimension, StoreStock } from "../../types";
 import "../../App.css";
@@ -29,11 +32,13 @@ const SaleAdd = () => {
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
-    
-    const [storeStocks, setStoreStocks] = useState<StoreStock[]>([]);
-    const [storePersonnel, setStorePersonnel] = useState<Personnel[]>([]); // Mağaza Personelleri
 
-    // Kullanıcı Bilgisi
+    const [storeStocks, setStoreStocks] = useState<StoreStock[]>([]);
+    const [storePersonnel, setStorePersonnel] = useState<(Personnel | SystemUser)[]>([]);
+
+    // 👇 İLÇE LİSTESİ STATE
+    const [districts, setDistricts] = useState<string[]>([]);
+
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
@@ -42,18 +47,17 @@ const SaleAdd = () => {
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
         storeId: "",
-        personnelId: "", // Seçilen personel ID
-        personnelName: "", // Seçilen personel Adı
+        personnelId: "",
+        personnelName: "",
         customerName: "",
         phone: "",
-        city: "",
-        district: "",
+        city: "",        // İl
+        district: "",    // İlçe
         address: "",
         customerNote: "",
         shippingCost: 0
     });
 
-    // Satır State (Değişmedi)
     const [selectedProductId, setSelectedProductId] = useState("");
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
@@ -83,9 +87,9 @@ const SaleAdd = () => {
     const requestedQty = lineItem.quantity || 0;
 
     const getStockStatusColor = () => {
-        if (currentFreeStock === 0) return '#fff5f5'; 
-        if (currentFreeStock < requestedQty) return '#fffbf0'; 
-        return '#f0fff4'; 
+        if (currentFreeStock === 0) return '#fff5f5';
+        if (currentFreeStock < requestedQty) return '#fffbf0';
+        return '#f0fff4';
     };
 
     // Veri Yükleme
@@ -101,13 +105,13 @@ const SaleAdd = () => {
                 if (userDoc.exists()) {
                     const u = userDoc.data() as SystemUser;
                     setCurrentUserData(u);
-                    
-                    if (u.role === 'admin' || u.role === 'control') { 
-                        setIsAdmin(true); 
-                        getStores().then(setStores); 
-                    } else { 
-                        setIsAdmin(false); 
-                        if(u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! })); 
+
+                    if (u.role === 'admin' || u.role === 'control') {
+                        setIsAdmin(true);
+                        getStores().then(setStores);
+                    } else {
+                        setIsAdmin(false);
+                        if (u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! }));
                     }
                 }
             }
@@ -115,36 +119,45 @@ const SaleAdd = () => {
         initData();
     }, [currentUser]);
 
-    // Mağaza değişince Stokları ve Personelleri Çek
     useEffect(() => {
-        if (headerData.storeId) { 
+        if (headerData.storeId) {
             getStoreStocks(headerData.storeId).then(setStoreStocks);
-            getPersonnelByStore(headerData.storeId).then(setStorePersonnel); // Personelleri getir
+            getPersonnelByStore(headerData.storeId).then(data => {
+                const sorted = data.sort((a, b) => a.fullName.localeCompare(b.fullName));
+                setStorePersonnel(sorted as (Personnel | SystemUser)[]);
+            });
         } else {
             setStorePersonnel([]);
             setStoreStocks([]);
         }
     }, [headerData.storeId]);
 
+    // HEADER CHANGE (İL/İLÇE VE PERSONEL MANTIĞI DAHİL)
     const handleHeaderChange = (e: any) => {
         const { name, value } = e.target;
-        
+
         if (name === 'personnelId') {
-            // Personel seçilince adını da bulup set et
             const p = storePersonnel.find(per => per.id === value);
-            setHeaderData(prev => ({ 
-                ...prev, 
-                personnelId: value, 
-                personnelName: p ? p.fullName : "" 
+            setHeaderData(prev => ({
+                ...prev,
+                personnelId: value,
+                personnelName: p ? p.fullName : ""
             }));
-        } else {
-            setHeaderData({ ...headerData, [name]: value });
+        }
+        // 👇 İL DEĞİŞİNCE İLÇELERİ GÜNCELLE VE İLÇEYİ SIFIRLA
+        else if (name === 'city') {
+            const selectedCity = iller.find(i => i.isim === value);
+            setDistricts(selectedCity ? selectedCity.ilceler : []);
+            setHeaderData(prev => ({ ...prev, city: value, district: "" }));
+        }
+        else {
+            setHeaderData(prev => ({ ...prev, [name]: value }));
         }
     };
 
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    // ... (Seçim Zinciri ve Stok kontrol fonksiyonları AYNI) ...
+    // Seçim Zinciri
     const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
     const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
     const updateLineItem = (prodId: string, colId: string, dimId: string) => { const prod = productsInCat.find(p => p.id === prodId); const col = allColors.find(c => c.id === colId); const dim = allDimensions.find(d => d.id === dimId); if (prod) { let name = prod.productName; setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name })); } };
@@ -165,40 +178,42 @@ const SaleAdd = () => {
 
     const saveSale = async () => {
         if (!headerData.storeId || !headerData.customerName) { setMessage({ type: 'error', text: 'Mağaza ve Müşteri bilgileri zorunludur.' }); return; }
-        if (!headerData.personnelId) { setMessage({ type: 'error', text: 'Lütfen Satış Personeli seçiniz.' }); return; } // Personel Kontrolü
+        if (!headerData.personnelId) { setMessage({ type: 'error', text: 'Lütfen Satış Personeli seçiniz.' }); return; }
         if (addedItems.length === 0) { setMessage({ type: 'error', text: 'Ürün ekleyiniz.' }); return; }
-        
+        if (!headerData.receiptNo.trim()) {
+            setMessage({ type: 'error', text: 'Lütfen Fiş No giriniz.' });
+            return;
+        }
         const grandTotal = addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost);
-        
-        const saleData: Sale = { 
-            ...headerData, 
-            shippingCost: Number(headerData.shippingCost), 
-            // Seçilen personeli kullanıyoruz (Login olanı değil)
-            personnelId: headerData.personnelId, 
-            personnelName: headerData.personnelName, 
-            items: addedItems, 
-            grandTotal, 
-            createdAt: new Date() 
+
+        const saleData: Sale = {
+            ...headerData,
+            shippingCost: Number(headerData.shippingCost),
+            personnelId: headerData.personnelId,
+            personnelName: headerData.personnelName,
+            items: addedItems,
+            grandTotal,
+            createdAt: new Date()
         };
-        
+
         try {
-            await addSale(saleData); 
-            setMessage({ type: 'success', text: 'Sipariş oluşturuldu!' }); 
-            setAddedItems([]); 
-            // Formu sıfırla ama mağazayı ve tarihi koru
-            setHeaderData(prev => ({ 
-                ...prev, 
-                receiptNo: "", 
-                personnelId: "", personnelName: "", 
-                customerName: "", phone: "", city: "", district: "", address: "", customerNote: "", shippingCost: 0 
-            })); 
+            await addSale(saleData);
+            setMessage({ type: 'success', text: 'Sipariş oluşturuldu!' });
+            setAddedItems([]);
+            setHeaderData(prev => ({
+                ...prev,
+                receiptNo: "",
+                personnelId: "", personnelName: "",
+                customerName: "", phone: "", city: "", district: "", address: "", customerNote: "", shippingCost: 0
+            }));
+            setDistricts([]); // İlçeleri de sıfırla
             getStoreStocks(headerData.storeId).then(setStoreStocks);
-        } catch (error: any) { 
-            setMessage({ type: 'error', text: error.message }); 
+        } catch (error: any) {
+            setMessage({ type: 'error', text: error.message });
         }
     };
 
-    // --- STİL NESNELERİ ---
+    // Stiller
     const cellStyle = { padding: '4px', verticalAlign: 'middle' };
     const smallInput = { width: '60px', padding: '4px', fontSize: '13px', height: '28px', textAlign: 'center' as const, borderRadius: '4px', border: '1px solid #ccc' };
     const mediumInput = { width: '80px', padding: '4px', fontSize: '13px', height: '28px', borderRadius: '4px', border: '1px solid #ccc' };
@@ -217,36 +232,37 @@ const SaleAdd = () => {
             {/* MÜŞTERİ BİLGİLERİ */}
             <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                    
-                    {/* TARİH */}
+
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-                    
-                    {/* MAĞAZA SEÇİMİ */}
+
                     <div>
                         <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Mağaza</label>
-                        {isAdmin ? 
-                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select> 
+                        {isAdmin ?
+                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select>
                             : <input disabled value={currentUserData?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee', padding: '6px' }} />
                         }
                     </div>
 
-                    {/* FİŞ NO */}
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Fiş No</label><input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>
+                            Fiş No <span style={{ color: 'red' }}>*</span>
+                        </label>
+                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} />
+                    </div>
 
-                    {/* PERSONEL SEÇİMİ (YENİ) */}
                     <div>
                         <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Satış Personeli</label>
-                        <select 
-                            name="personnelId" 
-                            value={headerData.personnelId} 
-                            onChange={handleHeaderChange} 
-                            className="form-input" 
-                            style={{ padding: '6px'}}
-                            disabled={!headerData.storeId} // Mağaza seçilmeden personel seçilemez
+                        <select
+                            name="personnelId"
+                            value={headerData.personnelId}
+                            onChange={handleHeaderChange}
+                            className="form-input"
+                            style={{ padding: '6px' }}
+                            disabled={!headerData.storeId}
                         >
                             <option value="">-- Personel Seç --</option>
                             {storePersonnel.map(p => (
-                                <option key={p.id} value={p.id}>{p.fullName}</option>
+                                <option key={p.id} value={p.id}>{p.fullName} {p.role === 'store_admin' ? '(Müdür)' : ''}</option>
                             ))}
                         </select>
                     </div>
@@ -256,13 +272,40 @@ const SaleAdd = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Müşteri Adı</label><input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Telefon</label><input name="phone" value={headerData.phone} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İl</label><input name="city" value={headerData.city} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İlçe</label><input name="district" value={headerData.district} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
+
+                    {/* 👇 İL SEÇİMİ */}
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İl</label>
+                        <select name="city" value={headerData.city} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}>
+                            <option value="">İl Seçiniz...</option>
+                            {iller.map(il => (
+                                <option key={il.id} value={il.isim}>{il.isim}</option>
+                            ))}
+                        </select>
+                    </div>
+
+                    {/* 👇 İLÇE SEÇİMİ */}
+                    <div>
+                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İlçe</label>
+                        <select
+                            name="district"
+                            value={headerData.district}
+                            onChange={handleHeaderChange}
+                            className="form-input"
+                            style={{ padding: '6px' }}
+                            disabled={!headerData.city} // İl seçilmeden pasif
+                        >
+                            <option value="">İlçe Seçiniz...</option>
+                            {districts.map((ilce, index) => (
+                                <option key={index} value={ilce}>{ilce}</option>
+                            ))}
+                        </select>
+                    </div>
                 </div>
+
                 <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 1fr', gap: '10px' }}>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Açık Adres</label><textarea name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" rows={1} style={{ resize: 'vertical', height: '32px', padding: '6px' }} /></div>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Notu</label><input name="customerNote" value={headerData.customerNote} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} placeholder="Örn: 15 gün sonra teslim" /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Nakliye</label><input type="number" name="shippingCost" value={headerData.shippingCost} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
                 </div>
             </div>
 

@@ -1,7 +1,7 @@
 // src/services/saleService.ts
 import { db } from "../firebase";
 import { collection, getDocs, orderBy, query, doc, runTransaction } from "firebase/firestore";
-import type { Sale, DeliveryStatus, PendingRequest } from "../types";
+import type { Sale, DeliveryStatus, PendingRequest, Debt } from "../types";
 
 export const addSale = async (sale: Sale) => {
     try {
@@ -30,6 +30,21 @@ export const addSale = async (sale: Sale) => {
 
             // Satış ID'sini şimdiden belirliyoruz
             const saleRef = doc(collection(db, "sales", sale.storeId, "receipts"));
+
+            const debtRef = doc(collection(db, "stores", sale.storeId, "debts")); // ID otomatik olsun veya saleRef.id kullanabiliriz
+
+            const newDebt: Debt = {
+                storeId: sale.storeId,
+                saleId: saleRef.id,
+                receiptNo: sale.receiptNo,
+                customerName: sale.customerName,
+                saleDate: sale.date,
+                totalAmount: sale.grandTotal, // Nakliye dahil toplam
+                paidAmount: 0,
+                remainingAmount: sale.grandTotal,
+                status: 'Ödenmedi'
+            };
+
 
             for (const { item, ref, doc } of stockReads) {
                 let currentData = {
@@ -93,6 +108,8 @@ export const addSale = async (sale: Sale) => {
 
             // A) Satış Fişini Kaydet
             transaction.set(saleRef, sale);
+
+            transaction.set(doc(db, "stores", sale.storeId, "debts", saleRef.id), newDebt); 
 
             // B) Stokları Güncelle
             for (const w of stockWrites) {
@@ -171,6 +188,31 @@ export const updateSaleItemStatus = async (
         });
     } catch (error) {
         console.error("Durum güncelleme hatası:", error);
+        throw error;
+    }
+};
+
+export const updateShippingCost = async (storeId: string, saleId: string, newCost: number) => {
+    try {
+        const saleRef = doc(db, "sales", storeId, "receipts", saleId);
+
+        await runTransaction(db, async (transaction) => {
+            const saleDoc = await transaction.get(saleRef);
+            if (!saleDoc.exists()) throw "Satış bulunamadı";
+
+            const sale = saleDoc.data() as Sale;
+
+            // Yeni Grand Total Hesapla
+            const itemsTotal = sale.items.reduce((acc, item) => acc + item.total, 0);
+            const newGrandTotal = itemsTotal + newCost;
+
+            transaction.update(saleRef, {
+                shippingCost: newCost,
+                grandTotal: newGrandTotal
+            });
+        });
+    } catch (error) {
+        console.error("Nakliye güncelleme hatası:", error);
         throw error;
     }
 };

@@ -253,3 +253,58 @@ export interface SSHRecord {
     status: 'Açık' | 'Kapalı'; // Servis durumu
     createdAt: string;     // Kayıt tarihi
 }
+
+
+
+
+export interface PaymentMethod {
+    id?: string;
+    name: string; // Nakit, Kredi Kartı, Havale/EFT, Sodexo vb.
+}
+
+// --- ÖDEME İŞLEM TİPLERİ ---
+export type TransactionType = 'Tahsilat' | 'Merkez' | 'Masraf' | 'E/F';
+
+// --- ÖDEME SATIRI (Excel Satırı) ---
+export interface PaymentItem {
+    type: TransactionType;      // İşlem Türü
+    saleId?: string;            // Tahsilat ise hangi satış?
+    saleReceiptNo?: string;     // Görsel için
+    customerName?: string;      // Görsel için
+
+    paymentMethodId: string;    // Nakit mi, Kart mı?
+    amount: number;             // Tutar
+    description: string;        // Açıklama
+}
+
+// --- ÖDEME MAKBUZU (Ana Belge) ---
+export interface PaymentDocument {
+    id?: string;
+    storeId: string;
+    receiptNo: string;          // Makbuz No (Örn: M-2024-001)
+    date: string;
+
+    personnelId: string;        // İşlemi yapan
+    personnelName: string;
+
+    items: PaymentItem[];       // İşlemler
+    totalAmount: number;        // Toplam Tutar (Sadece bilgi amaçlı)
+    createdAt?: any;
+}
+
+
+export interface Debt {
+    id?: string;
+    storeId: string;
+    saleId: string;          // Hangi satışa ait?
+    receiptNo: string;       // Fiş No
+    customerName: string;    // Müşteri Adı
+    saleDate: string;        // Satış Tarihi
+    
+    totalAmount: number;     // Toplam Borç (Satış Tutarı)
+    paidAmount: number;      // Bugüne kadar ödenen
+    remainingAmount: number; // Kalan Borç (Total - Paid)
+    
+    status: 'Ödenmedi' | 'Kısmi Ödeme' | 'Ödendi';
+    lastPaymentDate?: string;
+}

@@ -32,6 +32,9 @@ import PriceManager from "./pages/prices/PriceManager";
 import SSHList from "./pages/ssh/SSHList";
 import SSHAdd from "./pages/ssh/SSHAdd";
 import SaleDetail from "./pages/sales/SaleDetail";
+import PaymentMethods from "./pages/definitions/Payment/PaymentMethods";
+import PaymentAdd from "./pages/payments/PaymentAdd";
+import PaymentList from "./pages/payments/PaymentList";
 
 // --- 1. KORUMALI DÜZEN (Sidebar Burada Olacak) ---
 // Giriş yapmış kullanıcılar burayı ve Sidebar'ı görür.
@@ -109,6 +112,7 @@ function App() {
 
             <Route path="/definitions/cushions" element={<CushionsPage />} />
 
+
             {/* Fiyat & Stok & Alış */}
             <Route path="/prices/list" element={<PriceList />} />
             <Route path="/prices/manage" element={<PriceManager />} />
@@ -130,6 +134,12 @@ function App() {
             <Route path="/sales" element={<SaleList />} />
             <Route path="/sales/add" element={<SaleAdd />} />
             <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
+
+
+            {/* Ödeme Yöntemleri */}
+            <Route path="/definitions/payment-methods" element={<PaymentMethods />} />
+            <Route path="/payments/Add" element={<PaymentAdd />} />
+            <Route path="/payments/list" element={<PaymentList />} />
             
             {/* Puantaj Yönetimi */}
             <Route path="/attendance" element={<AttendanceManager />} />

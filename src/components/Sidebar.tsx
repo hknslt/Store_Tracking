@@ -89,7 +89,18 @@ const Sidebar = () => {
           <span className="nav-icon">🛒</span>
           <span>Alışlar</span>
         </NavLink>
+        
+        <NavLink to="/payments/list" className="nav-item">
+          <span className="nav-icon">📄</span>
+          <span>Ödeme Listesi</span>
+        </NavLink>
 
+        <NavLink to= "/payments/add" className="nav-item">
+          <span className="nav-icon">💰</span>
+          <span>Ödeme Ekle</span>
+        </NavLink>
+        
+        
         <NavLink to="/attendance" className="nav-item">
           <span className="nav-icon">📅</span>
           <span>Puantaj</span>
@@ -136,6 +147,11 @@ const Sidebar = () => {
         <NavLink to="/definitions/cushions" className="nav-item">
           <span className="nav-icon">🛋️</span>
           <span>Minderler</span>
+        </NavLink>
+
+        <NavLink to="/definitions/payment-methods" className="nav-item">
+          <span className="nav-icon">💳</span>
+          <span>Ödeme Yöntemleri</span>
         </NavLink>
 
         <NavLink to="/register" className="nav-item">
