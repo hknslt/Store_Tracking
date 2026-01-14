@@ -9,7 +9,8 @@ import {
     doc,
     updateDoc,
     orderBy,
-    setDoc
+    setDoc,
+    getDoc
 } from "firebase/firestore";
 import type { Store, Personnel, SystemUser } from "../types";
 import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
@@ -93,7 +94,7 @@ export const getAllPersonnel = async (): Promise<(Personnel | SystemUser)[]> => 
 export const getPersonnelByStore = async (storeId: string): Promise<Personnel[]> => {
     try {
         const q = query(
-            collection(db, "personnel"), 
+            collection(db, "personnel"),
             where("storeId", "==", storeId),
             where("role", "in", ["staff", "store_admin"])
         );
@@ -112,4 +113,20 @@ export const updatePersonnelStatus = async (id: string, isActive: boolean, endDa
         isActive,
         endDate: endDate || null // Pasifse tarih girilir, aktifse tarih silinir
     });
+};
+
+export const getStoreById = async (storeId: string): Promise<Store | null> => {
+    try {
+        const docRef = doc(db, "stores", storeId);
+        const docSnap = await getDoc(docRef);
+
+        if (docSnap.exists()) {
+            return { id: docSnap.id, ...docSnap.data() } as Store;
+        } else {
+            return null;
+        }
+    } catch (error) {
+        console.error("Mağaza detay hatası:", error);
+        return null;
+    }
 };

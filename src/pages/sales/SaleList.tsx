@@ -213,7 +213,7 @@ const SaleList = () => {
                                     <th style={{ width: '12%' }}>Fiş No</th>
                                     <th style={{ width: '18%' }}>Müşteri Adı</th>
                                     <th style={{ width: '15%' }}>İl / İlçe</th>
-                                    <th style={{ width: '15%' }}>Termin / Not</th>
+                                    <th style={{ width: '15%' }}>Termin Tarihi</th>
                                     <th style={{ width: '12%' }}>Personel</th>
                                     <th style={{ width: '13%', textAlign: 'right' }}>Toplam</th>
                                 </tr>
@@ -222,7 +222,6 @@ const SaleList = () => {
                                 {sales.length > 0 ? (
                                     sales.map(s => {
                                         const itemsTotal = s.items.reduce((acc, item) => acc + ((item.price - (item.discount || 0)) * item.quantity), 0);
-                                        const grandTotal = itemsTotal + (s.shippingCost || 0);
                                         const isAllDelivered = s.items.every(i => i.deliveryStatus === 'Teslim Edildi');
 
                                         return (
@@ -233,9 +232,9 @@ const SaleList = () => {
                                                     <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
                                                     <td style={{ fontWeight: '500' }}>{s.customerName}</td>
                                                     <td style={{ fontSize: '13px', color: '#555' }}>{s.city} / {s.district}</td>
-                                                    <td style={{ color: '#e67e22', fontStyle: 'italic', fontWeight: '500', fontSize: '13px' }}>{s.customerNote || "-"}</td>
+                                                    <td style={{ color: '#e67e22', fontWeight: '500', fontSize: '13px' }}>{formatDate(s.deadline)}</td>
                                                     <td>{s.personnelName}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>{grandTotal.toFixed(2)} ₺</td>
+                                                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>{itemsTotal.toFixed(2)} ₺</td>
                                                 </tr>
 
                                                 {expandedRowId === s.id && (
@@ -321,7 +320,7 @@ const SaleList = () => {
                                                                         <b>{s.shippingCost} ₺</b>
                                                                     </div>
                                                                     <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>
-                                                                        Genel Toplam: {grandTotal.toFixed(2)} ₺
+                                                                        Ürün Genel Toplam: {itemsTotal.toFixed(2)} ₺
                                                                     </div>
                                                                 </div>
                                                             </div>

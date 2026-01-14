@@ -37,6 +37,7 @@ const StoreStockManager = () => {
 
     useEffect(() => {
         if (!selectedStoreId) { setStocks([]); return; }
+        // Servis zaten 0 olanları filtreliyor, direkt set edebiliriz.
         getStoreStocks(selectedStoreId).then(setStocks);
     }, [selectedStoreId]);
 
@@ -46,6 +47,9 @@ const StoreStockManager = () => {
     };
     const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
     const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
+
+    // 0 ise boş göster, değilse değeri göster
+    const renderVal = (val: number) => val === 0 ? <span style={{ color: '#ccc' }}>-</span> : val;
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
 
@@ -70,7 +74,7 @@ const StoreStockManager = () => {
 
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
-                    {selectedStoreId && stocks.length > 0 ? (
+                    {selectedStoreId ? (
                         <table className="data-table dense">
                             <thead>
                                 <tr style={{ backgroundColor: '#f1f2f6' }}>
@@ -83,42 +87,50 @@ const StoreStockManager = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {stocks.map(stock => (
-                                    <tr key={stock.id}>
-                                        <td style={{ padding: '10px' }}>
-                                            <span style={{ fontWeight: '600', color: '#34495e', marginRight: '6px' }}>{stock.productName.split('-')[0].trim()}</span>
-                                            {stock.dimensionId && <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>{getDimName(stock.dimensionId)}</span>}
-                                            <span style={{ color: '#34495e', fontWeight: '600' }}>{getCatName(stock.productId)}</span>
-                                        </td>
+                                {stocks.length > 0 ? (
+                                    stocks.map(stock => (
+                                        <tr key={stock.id}>
+                                            <td style={{ padding: '10px' }}>
+                                                <span style={{ fontWeight: '600', color: '#34495e', marginRight: '6px' }}>{stock.productName.split('-')[0].trim()}</span>
+                                                {stock.dimensionId && <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>{getDimName(stock.dimensionId)}</span>}
+                                                <span style={{ color: '#34495e', fontWeight: '600' }}>{getCatName(stock.productId)}</span>
+                                            </td>
 
-                                        <td>{getColorName(stock.colorId)}</td>
+                                            <td>{getColorName(stock.colorId)}</td>
 
-                                        {/* 1. SERBEST STOK (Depoda boşta duran) */}
-                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#27ae60', fontSize: '15px', backgroundColor: '#f0fff4' }}>
-                                            {stock.freeStock}
-                                        </td>
+                                            {/* 1. SERBEST STOK */}
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#27ae60', fontSize: '15px', backgroundColor: '#f0fff4' }}>
+                                                {renderVal(stock.freeStock)}
+                                            </td>
 
-                                        {/* 2. REZERVE STOK (Satılmış, bekliyor) */}
-                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#f39c12', backgroundColor: '#fffcf5' }}>
-                                            {stock.reservedStock}
-                                        </td>
+                                            {/* 2. REZERVE STOK */}
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#f39c12', backgroundColor: '#fffcf5' }}>
+                                                {renderVal(stock.reservedStock)}
+                                            </td>
 
-                                        {/* 3. BEKLENEN (Depo stoğu için yolda) */}
-                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#3498db', backgroundColor: '#f0f9ff' }}>
-                                            {stock.incomingStock}
-                                        </td>
+                                            {/* 3. BEKLENEN (Depo) */}
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#3498db', backgroundColor: '#f0f9ff' }}>
+                                                {renderVal(stock.incomingStock)}
+                                            </td>
 
-                                        {/* 4. BEKLENEN MÜŞTERİ (Özel sipariş yolda) */}
-                                        <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#e74c3c', backgroundColor: '#fff5f5' }}>
-                                            {stock.incomingReservedStock}
+                                            {/* 4. BEKLENEN MÜŞTERİ */}
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold', color: '#e74c3c', backgroundColor: '#fff5f5' }}>
+                                                {renderVal(stock.incomingReservedStock)}
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
+                                            Bu mağazada şu an stok bulunmuyor.
                                         </td>
                                     </tr>
-                                ))}
+                                )}
                             </tbody>
                         </table>
                     ) : (
                         <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-                            {selectedStoreId ? "Stok kaydı yok." : "Lütfen mağaza seçiniz."}
+                            Lütfen mağaza seçiniz.
                         </div>
                     )}
                 </div>

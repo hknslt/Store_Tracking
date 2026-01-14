@@ -43,6 +43,7 @@ export interface Store {
     storeCode: string;
     address?: string;
     phone?: string;
+    currentBalance?: StoreBalance;
 }
 
 
@@ -173,7 +174,7 @@ export interface Sale {
     city: string;
     district: string;
     address: string;
-    customerNote?: string;
+    deadline: string;
 
     shippingCost: number;
     grandTotal: number;
@@ -264,17 +265,37 @@ export interface PaymentMethod {
 
 // --- ÖDEME İŞLEM TİPLERİ ---
 export type TransactionType = 'Tahsilat' | 'Merkez' | 'Masraf' | 'E/F';
+export type Currency = 'TL' | 'USD' | 'EUR' | 'GBP';
+
+
+//Kasa Bakiyesi Yapısı
+export interface StoreBalance {
+    TL: number;
+    USD: number;
+    EUR: number;
+    GBP: number;
+}
+
 
 // --- ÖDEME SATIRI (Excel Satırı) ---
 export interface PaymentItem {
-    type: TransactionType;      // İşlem Türü
-    saleId?: string;            // Tahsilat ise hangi satış?
-    saleReceiptNo?: string;     // Görsel için
-    customerName?: string;      // Görsel için
+    type: TransactionType;      // Tahsilat, Masraf vb.
 
-    paymentMethodId: string;    // Nakit mi, Kart mı?
-    amount: number;             // Tutar
-    description: string;        // Açıklama
+    // Tahsilat Detayları
+    saleId?: string;
+    saleReceiptNo?: string;
+    customerName?: string;
+
+    // Ödeme Detayları
+    paymentMethodId: string;    // Nakit, KK vb.
+
+    // 💰 DÖVİZ YÖNETİMİ 💰
+    currency: Currency;         // Seçilen Para Birimi
+    originalAmount: number;     // Döviz Tutarı (Örn: 100 $)
+    exchangeRate: number;       // Kur (Örn: 32.50)
+    amount: number;             // TL Karşılığı (Hesaplanan: 3250 TL) - Sistem bunu esas alır
+
+    description: string;
 }
 
 // --- ÖDEME MAKBUZU (Ana Belge) ---
@@ -300,11 +321,11 @@ export interface Debt {
     receiptNo: string;       // Fiş No
     customerName: string;    // Müşteri Adı
     saleDate: string;        // Satış Tarihi
-    
+
     totalAmount: number;     // Toplam Borç (Satış Tutarı)
     paidAmount: number;      // Bugüne kadar ödenen
     remainingAmount: number; // Kalan Borç (Total - Paid)
-    
+
     status: 'Ödenmedi' | 'Kısmi Ödeme' | 'Ödendi';
     lastPaymentDate?: string;
 }

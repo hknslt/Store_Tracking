@@ -11,6 +11,7 @@ import logo from "../assets/logo/Bahçemo_white.png";
 const Sidebar = () => {
   const { currentUser } = useAuth();
   const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   const handleLogout = async () => {
     try {
@@ -22,6 +23,7 @@ const Sidebar = () => {
   };
 
   const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
+  if (userRole === 'store_admin') return null;
 
   return (
     <div className="sidebar">
@@ -89,18 +91,18 @@ const Sidebar = () => {
           <span className="nav-icon">🛒</span>
           <span>Alışlar</span>
         </NavLink>
-        
+
         <NavLink to="/payments/list" className="nav-item">
           <span className="nav-icon">📄</span>
           <span>Ödeme Listesi</span>
         </NavLink>
 
-        <NavLink to= "/payments/add" className="nav-item">
+        <NavLink to="/payments/add" className="nav-item">
           <span className="nav-icon">💰</span>
           <span>Ödeme Ekle</span>
         </NavLink>
-        
-        
+
+
         <NavLink to="/attendance" className="nav-item">
           <span className="nav-icon">📅</span>
           <span>Puantaj</span>

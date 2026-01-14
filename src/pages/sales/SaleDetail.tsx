@@ -149,7 +149,7 @@ const SaleDetail = () => {
                         <h4 style={{ margin: '0 0 10px 0', borderBottom: '1px solid #ddd', paddingBottom: '5px', color: '#3498db' }}> Teslimat & Notlar </h4>
                         < div style={{ lineHeight: '1.6', fontSize: '14px', color: '#333' }}>
                             <strong>Adres: </strong> {sale.address || "Adres girilmedi"}<br />
-                            <strong>Not: </strong> <span style={{ fontStyle: 'italic' }}>{sale.customerNote || "-"}</span > <br />
+                            <strong>Termin Tarihi: </strong> <span>{formatDate(sale.deadline)}</span > <br />
                             < strong > Personel: </strong> {sale.personnelName}
                         </div>
                     </div>

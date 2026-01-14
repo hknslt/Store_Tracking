@@ -54,7 +54,7 @@ const SaleAdd = () => {
         city: "",        // İl
         district: "",    // İlçe
         address: "",
-        customerNote: "",
+        deadline: new Date().toISOString().split('T')[0], // Termin Tarihi
         shippingCost: 0
     });
 
@@ -204,7 +204,7 @@ const SaleAdd = () => {
                 ...prev,
                 receiptNo: "",
                 personnelId: "", personnelName: "",
-                customerName: "", phone: "", city: "", district: "", address: "", customerNote: "", shippingCost: 0
+                customerName: "", phone: "", city: "", district: "", address: "", deadline: "", shippingCost: 0
             }));
             setDistricts([]); // İlçeleri de sıfırla
             getStoreStocks(headerData.storeId).then(setStoreStocks);
@@ -305,7 +305,8 @@ const SaleAdd = () => {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 1fr', gap: '10px' }}>
                     <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Açık Adres</label><textarea name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" rows={1} style={{ resize: 'vertical', height: '32px', padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Notu</label><input name="customerNote" value={headerData.customerNote} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} placeholder="Örn: 15 gün sonra teslim" /></div>
+                    
+                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Tarihi</label><input type="date" name="deadline" value={headerData.deadline} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
                 </div>
             </div>
 
