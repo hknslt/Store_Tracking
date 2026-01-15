@@ -2,11 +2,11 @@
    1. TEMEL AYARLAR VE DEĞİŞKENLER
    ========================================= */
 :root {
-  --primary-color: #3498db;
-  /* Mavi */
+  --primary-color: #145a32;
+  /* Ana Yeşil */
   --secondary-color: #2c3e50;
   /* Koyu Lacivert */
-  --success-color: #2ecc71;
+  --success-color: #145a32;
   /* Yeşil */
   --warning-color: #f39c12;
   /* Turuncu */
@@ -116,53 +116,98 @@ body {
 }
 
 /* =========================================
-   4. TABLO STİLLERİ (DATA TABLE)
+   4. MODERN TABLO STİLLERİ (Yüzen Satırlar)
    ========================================= */
-.data-table {
+.modern-table-container {
+  background: transparent;
+}
+
+.data-table,
+.modern-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  /* Satırları ayırmak için gerekli */
+  border-spacing: 0 10px;
+  /* Satırlar arası 10px boşluk */
   font-size: 0.95rem;
 }
 
-.data-table thead tr {
-  background-color: #f1f2f6;
-  text-align: left;
+.data-table thead tr,
+.modern-table thead tr {
+  background-color: transparent;
+  /* Başlık arka planı şeffaf */
 }
 
-.data-table th {
-  padding: 12px 20px;
-  font-weight: 600;
-  color: var(--secondary-color);
-  vertical-align: middle;
+.data-table th,
+.modern-table th {
+  padding: 10px 20px;
+  font-weight: 700;
+  color: #64748b;
+  /* Daha modern gri */
+  text-transform: uppercase;
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  border: none;
 }
 
-.data-table tr {
-  border-bottom: 1px solid #eee;
+/* Satırların Kart Gibi Görünmesi */
+.hover-row,
+.modern-row {
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+  /* Hafif gölge */
+  transition: all 0.2s ease;
+  border-radius: 12px;
+  /* Köşeleri yuvarla */
 }
 
-.data-table tr:last-child {
-  border-bottom: none;
-}
-
-.data-table td {
-  padding: 12px 20px;
+.hover-row td,
+.modern-row td {
+  padding: 18px 20px;
   color: #34495e;
   vertical-align: middle;
+  border-top: 1px solid transparent;
+  /* Kenarlıkları temizle */
+  border-bottom: 1px solid transparent;
 }
 
-/* Sıkıştırılmış Tablo (Alış/Satış Giriş Ekranları İçin) */
-.data-table.dense th,
-.data-table.dense td {
-  padding: 8px 12px;
-  font-size: 13px;
+/* Satırın ilk ve son hücresini yuvarla */
+.hover-row td:first-child,
+.modern-row td:first-child {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
 }
 
-.data-table.dense tbody tr:hover {
-  background-color: #f8f9fa;
+.hover-row td:last-child,
+.modern-row td:last-child {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
 }
 
-.hover-row:hover {
-  background-color: #f1f2f6 !important;
+.hover-row:hover,
+.modern-row:hover {
+  transform: translateY(-3px);
+  /* Üzerine gelince yukarı kalksın */
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  position: relative;
+}
+
+/* Detay Satırı (Accordion İçin) */
+.detail-row td {
+  padding: 0 !important;
+  background: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+.detail-content {
+  background: #f8fafc;
+  margin: 0 15px 15px 15px;
+  /* Kenarlardan içeride */
+  padding: 20px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
 }
 
 /* =========================================
@@ -198,6 +243,11 @@ body {
 
 .btn-success {
   background-color: var(--success-color);
+  color: white;
+}
+
+.btn-past {
+  background-color: var(--danger-color);
   color: white;
 }
 
@@ -526,4 +576,236 @@ body {
 
 .action-btn.delete:hover {
   background-color: #fadbd8;
+}
+
+
+
+/* src/App.css EN ALTINA EKLE */
+
+@media print {
+
+  /* 1. Önce HER ŞEYİ gizle */
+  body * {
+    visibility: hidden;
+  }
+
+  /* 2. Scrollbarları ve arka planı temizle */
+  html,
+  body {
+    height: 100vh;
+    overflow: hidden !important;
+    background-color: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 3. Sadece 'printable-area' ID'li kutuyu ve içindekileri göster */
+  #printable-area,
+  #printable-area * {
+    visibility: visible;
+  }
+
+  /* 4. Faturayı kağıdın sol üst köşesine sabitle ve tam genişlik yap */
+  #printable-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0 !important;
+    padding: 20px !important;
+    /* Kağıt kenar boşluğu */
+
+    /* Web'deki gölgeleri ve kenarlıkları kaldır (Temiz çıktı için) */
+    box-shadow: none !important;
+    border: none !important;
+    background-color: white !important;
+  }
+
+  /* 5. Butonları vs. kesinlikle gizle */
+  .no-print,
+  button,
+  .btn,
+  .sidebar,
+  .modern-header {
+    display: none !important;
+  }
+}
+
+/* ============================================================
+   AŞAĞIDAKİLERİ src/App.css DOSYANIN EN ALTINA YAPIŞTIR
+   (Personel Sayfası Modern Görünüm Yaması)
+   ============================================================ */
+
+/* 1. Üst Başlık (Modern Header) */
+.modern-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 25px;
+  padding: 0 5px;
+}
+
+.modern-header h2 {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--secondary-color);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+
+.modern-header p {
+  color: #7f8c8d;
+  margin: 5px 0 0 0;
+  font-size: 14px;
+}
+
+/* 2. Filtre Çubuğu (Beyaz Kutu) */
+.filter-bar {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 15px 20px;
+  display: flex;
+  gap: 15px;
+  align-items: center;
+  flex-wrap: wrap;
+  box-shadow: var(--card-shadow);
+  margin-bottom: 25px;
+}
+
+/* 3. Yumuşak Inputlar ve Selectler */
+.soft-input {
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px 15px;
+  font-size: 14px;
+  color: #334155;
+  outline: none;
+  min-height: 42px;
+  transition: all 0.2s ease-in-out;
+  box-sizing: border-box;
+}
+
+.soft-input:focus {
+  background-color: #ffffff;
+  border-color: var(--primary-color);
+  box-shadow: 0 0 0 3px rgba(20, 90, 50, 0.1);
+}
+
+/* 4. Modern Butonlar (Yeşil Yeni Ekle ve Gri Geri Dön Butonu İçin) */
+.modern-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 14px;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+/* modern-btn sınıfı alan btn-primary */
+.modern-btn.btn-primary {
+  background-color: var(--primary-color);
+  color: white;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.modern-btn.btn-primary:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+/* modern-btn sınıfı alan btn-secondary (Geri Dön Butonu) */
+.modern-btn.btn-secondary {
+  background-color: #ffffff;
+  color: #475569;
+  border: 1px solid #cbd5e1;
+}
+
+.modern-btn.btn-secondary:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+/* 5. Modern Tablo Kapsayıcısı */
+.modern-table-container {
+  background: transparent;
+}
+
+.modern-table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 10px;
+}
+
+.modern-table thead th {
+  text-align: left;
+  padding: 10px 20px;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  border: none;
+}
+
+/* Personel Listesi Satırları (Kart Görünümü) */
+.modern-row {
+  background-color: white;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.03);
+  transition: all 0.2s ease;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.modern-row td {
+  padding: 16px 20px;
+  vertical-align: middle;
+  border: none;
+  color: #334155;
+}
+
+.modern-row td:first-child {
+  border-top-left-radius: 12px;
+  border-bottom-left-radius: 12px;
+}
+
+.modern-row td:last-child {
+  border-top-right-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.modern-row:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+}
+
+/* Durum Rozetleri (Yeşil/Kırmızı) */
+.status-badge {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: inline-flex;
+  align-items: center;
+}
+
+.status-badge.success {
+  background-color: #dcfce7;
+  color: #166534;
+}
+
+.status-badge.danger {
+  background-color: #fee2e2;
+  color: #991b1b;
+}
+
+.status-badge.neutral {
+  background-color: #f1f5f9;
+  color: #475569;
 }

@@ -7,6 +7,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import { getPaymentsByStore } from "../../services/paymentService";
 
+// 👇 SystemUser eklendi
 import type { PaymentDocument, Store, SystemUser } from "../../types";
 import "../../App.css";
 
@@ -23,27 +24,43 @@ const PaymentList = () => {
     // Detay satırı açma/kapama
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
-    // --- VERİ YÜKLEME ---
+    // 👇 YENİ: Filtreler
+    const [searchTerm, setSearchTerm] = useState("");
+    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+
+    // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
             if (!currentUser) return;
-            
-            // Mağazaları çek
-            const sData = await getStores();
-            setStores(sData);
+            try {
+                // Mağazaları çek
+                const sData = await getStores();
+                setStores(sData);
 
-            // Kullanıcı yetkisini kontrol et
-            const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-            if (userDoc.exists()) {
-                const u = userDoc.data() as SystemUser;
-                if (u.role === 'admin' || u.role === 'control') {
-                    setIsAdmin(true);
-                } else {
-                    setIsAdmin(false);
-                    if (u.storeId) setSelectedStoreId(u.storeId);
+                // Kullanıcı yetkisini kontrol et
+                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                if (userDoc.exists()) {
+                    // 👇 Tip Güvenliği: SystemUser
+                    const u = userDoc.data() as SystemUser;
+                    if (['admin', 'control', 'report'].includes(u.role)) {
+                        setIsAdmin(true);
+                    } else {
+                        setIsAdmin(false);
+                        if (u.storeId) setSelectedStoreId(u.storeId);
+                    }
                 }
+
+                // Varsayılan Tarih: Son 30 gün
+                const d = new Date();
+                d.setDate(d.getDate() - 30);
+                setStartDate(d.toISOString().split('T')[0]);
+
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
             }
-            setLoading(false);
         };
         init();
     }, [currentUser]);
@@ -57,14 +74,33 @@ const PaymentList = () => {
         }
     }, [selectedStoreId]);
 
-    // --- HESAPLAMALAR ---
-    // (Sadece bilgi amaçlı basit bir özet)
+    // --- FİLTRELEME MANTIĞI ---
+    const filteredPayments = payments.filter(p => {
+        // 1. Tarih Filtresi
+        const pDate = new Date(p.date);
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59); // Gün sonunu kapsasın
+
+        const isDateInRange = pDate >= start && pDate <= end;
+
+        // 2. Arama Filtresi (Makbuz No, Personel veya İçerik Açıklaması)
+        const lowerSearch = searchTerm.toLowerCase();
+        const matchesSearch =
+            p.receiptNo.toLowerCase().includes(lowerSearch) ||
+            p.personnelName.toLowerCase().includes(lowerSearch) ||
+            p.items.some(i => i.description?.toLowerCase().includes(lowerSearch) || i.customerName?.toLowerCase().includes(lowerSearch));
+
+        return isDateInRange && matchesSearch;
+    });
+
+    // --- ÖZET HESAPLAMA (Filtrelenmiş Veriye Göre) ---
     const calculateSummary = () => {
         let tahsilat = 0;
         let masraf = 0;
         let merkez = 0;
 
-        salesLoop: for (const p of payments) {
+        for (const p of filteredPayments) {
             for (const item of p.items) {
                 const val = Number(item.amount);
                 if (item.type === 'Tahsilat') tahsilat += val;
@@ -79,7 +115,7 @@ const PaymentList = () => {
 
     // --- YARDIMCILAR ---
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
-    
+
     const toggleRow = (id: string) => {
         if (expandedRowId === id) setExpandedRowId(null);
         else setExpandedRowId(id);
@@ -97,25 +133,43 @@ const PaymentList = () => {
                 <Link to="/payments/add" className="btn btn-success">+ Yeni İşlem Ekle</Link>
             </div>
 
-            {/* MAĞAZA SEÇİMİ */}
+            {/* FİLTRE BARI */}
             <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <label style={{ fontWeight: '600', color: '#2c3e50' }}>Mağaza:</label>
+                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
+
+                    {/* Mağaza Seçimi */}
                     {isAdmin ? (
-                        <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ maxWidth: '300px' }}>
-                            <option value="">-- Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                        <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ maxWidth: '200px' }}>
+                            <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                         </select>
                     ) : (
                         <div style={{ fontWeight: 'bold', color: '#2980b9', padding: '10px', backgroundColor: '#ecf0f1', borderRadius: '5px' }}>
                             📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
                         </div>
                     )}
+
+                    {/* Tarih Aralığı */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                        <span>-</span>
+                        <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    </div>
+
+                    {/* Arama Kutusu */}
+                    <input
+                        type="text"
+                        placeholder="🔍 Makbuz, Personel veya Açıklama..."
+                        className="form-input"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        style={{ flex: 1, minWidth: '200px' }}
+                    />
                 </div>
             </div>
 
-            {/* ÖZET KARTLARI */}
+            {/* ÖZET KARTLARI (Filtreye Göre Değişir) */}
             {selectedStoreId && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '20px', marginBottom: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '20px' }}>
                     <div className="card" style={{ backgroundColor: '#e8f8f5', borderLeft: '5px solid #2ecc71', padding: '15px' }}>
                         <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>TOPLAM TAHSİLAT</div>
                         <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#27ae60' }}>+{summary.tahsilat.toFixed(2)} ₺</div>
@@ -147,8 +201,8 @@ const PaymentList = () => {
                                 </tr>
                             </thead>
                             <tbody>
-                                {payments.length > 0 ? (
-                                    payments.map(p => (
+                                {filteredPayments.length > 0 ? (
+                                    filteredPayments.map(p => (
                                         <>
                                             {/* ANA SATIR */}
                                             <tr key={p.id} onClick={() => toggleRow(p.id!)} className="hover-row" style={{ cursor: 'pointer', borderBottom: expandedRowId === p.id ? 'none' : '1px solid #eee' }}>
@@ -184,11 +238,10 @@ const PaymentList = () => {
                                                                 {p.items.map((item, idx) => (
                                                                     <tr key={idx} style={{ borderBottom: '1px solid #f5f5f5' }}>
                                                                         <td>
-                                                                            <span className={`badge ${
-                                                                                item.type === 'Tahsilat' ? 'badge-success' : 
-                                                                                item.type === 'Merkez' ? 'badge-danger' : 
-                                                                                item.type === 'Masraf' ? 'badge-warning' : 'badge-secondary'
-                                                                            }`}>
+                                                                            <span className={`badge ${item.type === 'Tahsilat' ? 'badge-success' :
+                                                                                    item.type === 'Merkez' ? 'badge-danger' :
+                                                                                        item.type === 'Masraf' ? 'badge-warning' : 'badge-secondary'
+                                                                                }`}>
                                                                                 {item.type}
                                                                             </span>
                                                                         </td>
@@ -196,7 +249,7 @@ const PaymentList = () => {
                                                                             {item.customerName ? (
                                                                                 <div>
                                                                                     <strong>{item.customerName}</strong>
-                                                                                    <div style={{fontSize:'11px', color:'#777'}}>Fiş: {item.saleReceiptNo}</div>
+                                                                                    <div style={{ fontSize: '11px', color: '#777' }}>Fiş: {item.saleReceiptNo}</div>
                                                                                 </div>
                                                                             ) : "-"}
                                                                         </td>
@@ -215,7 +268,7 @@ const PaymentList = () => {
                                         </>
                                     ))
                                 ) : (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Kayıt bulunamadı.</td></tr>
+                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Bu kriterlere uygun kayıt bulunamadı.</td></tr>
                                 )}
                             </tbody>
                         </table>

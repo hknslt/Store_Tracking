@@ -276,7 +276,7 @@ const PaymentAdd = () => {
                             padding: '15px',
                             border: 'none',
                             borderRadius: '10px',
-                            backgroundColor: selectedType === type ? '#2c3e50' : 'white',
+                            backgroundColor: selectedType === type ? '#145a32' : 'white',
                             color: selectedType === type ? 'white' : '#7f8c8d',
                             cursor: 'pointer',
                             fontWeight: 'bold',

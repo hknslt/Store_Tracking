@@ -119,7 +119,6 @@ export interface Purchase {
     id?: string;
     storeId: string;
     type?: PurchaseType; // Fişin türü
-    contactName?: string;
 
     date: string;
     receiptNo: string;
@@ -134,7 +133,7 @@ export interface Purchase {
 // --- SATIŞ MODÜLÜ (SİPARİŞ OLUŞTURMA) ---
 
 export type SupplyMethod = 'Stoktan' | 'Merkezden';
-export type DeliveryStatus = 'Bekliyor' | 'Teslim Edildi';
+export type DeliveryStatus = 'Bekliyor' | 'Teslim Edildi' | 'İptal';
 // Satış satırının genel durumu
 export type SaleStatus = 'Sipariş' | 'İade' | 'İptal' | 'Tamamlandı';
 

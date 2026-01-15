@@ -7,7 +7,8 @@ import { getStores } from "../../services/storeService";
 import { getSalesByStore } from "../../services/saleService";
 import { addSSHRecord } from "../../services/sshService";
 
-import type { Store, Sale, SSHItem, SSHRecord, Personnel } from "../../types";
+// 👇 SystemUser eklendi
+import type { Store, Sale, SSHItem, SSHRecord, SystemUser } from "../../types";
 import "../../App.css";
 
 const SSHAdd = () => {
@@ -50,11 +51,15 @@ const SSHAdd = () => {
 
             const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
             if (userDoc.exists()) {
-                const u = userDoc.data() as Personnel;
-                if (u.role === 'admin') { setIsAdmin(true); }
-                else {
+                // 👇 DÜZELTME BURADA: Personnel yerine SystemUser kullanıldı
+                const u = userDoc.data() as SystemUser;
+
+                // Admin, Control veya Report ise yönetici yetkisi ver (Mağaza seçebilsin)
+                if (['admin', 'control', 'report'].includes(u.role)) {
+                    setIsAdmin(true);
+                } else {
                     setIsAdmin(false);
-                    setSelectedStoreId(u.storeId);
+                    if (u.storeId) setSelectedStoreId(u.storeId);
                 }
             }
         };

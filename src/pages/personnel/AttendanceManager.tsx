@@ -178,7 +178,7 @@ const AttendanceManager = () => {
                 </div>
                 {hasChanges && (
                     <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 25px', fontSize: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                        💾 DEĞİŞİKLİKLERİ KAYDET
+                    DEĞİŞİKLİKLERİ KAYDET
                     </button>
                 )}
             </div>

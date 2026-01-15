@@ -109,7 +109,7 @@ export const addSale = async (sale: Sale) => {
             // A) Satış Fişini Kaydet
             transaction.set(saleRef, sale);
 
-            transaction.set(doc(db, "stores", sale.storeId, "debts", saleRef.id), newDebt); 
+            transaction.set(doc(db, "stores", sale.storeId, "debts", saleRef.id), newDebt);
 
             // B) Stokları Güncelle
             for (const w of stockWrites) {
@@ -213,6 +213,112 @@ export const updateShippingCost = async (storeId: string, saleId: string, newCos
         });
     } catch (error) {
         console.error("Nakliye güncelleme hatası:", error);
+        throw error;
+    }
+};
+
+
+// --- SATIŞ İPTAL ETME (Stokları geri alır, Fişi 'İptal' işaretler) ---
+export const cancelSaleComplete = async (storeId: string, saleId: string) => {
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Satışı Getir
+            const saleRef = doc(db, "sales", storeId, "receipts", saleId);
+            const saleDoc = await transaction.get(saleRef);
+            if (!saleDoc.exists()) throw "Satış bulunamadı.";
+            const sale = saleDoc.data() as Sale;
+
+            // 2. Stokları İade Et (Rezerve -> Serbest)
+            for (const item of sale.items) {
+                // Eğer ürün zaten teslim edildiyse, iptal yerine "İade" süreci gerekir. 
+                // Biz burada henüz teslim edilmemiş veya teslim edilse bile stoğa geri sokulacak varsayıyoruz.
+
+                const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+                const stockDoc = await transaction.get(stockRef);
+
+                if (stockDoc.exists()) {
+                    const currentData = stockDoc.data();
+                    const qty = Number(item.quantity);
+
+                    // Satış yapılırken: Free azalmış, Reserved artmıştı.
+                    // İptalde: Free artmalı, Reserved azalmalı.
+
+                    const newFree = (currentData.freeStock || 0) + qty;
+
+                    // Eğer ürün teslim edildiyse rezerve zaten düşmüştür, değilse rezerveden düş.
+                    let newReserved = currentData.reservedStock || 0;
+                    if (item.deliveryStatus !== 'Teslim Edildi') {
+                        newReserved = Math.max(0, newReserved - qty);
+                    }
+
+                    transaction.update(stockRef, {
+                        freeStock: newFree,
+                        reservedStock: newReserved
+                    });
+                }
+            }
+
+            // 3. Borcu Sil (Veya İptal İşaretle - Biz siliyoruz ki bakiyeyi etkilemesin)
+            const debtRef = doc(db, "stores", storeId, "debts", saleId);
+            transaction.delete(debtRef);
+
+            // 4. Satışın Durumunu Güncelle (Silmiyoruz, İptal Statüsüne Çekiyoruz)
+            // Not: Sale tipine 'status' alanı eklenmeli veya items içindeki statüler güncellenmeli.
+            // Biz items içindeki her ürünü 'İptal' yapalım.
+            const updatedItems = sale.items.map(i => ({ ...i, deliveryStatus: 'İptal' }));
+            transaction.update(saleRef, { items: updatedItems, grandTotal: 0, shippingCost: 0 }); // Tutarı sıfırla
+        });
+    } catch (error) {
+        console.error("İptal hatası:", error);
+        throw error;
+    }
+};
+
+// --- SATIŞI TAMAMEN SİLME ---
+export const deleteSaleComplete = async (storeId: string, saleId: string) => {
+    try {
+        await runTransaction(db, async (transaction) => {
+            // 1. Satışı Oku
+            const saleRef = doc(db, "sales", storeId, "receipts", saleId);
+            const saleDoc = await transaction.get(saleRef);
+            if (!saleDoc.exists()) throw "Satış bulunamadı.";
+            const sale = saleDoc.data() as Sale;
+
+            // 2. Stokları Geri Yükle
+            for (const item of sale.items) {
+                const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+                const stockDoc = await transaction.get(stockRef);
+
+                if (stockDoc.exists()) {
+                    const currentData = stockDoc.data();
+                    const qty = Number(item.quantity);
+
+                    // Mantık İptal ile aynı: Stoğu geri koy
+                    const newFree = (currentData.freeStock || 0) + qty;
+                    let newReserved = currentData.reservedStock || 0;
+
+                    if (item.deliveryStatus !== 'Teslim Edildi') {
+                        newReserved = Math.max(0, newReserved - qty);
+                    }
+
+                    transaction.update(stockRef, {
+                        freeStock: newFree,
+                        reservedStock: newReserved
+                    });
+                }
+            }
+
+            // 3. Borcu Sil
+            const debtRef = doc(db, "stores", storeId, "debts", saleId);
+            transaction.delete(debtRef);
+
+            // 4. Satış Kaydını Sil (Tamamen Yok Et)
+            transaction.delete(saleRef);
+        });
+    } catch (error) {
+        console.error("Silme hatası:", error);
         throw error;
     }
 };

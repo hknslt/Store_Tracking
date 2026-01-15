@@ -12,10 +12,9 @@ import {
     getCushions,
     getColors,
     getDimensions,
-    getGroups
 } from "../../services/definitionService";
 
-import type { Sale, Store, SystemUser, Category, Cushion, Color, Dimension, Group, DeliveryStatus } from "../../types";
+import type { Sale, Store, SystemUser, Category, Cushion, Color, Dimension, DeliveryStatus } from "../../types";
 import "../../App.css";
 
 const SaleList = () => {
@@ -29,6 +28,7 @@ const SaleList = () => {
     const [cushions, setCushions] = useState<Cushion[]>([]);
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
+
     const [selectedStoreId, setSelectedStoreId] = useState("");
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
@@ -37,10 +37,16 @@ const SaleList = () => {
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
     const [rowStockStatus, setRowStockStatus] = useState<Record<string, number>>({});
 
-    // 👇 MODAL STATE (PROMPT YERİNE)
+    // 👇 YENİ: Aktif / Geçmiş Tab Seçimi
+    const [activeTab, setActiveTab] = useState<'active' | 'completed'>('active');
+
+    // Modal State
     const [showShippingModal, setShowShippingModal] = useState(false);
     const [pendingDelivery, setPendingDelivery] = useState<{ saleId: string, itemIndex: number } | null>(null);
     const [modalShippingCost, setModalShippingCost] = useState<number>(0);
+
+    // Filtreler
+    const [searchTerm, setSearchTerm] = useState("");
 
     useEffect(() => {
         const initData = async () => {
@@ -65,11 +71,33 @@ const SaleList = () => {
     const refreshSales = async () => {
         if (!selectedStoreId) return;
         const data = await getSalesByStore(selectedStoreId);
-        data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        // 👇 YENİ SIRALAMA MANTIĞI: Termin Tarihine Göre (En yakın en üstte)
+        data.sort((a, b) => new Date(a.deadline).getTime() - new Date(b.deadline).getTime());
+
         setSales(data);
     };
 
     useEffect(() => { refreshSales(); }, [selectedStoreId]);
+
+    // 👇 FİLTRELEME VE TAB AYRIMI MANTIĞI
+    const filteredSales = sales.filter(s => {
+        // 1. Arama Filtresi
+        const matchesSearch =
+            s.receiptNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            s.customerName.toLowerCase().includes(searchTerm.toLowerCase());
+
+        if (!matchesSearch) return false;
+
+        // 2. Tab Filtresi (Aktif / Geçmiş)
+        const isAllDelivered = s.items.every(i => i.deliveryStatus === 'Teslim Edildi');
+
+        if (activeTab === 'active') {
+            return !isAllDelivered; // En az bir ürün teslim edilmemişse "Aktif"tir.
+        } else {
+            return isAllDelivered;  // Hepsi teslim edilmişse "Geçmiş"tir.
+        }
+    });
 
     // Yardımcılar
     const formatDate = (dateString: string) => { if (!dateString) return "-"; return new Date(dateString).toLocaleDateString('tr-TR'); };
@@ -98,65 +126,39 @@ const SaleList = () => {
         }
     };
 
-    // 👇 BUTONA TIKLAYINCA ÇALIŞAN FONKSİYON
     const handleStatusClick = async (sale: Sale, itemIndex: number, currentStatus: DeliveryStatus) => {
-        if (currentStatus === 'Teslim Edildi') return; // Zaten teslim edildiyse işlem yapma
-
-        // Kontrol: Bu son teslim edilmemiş ürün mü?
+        if (currentStatus === 'Teslim Edildi') return;
         const remainingItems = sale.items.filter((item, idx) => idx !== itemIndex && item.deliveryStatus !== 'Teslim Edildi');
-
         if (remainingItems.length === 0) {
-            // EVET, SON ÜRÜN. MODAL AÇALIM.
             setPendingDelivery({ saleId: sale.id!, itemIndex });
-            setModalShippingCost(sale.shippingCost); // Mevcut tutarı getir
+            setModalShippingCost(sale.shippingCost);
             setShowShippingModal(true);
         } else {
-            // HAYIR, DAHA ÜRÜN VAR. DİREKT GÜNCELLE.
             try {
                 await updateSaleItemStatus(selectedStoreId, sale.id!, itemIndex, 'Teslim Edildi');
                 await refreshSales();
                 if (expandedRowId === sale.id) toggleRow(sale.id!);
-            } catch (error: any) {
-                alert("Hata: " + error.message);
-            }
+            } catch (error: any) { alert("Hata: " + error.message); }
         }
     };
 
-    // 👇 MODALDA "KAYDET" DEYİNCE ÇALIŞAN FONKSİYON
     const confirmDeliveryWithShipping = async () => {
         if (!pendingDelivery) return;
-
         try {
-            // 1. Ürün durumunu güncelle
             await updateSaleItemStatus(selectedStoreId, pendingDelivery.saleId, pendingDelivery.itemIndex, 'Teslim Edildi');
-
-            // 2. Nakliye ücretini güncelle
             await updateShippingCost(selectedStoreId, pendingDelivery.saleId, Number(modalShippingCost));
-
-            // 3. Modalı kapat ve yenile
-            setShowShippingModal(false);
-            setPendingDelivery(null);
-            await refreshSales();
-
-            // Detay açıksa stokları yenilemek için toggle yap
+            setShowShippingModal(false); setPendingDelivery(null); await refreshSales();
             if (expandedRowId === pendingDelivery.saleId) toggleRow(pendingDelivery.saleId);
-
-        } catch (error: any) {
-            alert("İşlem sırasında hata: " + error.message);
-        }
+        } catch (error: any) { alert("İşlem hatası: " + error.message); }
     };
 
-    const goToDetail = (sale: Sale) => {
-        if (sale.id && selectedStoreId) {
-            navigate(`/sales/${selectedStoreId}/${sale.id}`, { state: { sale } });
-        }
-    };
+    const goToDetail = (sale: Sale) => { if (sale.id && selectedStoreId) navigate(`/sales/${selectedStoreId}/${sale.id}`, { state: { sale } }); };
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
 
     return (
         <div className="page-container">
-            {/* 👇 ÖZEL MODAL (PROMPT YERİNE) */}
+            {/* Modal */}
             {showShippingModal && (
                 <div style={{
                     position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
@@ -165,15 +167,7 @@ const SaleList = () => {
                     <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '300px', boxShadow: '0 4px 10px rgba(0,0,0,0.2)' }}>
                         <h3 style={{ marginTop: 0, color: '#2c3e50' }}>Teslimat Tamamlanıyor</h3>
                         <p style={{ fontSize: '14px', color: '#555' }}>Tüm ürünler teslim edildi. Nakliye ücretini giriniz:</p>
-
-                        <input
-                            type="number"
-                            className="form-input"
-                            value={modalShippingCost}
-                            onChange={e => setModalShippingCost(Number(e.target.value))}
-                            autoFocus
-                        />
-
+                        <input type="number" className="form-input" value={modalShippingCost} onChange={e => setModalShippingCost(Number(e.target.value))} autoFocus />
                         <div style={{ display: 'flex', gap: '10px', marginTop: '20px', justifyContent: 'flex-end' }}>
                             <button onClick={() => setShowShippingModal(false)} className="btn btn-secondary">İptal</button>
                             <button onClick={confirmDeliveryWithShipping} className="btn btn-success">Tamamla & Kaydet</button>
@@ -188,18 +182,44 @@ const SaleList = () => {
             </div>
 
             <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
-                    <label style={{ fontWeight: '600', color: '#2c3e50' }}>Mağaza Seçiniz:</label>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '15px', flexWrap: 'wrap' }}>
                     {isAdmin ? (
-                        <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ maxWidth: '300px' }}>
-                            <option value="">-- Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                        <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ maxWidth: '250px' }}>
+                            <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                         </select>
                     ) : (
                         <div style={{ fontWeight: 'bold', color: '#2980b9', padding: '10px', backgroundColor: '#ecf0f1', borderRadius: '5px' }}>
                             📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
                         </div>
                     )}
+
+                    <input
+                        type="text"
+                        placeholder="🔍 Müşteri veya Fiş No Ara..."
+                        className="form-input"
+                        value={searchTerm}
+                        onChange={e => setSearchTerm(e.target.value)}
+                        style={{ maxWidth: '300px' }}
+                    />
                 </div>
+            </div>
+
+            {/* 👇 TAB BUTONLARI (Aktif / Geçmiş) */}
+            <div style={{ display: 'flex', gap: '10px', marginBottom: '15px' }}>
+                <button
+                    onClick={() => setActiveTab('active')}
+                    className={`btn ${activeTab === 'active' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ flex: 1, borderRadius: '8px', padding: '12px' }}
+                >
+                    Aktif Siparişler
+                </button>
+                <button
+                    onClick={() => setActiveTab('completed')}
+                    className={`btn ${activeTab === 'completed' ? 'btn-past' : 'btn-secondary'}`}
+                    style={{ flex: 1, borderRadius: '8px', padding: '12px' }}
+                >
+                   Geçmiş (Tamamlananlar)
+                </button>
             </div>
 
             <div className="card">
@@ -212,126 +232,103 @@ const SaleList = () => {
                                     <th style={{ width: '10%' }}>Tarih</th>
                                     <th style={{ width: '12%' }}>Fiş No</th>
                                     <th style={{ width: '18%' }}>Müşteri Adı</th>
-                                    <th style={{ width: '15%' }}>İl / İlçe</th>
                                     <th style={{ width: '15%' }}>Termin Tarihi</th>
                                     <th style={{ width: '12%' }}>Personel</th>
                                     <th style={{ width: '13%', textAlign: 'right' }}>Toplam</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {sales.length > 0 ? (
-                                    sales.map(s => {
-                                        const itemsTotal = s.items.reduce((acc, item) => acc + ((item.price - (item.discount || 0)) * item.quantity), 0);
-                                        const isAllDelivered = s.items.every(i => i.deliveryStatus === 'Teslim Edildi');
+                                {filteredSales.length > 0 ? filteredSales.map(s => {
+                                    const itemsTotal = s.items.reduce((acc, item) => acc + ((item.price - (item.discount || 0)) * item.quantity), 0);
+                                    const isAllDelivered = s.items.every(i => i.deliveryStatus === 'Teslim Edildi');
 
-                                        return (
-                                            <>
-                                                <tr key={s.id} onClick={() => s.id && toggleRow(s.id)} className="hover-row" style={{ cursor: 'pointer', backgroundColor: expandedRowId === s.id ? '#f0fdf4' : 'white', borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee' }}>
-                                                    <td style={{ textAlign: 'center', fontSize: '18px' }}>{isAllDelivered ? <span style={{ color: '#27ae60' }}>●</span> : <span style={{ color: '#e74c3c' }}>●</span>}</td>
-                                                    <td>{formatDate(s.date)}</td>
-                                                    <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
-                                                    <td style={{ fontWeight: '500' }}>{s.customerName}</td>
-                                                    <td style={{ fontSize: '13px', color: '#555' }}>{s.city} / {s.district}</td>
-                                                    <td style={{ color: '#e67e22', fontWeight: '500', fontSize: '13px' }}>{formatDate(s.deadline)}</td>
-                                                    <td>{s.personnelName}</td>
-                                                    <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>{itemsTotal.toFixed(2)} ₺</td>
-                                                </tr>
+                                    return (
+                                        <>
+                                            <tr key={s.id} onClick={() => s.id && toggleRow(s.id)} className="hover-row" style={{ cursor: 'pointer', backgroundColor: expandedRowId === s.id ? '#f0fdf4' : 'white', borderBottom: expandedRowId === s.id ? 'none' : '1px solid #eee' }}>
+                                                <td style={{ textAlign: 'center', fontSize: '18px' }}>{isAllDelivered ? <span style={{ color: '#27ae60' }}>●</span> : <span style={{ color: '#e74c3c' }}>●</span>}</td>
+                                                <td>{formatDate(s.date)}</td>
+                                                <td style={{ fontWeight: '600', color: '#2c3e50' }}>{s.receiptNo}</td>
+                                                <td style={{ fontWeight: '500' }}>{s.customerName}</td>
+                                                {/* Termin Tarihi (Kırmızı ise geçmiş, Turuncu ise yakın) */}
+                                                <td style={{
+                                                    color: new Date(s.deadline) < new Date() && !isAllDelivered ? '#e74c3c' : '#e67e22',
+                                                    fontWeight: '600'
+                                                }}>
+                                                    {formatDate(s.deadline)}
+                                                </td>
+                                                <td>{s.personnelName}</td>
+                                                <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#27ae60' }}>{itemsTotal.toFixed(2)} ₺</td>
+                                            </tr>
 
-                                                {expandedRowId === s.id && (
-                                                    <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
-                                                        <td colSpan={8} style={{ padding: '20px' }}>
-                                                            <div style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', backgroundColor: 'white' }}>
-                                                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr 1fr', gap: '20px', marginBottom: '15px', fontSize: '13px', color: '#555', borderBottom: '1px solid #eee', paddingBottom: '10px', alignItems: 'center' }}>
-                                                                    <div><strong>Telefon:</strong> {s.phone}</div>
-                                                                    <div><strong>Adres:</strong> {s.address || "-"}</div>
-                                                                    <div style={{ textAlign: 'right' }}>
-                                                                        <button onClick={(e) => { e.stopPropagation(); goToDetail(s); }} className="btn btn-sm btn-info" style={{ fontSize: '12px', padding: '5px 10px' }}>🔍 Satış Detayına Git</button>
-                                                                    </div>
-                                                                </div>
-
-                                                                <table className="data-table dense" style={{ border: '1px solid #eee', backgroundColor: 'white', fontSize: '13px' }}>
-                                                                    <thead>
-                                                                        <tr style={{ backgroundColor: '#f1f2f6' }}>
-                                                                            <th style={{ width: '25%' }}>Ürün Bilgisi</th>
-                                                                            <th style={{ width: '10%' }}>Renk</th>
-                                                                            <th style={{ width: '10%' }}>Minder</th>
-                                                                            <th style={{ width: '15%' }}>Not</th>
-                                                                            <th style={{ textAlign: 'center', width: '5%' }}>Adet</th>
-                                                                            <th style={{ textAlign: 'right', width: '10%' }}>Fiyat</th>
-                                                                            <th style={{ textAlign: 'center', width: '10%' }}>Temin</th>
-                                                                            <th style={{ width: '140px', textAlign: 'center' }}>Teslim İşlemi</th>
-                                                                        </tr>
-                                                                    </thead>
-                                                                    <tbody>
-                                                                        {s.items.map((item, idx) => {
-                                                                            const uniqueId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
-                                                                            const availableReserved = rowStockStatus[uniqueId] || 0;
-                                                                            const isSupplyFromCenter = item.supplyMethod === 'Merkezden';
-                                                                            const isArrived = availableReserved >= item.quantity;
-                                                                            const isDelivered = item.deliveryStatus === 'Teslim Edildi';
-                                                                            const isActionEnabled = !isDelivered && (!isSupplyFromCenter || isArrived);
-
-                                                                            // RENK: Teslim edildiyse GRİ
-                                                                            const badgeColor = isDelivered ? '#95a5a6' : (item.supplyMethod === 'Stoktan' || isArrived ? '#27ae60' : '#e74c3c');
-
-                                                                            return (
-                                                                                <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9', backgroundColor: isDelivered ? '#fdfdfd' : 'inherit' }}>
-                                                                                    <td style={{ padding: '8px', opacity: isDelivered ? 0.6 : 1 }}>
-                                                                                        <span style={{ fontWeight: '600', color: '#34495e', marginRight: '6px' }}>{item.productName.split('-')[0].trim()}</span>
-                                                                                        {item.dimensionId && <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>{getDimensionName(item.dimensionId)}</span>}
-                                                                                        <span style={{ color: '#34495e', fontWeight: '600' }}>{getCatName(item.categoryId)}</span>
-                                                                                    </td>
-                                                                                    <td style={{ opacity: isDelivered ? 0.6 : 1 }}>{getColorName(item.colorId)}</td>
-                                                                                    <td style={{ opacity: isDelivered ? 0.6 : 1 }}>{getCushionName(item.cushionId)}</td>
-                                                                                    <td style={{ fontStyle: 'italic', color: '#777', opacity: isDelivered ? 0.6 : 1 }}>{item.productNote || "-"}</td>
-                                                                                    <td style={{ textAlign: 'center', fontWeight: 'bold', opacity: isDelivered ? 0.6 : 1 }}>{item.quantity}</td>
-                                                                                    <td style={{ textAlign: 'right', opacity: isDelivered ? 0.6 : 1 }}>{item.price} ₺</td>
-                                                                                    <td style={{ textAlign: 'center' }}>
-                                                                                        <span className="badge" style={{ fontSize: '10px', backgroundColor: badgeColor, color: 'white' }}>
-                                                                                            {item.supplyMethod === 'Stoktan' ? 'Stoktan' : (isArrived ? 'Merkez' : 'Merkez')}
-                                                                                        </span>
-                                                                                    </td>
-                                                                                    <td style={{ textAlign: 'center' }}>
-                                                                                        <button
-                                                                                            onClick={() => handleStatusClick(s, idx, item.deliveryStatus!)}
-                                                                                            disabled={!isActionEnabled}
-                                                                                            className={`btn ${isDelivered ? 'btn-secondary' : 'btn-primary'}`}
-                                                                                            style={{
-                                                                                                width: '100%', padding: '5px 8px', fontSize: '11px',
-                                                                                                opacity: isActionEnabled ? 1 : 0.6,
-                                                                                                cursor: isActionEnabled ? 'pointer' : 'not-allowed',
-                                                                                                display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px',
-                                                                                                backgroundColor: isDelivered ? '#95a5a6' : undefined,
-                                                                                                borderColor: isDelivered ? '#95a5a6' : undefined
-                                                                                            }}
-                                                                                        >
-                                                                                            {isDelivered ? <>✔ Teslim Edildi</> : <>{isActionEnabled ? 'Teslim Et' : 'Stok Bekleniyor'}</>}
-                                                                                        </button>
-                                                                                    </td>
-                                                                                </tr>
-                                                                            );
-                                                                        })}
-                                                                    </tbody>
-                                                                </table>
-
-                                                                <div style={{ marginTop: '10px', display: 'flex', justifyContent: 'flex-end', gap: '30px', alignItems: 'center', fontSize: '14px', color: '#2c3e50', borderTop: '1px solid #eee', paddingTop: '10px' }}>
-                                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                                                        <span style={{ color: '#7f8c8d' }}>Nakliye:</span>
-                                                                        <b>{s.shippingCost} ₺</b>
-                                                                    </div>
-                                                                    <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>
-                                                                        Ürün Genel Toplam: {itemsTotal.toFixed(2)} ₺
-                                                                    </div>
-                                                                </div>
+                                            {expandedRowId === s.id && (
+                                                <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
+                                                    <td colSpan={7} style={{ padding: '20px' }}>
+                                                        <div style={{ padding: '15px', border: '1px solid #eee', borderRadius: '8px', backgroundColor: 'white', marginBottom: '10px' }}>
+                                                            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                                                                <div><strong>Tel:</strong> {s.phone} | <strong>Adres:</strong> {s.address}</div>
+                                                                <button onClick={(e) => { e.stopPropagation(); goToDetail(s); }} className="btn btn-sm btn-info">🔍 Detay</button>
                                                             </div>
-                                                        </td>
-                                                    </tr>
-                                                )}
-                                            </>
-                                        );
-                                    })
-                                ) : (
-                                    <tr><td colSpan={8} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>Satış kaydı bulunamadı.</td></tr>
+                                                        </div>
+                                                        <table className="data-table dense" style={{ border: '1px solid #eee', backgroundColor: 'white' }}>
+                                                            <thead>
+                                                                <tr style={{ backgroundColor: '#f1f2f6' }}>
+                                                                    <th style={{ width: '25%' }}>Ürün Bilgisi</th>
+                                                                    <th style={{ width: '10%' }}>Renk</th>
+                                                                    <th style={{ width: '10%' }}>Minder</th>
+                                                                    <th style={{ width: '15%' }}>Not</th>
+                                                                    <th style={{ textAlign: 'center', width: '5%' }}>Adet</th>
+                                                                    <th style={{ textAlign: 'right', width: '10%' }}>Fiyat</th>
+                                                                    <th style={{ textAlign: 'center', width: '10%' }}>Temin</th>
+                                                                    <th style={{ width: '140px', textAlign: 'center' }}>Teslim İşlemi</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody>
+                                                                {s.items.map((item, idx) => {
+                                                                    const uniqueId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                                                                    const availableReserved = rowStockStatus[uniqueId] || 0;
+                                                                    const isArrived = availableReserved >= item.quantity;
+                                                                    const isDelivered = item.deliveryStatus === 'Teslim Edildi';
+                                                                    const isActionEnabled = !isDelivered && (item.supplyMethod === 'Stoktan' || isArrived);
+
+                                                                    return (
+                                                                        <tr key={idx} style={{ backgroundColor: isDelivered ? '#fdfdfd' : 'inherit' }}>
+                                                                            <td style={{ padding: '8px' }}>
+                                                                                <span style={{ fontWeight: '600', color: '#34495e', marginRight: '6px' }}>{item.productName.split('-')[0].trim()}</span>
+                                                                                {item.dimensionId && <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>{getDimensionName(item.dimensionId)}</span>}
+                                                                                <span style={{ color: '#7f8c8d', fontSize: '12px' }}>({getCatName(item.categoryId)})</span>
+                                                                            </td>
+                                                                            <td>{getColorName(item.colorId)}</td>
+                                                                            <td>{getCushionName(item.cushionId)}</td>
+                                                                            <td style={{ fontStyle: 'italic', color: '#777' }}>{item.productNote || "-"}</td>
+                                                                            <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
+                                                                            <td style={{ textAlign: 'right' }}>{item.price} ₺</td>
+                                                                            <td style={{ textAlign: 'center' }}>
+                                                                                <span className="badge" style={{ fontSize: '10px', backgroundColor: isDelivered ? '#ecf0f1' : (item.supplyMethod === 'Stoktan' ? '#d4edda' : (isArrived ? '#d4edda' : '#f8d7da')), color: isDelivered ? '#777' : (item.supplyMethod === 'Stoktan' || isArrived ? '#155724' : '#721c24') }}>
+                                                                                    {item.supplyMethod === 'Stoktan' ? 'Stoktan' : (isArrived ? 'Merkez' : 'Merkez')}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td style={{ textAlign: 'center' }}>
+                                                                                <button
+                                                                                    onClick={() => handleStatusClick(s, idx, item.deliveryStatus!)}
+                                                                                    disabled={!isActionEnabled}
+                                                                                    className={`btn ${isDelivered ? 'btn-secondary' : 'btn-primary'}`}
+                                                                                    style={{ width: '100%', padding: '5px 8px', fontSize: '11px', opacity: isActionEnabled ? 1 : 0.6, cursor: isActionEnabled ? 'pointer' : 'not-allowed' }}
+                                                                                >
+                                                                                    {isDelivered ? '✔ Teslim Edildi' : 'Teslim Et'}
+                                                                                </button>
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                            </tbody>
+                                                        </table>
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </>
+                                    );
+                                }) : (
+                                    <tr><td colSpan={7} style={{ padding: '40px', textAlign: 'center', color: '#999' }}>Bu kategoride satış kaydı bulunamadı.</td></tr>
                                 )}
                             </tbody>
                         </table>

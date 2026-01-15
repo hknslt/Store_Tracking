@@ -38,6 +38,8 @@ import PaymentAdd from "./pages/payments/PaymentAdd";
 import PaymentList from "./pages/payments/PaymentList";
 import StoreDashboard from "./pages/stores/StoreDashboard";
 import DebtList from "./pages/debts/DebtList";
+import PurchaseDetail from "./pages/purchases/PurchaseDetail";
+import PersonnelDetail from "./pages/personnel/PersonnelDetail";
 
 // --- CUSTOM COMPONENT: Store Back Button ---
 const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
@@ -207,6 +209,7 @@ function App() {
             <Route path="/store-stocks" element={<StoreStockManager />} />
             <Route path="/purchases" element={<PurchaseList />} />
             <Route path="/purchases/add" element={<PurchaseAdd />} />
+            <Route path="/purchases/:storeId/:id" element={<PurchaseDetail />} />
 
             {/* Management */}
             <Route path="/stores" element={<StoreList />} />
@@ -215,6 +218,7 @@ function App() {
 
             <Route path="/personnel" element={<PersonnelList />} />
             <Route path="/personnel/add" element={<PersonnelAdd />} />
+            <Route path="/personnel/:id" element={<PersonnelDetail />} />
             <Route path="/attendance" element={<AttendanceManager />} />
             <Route path="/register" element={<Register />} />
 
