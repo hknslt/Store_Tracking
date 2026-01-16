@@ -185,7 +185,7 @@ const AttendanceManager = () => {
 
             <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                    <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '80px' }}>
+                    <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '120px' }}>
                         {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                     </select>
                     <select className="form-input" value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ width: '120px' }}>

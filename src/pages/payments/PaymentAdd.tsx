@@ -22,6 +22,9 @@ const PaymentAdd = () => {
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
+    // Mesaj Durumu (Hata / Başarı)
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
     // Başlık Bilgileri
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
@@ -133,30 +136,23 @@ const PaymentAdd = () => {
         setItems(newItems);
     };
 
-    // 👇 GÜNCELLENEN MANTIK: MANUEL GİRİŞ
+    // MANUEL GİRİŞ GÜNCELLEME
     const updateItem = (index: number, field: keyof PaymentItem, value: any) => {
         const newItems = [...items];
         const item = { ...newItems[index], [field]: value };
 
         // 1. Eğer Para Birimi TL seçilirse:
-        //    - "Miktar" ve "TL Karşılığı" eşitlenir.
-        //    - "Kur" 1 olur.
         if (field === 'currency' && value === 'TL') {
             item.exchangeRate = 1;
             item.amount = Number(item.originalAmount);
         }
 
         // 2. Eğer "Miktar" (Orjinal) değişirse:
-        //    - Para birimi TL ise, "TL Karşılığı"nı da güncelle.
-        //    - Döviz ise, TL karşılığına DOKUNMA (Kullanıcı manuel girecek).
         if (field === 'originalAmount') {
             if (item.currency === 'TL') {
                 item.amount = Number(value);
             }
         }
-
-        // 3. Eğer "TL Karşılığı" (amount) değişirse:
-        //    - Sadece kaydet (Yukarıda currency kontrolü input'un disabled durumuyla yapılıyor zaten)
 
         // Tahsilat Fiş Seçimi
         if (field === 'saleId') {
@@ -171,16 +167,18 @@ const PaymentAdd = () => {
     };
 
     const handleSave = async () => {
-        if (!headerData.receiptNo) return alert("Makbuz No giriniz.");
-        if (!headerData.storeId) return alert("Mağaza seçiniz.");
-        if (!headerData.personnelId) return alert("Personel seçiniz.");
+        setMessage(null); // Önceki mesajı temizle
+
+        if (!headerData.receiptNo) { setMessage({ type: 'error', text: "Lütfen Makbuz No giriniz." }); return; }
+        if (!headerData.storeId) { setMessage({ type: 'error', text: "Lütfen Mağaza seçiniz." }); return; }
+        if (!headerData.personnelId) { setMessage({ type: 'error', text: "Lütfen Personel seçiniz." }); return; }
 
         const validItems = items.filter(i => i.amount > 0 && i.paymentMethodId);
-        if (validItems.length === 0) return alert("Geçerli bir işlem giriniz (TL Tutarı 0'dan büyük olmalı).");
+        if (validItems.length === 0) { setMessage({ type: 'error', text: "Geçerli bir işlem giriniz (TL Tutarı 0'dan büyük olmalı ve Ödeme Yöntemi seçilmeli)." }); return; }
 
         if (selectedType === 'Tahsilat') {
             const missingSale = validItems.find(i => !i.saleId);
-            if (missingSale) return alert("Tahsilat işlemlerinde Fiş/Müşteri seçimi zorunludur.");
+            if (missingSale) { setMessage({ type: 'error', text: "Tahsilat işlemlerinde Fiş/Müşteri seçimi zorunludur." }); return; }
         }
 
         try {
@@ -195,14 +193,19 @@ const PaymentAdd = () => {
                 createdAt: new Date()
             });
 
-            alert("✅ İşlem Kaydedildi!");
+            setMessage({ type: 'success', text: "✅ İşlem Başarıyla Kaydedildi!" });
+
+            // Başarılı kayıttan sonra formu temizle
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
             handleTypeChange('Tahsilat');
             if (headerData.storeId) getDebtsByStore(headerData.storeId).then(setDebts);
 
+            // 3 saniye sonra mesajı kaldır
+            setTimeout(() => setMessage(null), 3000);
+
         } catch (error: any) {
             console.error(error);
-            alert("Hata: " + error.message);
+            setMessage({ type: 'error', text: "Hata oluştu: " + error.message });
         }
     };
 
@@ -220,6 +223,25 @@ const PaymentAdd = () => {
                 </div>
                 <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 30px', fontSize: '16px' }}>KAYDET</button>
             </div>
+
+            {/* MESAJ KUTUSU (Alert yerine) */}
+            {message && (
+                <div style={{
+                    padding: '15px',
+                    marginBottom: '20px',
+                    borderRadius: '8px',
+                    backgroundColor: message.type === 'success' ? '#dcfce7' : '#fee2e2',
+                    color: message.type === 'success' ? '#166534' : '#991b1b',
+                    border: `1px solid ${message.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '10px',
+                    fontWeight: '500'
+                }}>
+                    <span>{message.type === 'success' ? '✓' : '⚠️'}</span>
+                    {message.text}
+                </div>
+            )}
 
             {/* HEADER */}
             <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
@@ -302,7 +324,6 @@ const PaymentAdd = () => {
                                 <th style={{ width: '15%' }}>Ödeme Yöntemi</th>
                                 <th style={{ width: '10%' }}>Birim</th>
                                 <th style={{ width: '12%', textAlign: 'right' }}>Döviz Miktarı</th>
-                                {/* Kur sütunu kaldırıldı veya gizlenebilir, artık manuel giriyoruz */}
                                 <th style={{ width: '15%', textAlign: 'right' }}>TL Karşılığı (Giriş)</th>
                                 <th>Açıklama</th>
                                 <th style={{ width: '50px' }}></th>
@@ -369,16 +390,14 @@ const PaymentAdd = () => {
                                         <input
                                             type="number"
                                             placeholder="TL Tutarı"
-                                            // Eğer birim TL ise burası kilitli olsun, sol taraftan otomatik gelsin
-                                            // Eğer Döviz ise kullanıcı elle girsin
                                             disabled={item.currency === 'TL'}
                                             style={{
                                                 ...inputStyle,
                                                 textAlign: 'right',
-                                                backgroundColor: item.currency === 'TL' ? '#e9ecef' : '#fff', // TL ise gri, değilse beyaz
+                                                backgroundColor: item.currency === 'TL' ? '#e9ecef' : '#fff',
                                                 fontWeight: 'bold',
                                                 color: '#2c3e50',
-                                                border: item.currency !== 'TL' ? '2px solid #3498db' : '1px solid #ddd' // Dövizde mavi çerçeve
+                                                border: item.currency !== 'TL' ? '2px solid #3498db' : '1px solid #ddd'
                                             }}
                                             value={item.amount || ""}
                                             onChange={e => updateItem(index, 'amount', e.target.value)}

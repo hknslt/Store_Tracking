@@ -1,182 +1,270 @@
-/* src/components/styles/Sidebar.css */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
-  --sidebar-bg: #1e293b;
-  /* Koyu Gri-Mavi */
-  --sidebar-width: 280px;
-  --sidebar-text: #94a3b8;
-  /* Soluk Gri Metin */
-  --sidebar-text-active: #ffffff;
-  /* Aktif Beyaz */
-  --primary-glow: rgba(56, 189, 248, 0.15);
-  /* Mavi Işıltı */
-  --primary-accent: #38bdf8;
-  /* Açık Mavi */
-  --danger-color: #ef4444;
-  /* Kırmızı */
+  --sidebar-width: 260px;
+  /* Genişliği biraz kıstım daha kibar dursun diye */
+  --sidebar-collapsed-width: 80px;
+  --primary-color: #4ade80;
+  /* Parlak Yeşil */
+  --text-color: #e2e8f0;
 }
 
-/* --- ANA KONTEYNER --- */
+/* --- ANA GÖVDE (Zorla Koyu Yeşil) --- */
 .sidebar {
   width: var(--sidebar-width);
-  background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
-  /* Hafif dikey geçiş */
-  color: var(--sidebar-text);
+  /* Arka planın beyaz olmasını engellemek için !important */
+  background-color: #052e16 !important;
+  background: linear-gradient(180deg, #052e16 0%, #14532d 100%) !important;
+
+  color: var(--text-color);
   display: flex;
   flex-direction: column;
   height: 100vh;
   position: sticky;
   top: 0;
-  border-right: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  border-right: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow: 4px 0 20px rgba(0, 0, 0, 0.4);
   flex-shrink: 0;
-  z-index: 100;
+  z-index: 1000;
   font-family: 'Inter', sans-serif;
+  transition: width 0.3s ease;
+  overflow-x: hidden;
+  white-space: nowrap;
+}
+
+.sidebar.collapsed {
+  width: var(--sidebar-collapsed-width);
+}
+
+/* --- YENİLENEN TOGGLE BUTONU (BEYAZ ZEMİN / YEŞİL OK) --- */
+.sidebar-toggle-btn {
+  position: absolute;
+  top: 25px;
+  right: 15px;
+
+  width: 28px;
+  /* Biraz daha kompakt */
+  height: 28px;
+
+  /* İsteğin üzerine: PARLAK BEYAZ Zemin */
+  background-color: #ffffff;
+  /* İsteğin üzerine: YEŞİL Ok */
+  color: #14532d;
+
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  border-radius: 8px;
+  /* Hafif köşeli modern */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
+  z-index: 1002;
+}
+
+/* Hover olunca hafif büyüme ve gölge */
+.sidebar-toggle-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.6);
+  color: #15803d;
+  /* Hoverda yeşil tonu biraz daha canlansın */
+}
+
+/* Kapalıyken buton ortalansın */
+.sidebar.collapsed .sidebar-toggle-btn {
+  right: 0;
+  left: 0;
+  margin: 0 auto;
 }
 
 /* --- HEADER --- */
 .sidebar-header {
   padding: 25px 20px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 12px;
+  justify-content: center;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  min-height: 110px;
+  transition: all 0.3s;
 }
 
-.brand-icon {
-  font-size: 1.5rem;
-  background: linear-gradient(135deg, #38bdf8 0%, #3b82f6 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
+.sidebar-logo {
+  width: 130px;
+  height: auto;
+  object-fit: contain;
+  transition: width 0.3s;
+  filter: brightness(0) invert(1) !important;
+  opacity: 0.95;
 }
 
-.sidebar-header h2 {
-  margin: 0;
-  font-size: 1.3rem;
+.sidebar-brand-text {
+  margin-top: 12px;
+  font-size: 10px;
+  /* Font küçültüldü */
+  letter-spacing: 2px;
   font-weight: 700;
   color: #fff;
-  letter-spacing: -0.5px;
+  text-transform: uppercase;
+  transition: opacity 0.2s;
 }
 
-/* --- NAVİGASYON --- */
+.sidebar.collapsed .sidebar-header {
+  padding: 20px 10px;
+}
+
+.sidebar.collapsed .sidebar-logo {
+  width: 40px;
+}
+
+.sidebar.collapsed .sidebar-brand-text {
+  display: none;
+}
+
+/* --- MENÜ --- */
 .sidebar-nav {
-  padding: 20px 12px;
+  padding: 15px 10px;
   flex: 1;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
+  /* Linkler arası boşluk biraz azaltıldı */
 }
 
-/* Scrollbar'ı Güzelleştir */
+/* Scrollbar Gizle */
 .sidebar-nav::-webkit-scrollbar {
-  width: 4px;
+  width: 0px;
 }
 
-.sidebar-nav::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 4px;
-}
-
-/* Başlıklar (YÖNETİM, MODÜLLER vb.) */
+/* Başlıklar (YÖNETİM vb.) */
 .nav-section {
-  font-size: 0.75rem;
+  font-size: 0.65rem;
+  /* Font küçültüldü */
   font-weight: 700;
-  color: #64748b;
-  margin: 20px 0 8px 12px;
-  text-transform: uppercase;
-  letter-spacing: 1.2px;
+  color: rgba(255, 255, 255, 0.5);
+  margin: 15px 0 5px 12px;
+  letter-spacing: 1px;
 }
 
-/* Menü Öğeleri */
+.sidebar.collapsed .nav-section {
+  display: none;
+}
+
+/* Linkler */
 .nav-item {
   display: flex;
   align-items: center;
-  padding: 12px 16px;
-  color: var(--sidebar-text);
+  padding: 10px 14px;
+  /* Padding biraz daha sıkı */
+  color: #fff;
   text-decoration: none;
   border-radius: 8px;
-  font-size: 0.95rem;
+  font-size: 0.85rem;
+  /* YAZI BOYUTU KÜÇÜLTÜLDÜ (Eskisi 0.95rem) */
   font-weight: 500;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
+  transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .nav-icon {
-  margin-right: 14px;
-  font-size: 1.2rem;
+  min-width: 22px;
+  height: 22px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* İkonları Beyazlat */
+.nav-icon img {
+  width: 18px;
+  /* İkonlar yazıya uyumlu olsun diye hafif küçüldü */
+  height: 18px;
+  object-fit: contain;
+  filter: brightness(0) invert(1) !important;
   opacity: 0.8;
   transition: transform 0.2s;
 }
 
-/* Hover Durumu */
+.nav-text {
+  margin-left: 12px;
+  transition: opacity 0.3s;
+}
+
+/* Hover & Active */
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.03);
-  color: #fff;
+  background-color: rgba(255, 255, 255, 0.1);
+  transform: translateX(3px);
 }
 
-.nav-item:hover .nav-icon {
+.nav-item:hover .nav-icon img {
   opacity: 1;
-  transform: translateX(2px);
+  transform: scale(1.1);
 }
 
-/* Aktif (Seçili) Durum */
 .nav-item.active {
-  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%);
-  color: var(--sidebar-text-active);
+  background: rgba(74, 222, 128, 0.15);
+  color: #fff;
+  border: 1px solid rgba(74, 222, 128, 0.4);
 }
 
-/* Aktif olduğunda soldaki mavi çizgi */
-.nav-item.active::before {
-  content: "";
-  position: absolute;
-  left: 0;
-  top: 10%;
-  bottom: 10%;
-  width: 3px;
-  background-color: var(--primary-accent);
-  border-radius: 0 4px 4px 0;
-  box-shadow: 0 0 10px var(--primary-accent);
-}
-
-.nav-item.active .nav-icon {
-  color: var(--primary-accent);
+.nav-item.active .nav-icon img {
   opacity: 1;
+  filter: brightness(0) invert(1) drop-shadow(0 0 5px rgba(74, 222, 128, 0.6)) !important;
 }
 
-/* --- FOOTER (KULLANICI KARTI) --- */
+.sidebar.collapsed .nav-item {
+  justify-content: center;
+  padding: 12px 0;
+}
+
+.sidebar.collapsed .nav-text {
+  display: none;
+}
+
+/* --- FOOTER --- */
 .sidebar-footer {
-  padding: 16px;
-  background-color: rgba(0, 0, 0, 0.1);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 15px;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(0, 0, 0, 0.2);
 }
 
 .user-card {
-  background-color: rgba(255, 255, 255, 0.03);
-  padding: 12px;
-  border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  overflow: hidden;
 }
 
 .user-info {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .user-avatar {
-  width: 36px;
-  height: 36px;
-  background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%);
+  width: 32px;
+  height: 32px;
+  background: #fff;
+  color: #052e16;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  color: white;
-  font-size: 14px;
+  font-weight: 700;
+  font-size: 0.85rem;
+  flex-shrink: 0;
 }
 
 .user-details {
@@ -186,41 +274,87 @@
 }
 
 .user-email {
-  font-size: 0.85rem;
+  font-size: 0.75rem;
+  /* Font küçüldü */
+  font-weight: 600;
   color: #fff;
-  font-weight: 500;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  max-width: 140px;
 }
 
 .user-role {
-  font-size: 0.7rem;
-  color: #64748b;
+  font-size: 0.65rem;
+  color: rgba(255, 255, 255, 0.7);
 }
 
-/* Çıkış Butonu */
 .logout-btn {
-  width: 100%;
-  padding: 10px;
-  background-color: transparent;
-  color: #f87171;
-  /* Soluk Kırmızı */
-  border: 1px solid rgba(239, 68, 68, 0.2);
-  border-radius: 8px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
   cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  transition: all 0.2s;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
+  transition: all 0.2s;
+  flex-shrink: 0;
 }
 
 .logout-btn:hover {
-  background-color: rgba(239, 68, 68, 0.1);
-  border-color: var(--danger-color);
-  color: #fff;
+  background: #ef4444;
+  border-color: #ef4444;
+}
+
+.logout-btn .nav-icon {
+  margin: 0;
+}
+
+.logout-btn .nav-icon img {
+  width: 16px;
+  height: 16px;
+}
+
+/* Footer ikonu biraz daha küçük */
+.logout-btn .nav-text {
+  display: none;
+}
+
+.sidebar.collapsed .user-card {
+  flex-direction: column;
+  background: transparent;
+  border: none;
+  padding: 0;
+  gap: 15px;
+}
+
+.sidebar.collapsed .user-info {
+  justify-content: center;
+  width: 100%;
+}
+
+.sidebar.collapsed .user-details {
+  display: none;
+}
+
+/* Vurgulu Buton */
+.highlight-item {
+  margin-top: 10px;
+  border: 1px dashed #4ade80;
+  color: #4ade80 !important;
+}
+
+.highlight-item .nav-icon img {
+  filter: none !important;
+}
+
+.highlight-item:hover {
+  background: #4ade80 !important;
+  color: #052e16 !important;
+  border-style: solid;
+}
+
+.highlight-item:hover .nav-icon img {
+  filter: brightness(0) !important;
 }

@@ -809,3 +809,61 @@ body {
   background-color: #f1f5f9;
   color: #475569;
 }
+
+.status-badge.warning {
+  background-color: #fef3c7;
+  color: #92400e;
+}
+
+.dashboard-layout {
+  display: grid;
+  grid-template-columns: 3fr 1fr;
+  /* Sol 3 birim, Sağ 1 birim genişlik */
+  gap: 25px;
+}
+
+.text-btn {
+  border: none;
+  background: transparent;
+  color: #3b82f6;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.text-btn:hover {
+  text-decoration: underline;
+}
+
+.empty-cell {
+  padding: 30px;
+  text-align: center;
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Scrollbar Güzelleştirme (Özet Kartı İçin) */
+.scrollable-summary::-webkit-scrollbar {
+  width: 5px;
+}
+
+.scrollable-summary::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.scrollable-summary::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 10px;
+}
+
+.scrollable-summary::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Mobil Uyumluluk */
+@media (max-width: 1000px) {
+  .dashboard-layout {
+    grid-template-columns: 1fr;
+    /* Mobilde alt alta */
+  }
+}

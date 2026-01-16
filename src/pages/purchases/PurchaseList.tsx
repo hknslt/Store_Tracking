@@ -167,7 +167,7 @@ const PurchaseList = () => {
                         </select>
                     ) : (
                         <div style={{ fontWeight: 'bold', color: '#2980b9', padding: '10px', backgroundColor: '#ecf0f1', borderRadius: '5px' }}>
-                            📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+                            {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
                         </div>
                     )}
 

@@ -14,8 +14,9 @@ import {
     getDimensions
 } from "../../services/definitionService";
 import { getProductsByCategoryId } from "../../services/productService";
+import { useNavigate } from "react-router-dom";
 
-// 👇 ŞEHİR VERİSİNİ IMPORT ETTİK
+// ŞEHİR VERİSİ
 import { iller } from "../../constants/cities";
 
 import type { Sale, SaleItem, Store, SystemUser, Personnel, Group, Category, Product, Cushion, Color, Dimension, StoreStock } from "../../types";
@@ -23,6 +24,7 @@ import "../../App.css";
 
 const SaleAdd = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
 
     // Listeler
     const [stores, setStores] = useState<Store[]>([]);
@@ -35,8 +37,6 @@ const SaleAdd = () => {
 
     const [storeStocks, setStoreStocks] = useState<StoreStock[]>([]);
     const [storePersonnel, setStorePersonnel] = useState<(Personnel | SystemUser)[]>([]);
-
-    // 👇 İLÇE LİSTESİ STATE
     const [districts, setDistricts] = useState<string[]>([]);
 
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
@@ -74,6 +74,28 @@ const SaleAdd = () => {
     const [addedItems, setAddedItems] = useState<SaleItem[]>([]);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
     const quantityInputRef = useRef<HTMLInputElement>(null);
+
+    // YARDIMCILAR
+    const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
+
+    // FORMATLAYICILAR
+    const formatPhone = (value: string) => {
+        const input = value.replace(/\D/g, '');
+        const match = input.match(/^(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
+        if (match) {
+            let formatted = '';
+            if (match[1]) formatted += `(${match[1]}`;
+            if (match[2]) formatted += `) ${match[2]}`;
+            if (match[3]) formatted += ` ${match[3]}`;
+            if (match[4]) formatted += ` ${match[4]}`;
+            return formatted;
+        }
+        return value;
+    };
+
+    const capitalizeWords = (str: string) => {
+        return str.replace(/\b\w/g, char => char.toUpperCase());
+    };
 
     // Stok Kontrolü
     const getCurrentStockQuantity = () => {
@@ -132,7 +154,7 @@ const SaleAdd = () => {
         }
     }, [headerData.storeId]);
 
-    // HEADER CHANGE (İL/İLÇE VE PERSONEL MANTIĞI DAHİL)
+    // HEADER CHANGE
     const handleHeaderChange = (e: any) => {
         const { name, value } = e.target;
 
@@ -144,11 +166,16 @@ const SaleAdd = () => {
                 personnelName: p ? p.fullName : ""
             }));
         }
-        // 👇 İL DEĞİŞİNCE İLÇELERİ GÜNCELLE VE İLÇEYİ SIFIRLA
         else if (name === 'city') {
             const selectedCity = iller.find(i => i.isim === value);
             setDistricts(selectedCity ? selectedCity.ilceler : []);
             setHeaderData(prev => ({ ...prev, city: value, district: "" }));
+        }
+        else if (name === 'phone') {
+            setHeaderData(prev => ({ ...prev, phone: formatPhone(value) }));
+        }
+        else if (name === 'customerName' || name === 'address') {
+            setHeaderData(prev => ({ ...prev, [name]: capitalizeWords(value) }));
         }
         else {
             setHeaderData(prev => ({ ...prev, [name]: value }));
@@ -160,7 +187,7 @@ const SaleAdd = () => {
     // Seçim Zinciri
     const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
     const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
-    const updateLineItem = (prodId: string, colId: string, dimId: string) => { const prod = productsInCat.find(p => p.id === prodId); const col = allColors.find(c => c.id === colId); const dim = allDimensions.find(d => d.id === dimId); if (prod) { let name = prod.productName; setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name })); } };
+    const updateLineItem = (prodId: string, colId: string, dimId: string) => { const prod = productsInCat.find(p => p.id === prodId); if (prod) { let name = prod.productName; setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name })); } };
     const handleProductChange = (val: string) => { setSelectedProductId(val); updateLineItem(val, selectedColorId, selectedDimensionId); };
     const handleColorChange = (val: string) => { setSelectedColorId(val); updateLineItem(selectedProductId, val, selectedDimensionId); };
     const handleDimensionChange = (val: string) => { setSelectedDimensionId(val); updateLineItem(selectedProductId, selectedColorId, val); };
@@ -199,183 +226,171 @@ const SaleAdd = () => {
         try {
             await addSale(saleData);
             setMessage({ type: 'success', text: 'Sipariş oluşturuldu!' });
-            setAddedItems([]);
-            setHeaderData(prev => ({
-                ...prev,
-                receiptNo: "",
-                personnelId: "", personnelName: "",
-                customerName: "", phone: "", city: "", district: "", address: "", deadline: "", shippingCost: 0
-            }));
-            setDistricts([]); // İlçeleri de sıfırla
-            getStoreStocks(headerData.storeId).then(setStoreStocks);
+            setTimeout(() => navigate('/sales'), 1000);
         } catch (error: any) {
             setMessage({ type: 'error', text: error.message });
         }
     };
 
     // Stiller
-    const cellStyle = { padding: '4px', verticalAlign: 'middle' };
-    const smallInput = { width: '60px', padding: '4px', fontSize: '13px', height: '28px', textAlign: 'center' as const, borderRadius: '4px', border: '1px solid #ccc' };
-    const mediumInput = { width: '80px', padding: '4px', fontSize: '13px', height: '28px', borderRadius: '4px', border: '1px solid #ccc' };
-    const selectStyle = { width: '100%', padding: '4px', fontSize: '12px', height: '28px', borderRadius: '4px', border: '1px solid #ccc' };
-    const filterSelectStyle = { width: '80px', padding: '4px', fontSize: '11px', height: '28px', borderRadius: '4px', border: '1px solid #ccc', backgroundColor: '#fdfdfd' };
+    const cellStyle = { padding: '6px', verticalAlign: 'middle' };
+    const smallInput = { width: '60px', padding: '6px', fontSize: '13px', textAlign: 'center' as const };
+    const mediumInput = { width: '80px', padding: '6px', fontSize: '13px' };
+    const selectStyle = { width: '100%', padding: '6px', fontSize: '12px' };
+    const filterSelectStyle = { width: '90px', padding: '6px', fontSize: '11px', marginRight: '4px' };
 
     return (
         <div className="page-container">
             {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
 
-            <div className="page-header" style={{ marginBottom: '15px' }}>
-                <div className="page-title"><h2>Yeni Sipariş / Satış</h2></div>
-                {addedItems.length > 0 && (<button onClick={saveSale} className="btn btn-success" style={{ padding: '8px 15px', fontSize: '14px' }}>SİPARİŞİ TAMAMLA ({addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost)} ₺)</button>)}
+            <div className="modern-header">
+                <div>
+                    <h2>Yeni Sipariş / Satış</h2>
+                    <p>Müşteri siparişi oluşturma</p>
+                </div>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <button onClick={() => navigate('/sales')} className="modern-btn btn-secondary">İptal</button>
+                    {addedItems.length > 0 && (<button onClick={saveSale} className="modern-btn btn-success">SİPARİŞİ TAMAMLA ({addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost)} ₺)</button>)}
+                </div>
             </div>
 
-            {/* MÜŞTERİ BİLGİLERİ */}
-            <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
+            {/* --- SİPARİŞ BİLGİLERİ (ESKİ KART STİLİNE DÖNÜLDÜ) --- */}
+            <div className="card" style={{ marginBottom: '15px', padding: '20px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '15px' }}>
 
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Tarih</label><input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-
+                    {/* 1. Satır: Tarih, Mağaza, Fiş No, Personel */}
                     <div>
-                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Mağaza</label>
+                        <label className="form-label">Tarih</label>
+                        <input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" />
+                    </div>
+                    <div>
+                        <label className="form-label">Mağaza</label>
                         {isAdmin ?
-                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select>
-                            : <input disabled value={currentUserData?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#eee', padding: '6px' }} />
+                            <select name="storeId" value={headerData.storeId} onChange={handleHeaderChange} className="form-input"><option value="">Seçiniz...</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}</select>
+                            : <input disabled value={currentUserData?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#f1f5f9' }} />
                         }
                     </div>
-
                     <div>
-                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>
-                            Fiş No <span style={{ color: 'red' }}>*</span>
-                        </label>
-                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} />
+                        <label className="form-label">Fiş No <span style={{ color: 'red' }}>*</span></label>
+                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="Örn: 2024-001" />
                     </div>
-
                     <div>
-                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Satış Personeli</label>
-                        <select
-                            name="personnelId"
-                            value={headerData.personnelId}
-                            onChange={handleHeaderChange}
-                            className="form-input"
-                            style={{ padding: '6px' }}
-                            disabled={!headerData.storeId}
-                        >
-                            <option value="">-- Personel Seç --</option>
-                            {storePersonnel.map(p => (
-                                <option key={p.id} value={p.id}>{p.fullName} {p.role === 'store_admin' ? '(Müdür)' : ''}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                </div>
-
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '10px', marginBottom: '10px' }}>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Müşteri Adı</label><input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Telefon</label><input name="phone" value={headerData.phone} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
-
-                    {/* 👇 İL SEÇİMİ */}
-                    <div>
-                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İl</label>
-                        <select name="city" value={headerData.city} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }}>
-                            <option value="">İl Seçiniz...</option>
-                            {iller.map(il => (
-                                <option key={il.id} value={il.isim}>{il.isim}</option>
-                            ))}
-                        </select>
-                    </div>
-
-                    {/* 👇 İLÇE SEÇİMİ */}
-                    <div>
-                        <label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>İlçe</label>
-                        <select
-                            name="district"
-                            value={headerData.district}
-                            onChange={handleHeaderChange}
-                            className="form-input"
-                            style={{ padding: '6px' }}
-                            disabled={!headerData.city} // İl seçilmeden pasif
-                        >
-                            <option value="">İlçe Seçiniz...</option>
-                            {districts.map((ilce, index) => (
-                                <option key={index} value={ilce}>{ilce}</option>
-                            ))}
+                        <label className="form-label">Satış Personeli</label>
+                        <select name="personnelId" value={headerData.personnelId} onChange={handleHeaderChange} className="form-input" disabled={!headerData.storeId}>
+                            <option value="">-- Seç --</option>
+                            {storePersonnel.map(p => (<option key={p.id} value={p.id}>{p.fullName}</option>))}
                         </select>
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '3fr 2fr 1fr', gap: '10px' }}>
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Açık Adres</label><textarea name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" rows={1} style={{ resize: 'vertical', height: '32px', padding: '6px' }} /></div>
-                    
-                    <div><label className="form-label" style={{ marginBottom: '2px', fontSize: '12px' }}>Termin Tarihi</label><input type="date" name="deadline" value={headerData.deadline} onChange={handleHeaderChange} className="form-input" style={{ padding: '6px' }} /></div>
+                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                    {/* 2. Satır: Müşteri Adı, Telefon, İl, İlçe */}
+                    <div>
+                        <label className="form-label">Müşteri Adı</label>
+                        <input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" placeholder="Ad Soyad" />
+                    </div>
+                    <div>
+                        <label className="form-label">Telefon</label>
+                        <input name="phone" value={headerData.phone} onChange={handleHeaderChange} className="form-input" placeholder="(5XX) XXX XX XX" maxLength={15} />
+                    </div>
+                    <div>
+                        <label className="form-label">İl</label>
+                        <select name="city" value={headerData.city} onChange={handleHeaderChange} className="form-input">
+                            <option value="">Seçiniz...</option>
+                            {iller.map(il => (<option key={il.id} value={il.isim}>{il.isim}</option>))}
+                        </select>
+                    </div>
+                    <div>
+                        <label className="form-label">İlçe</label>
+                        <select name="district" value={headerData.district} onChange={handleHeaderChange} className="form-input" disabled={!headerData.city}>
+                            <option value="">Seçiniz...</option>
+                            {districts.map((ilce, index) => (<option key={index} value={ilce}>{ilce}</option>))}
+                        </select>
+                    </div>
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '15px' }}>
+                    {/* 3. Satır: Adres (Geniş), Termin Tarihi */}
+                    <div>
+                        <label className="form-label">Açık Adres</label>
+                        <input name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" placeholder="Mahalle, Cadde, Sokak, No..." />
+                    </div>
+                    <div>
+                        <label className="form-label">Termin Tarihi</label>
+                        <input type="date" name="deadline" value={headerData.deadline} onChange={handleHeaderChange} className="form-input" />
+                    </div>
                 </div>
             </div>
 
             {/* ÜRÜN GİRİŞİ */}
             <div className="card">
+                <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid #eee' }}>
+                    <h3 style={{ margin: 0, fontSize: '16px', color: '#2c3e50' }}>Ürün Girişi</h3>
+                </div>
                 <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
-                    <table className="data-table dense" style={{ minWidth: '1000px', fontSize: '12px' }}>
-                        <thead style={{ backgroundColor: '#f1f2f6' }}>
+                    <table className="modern-table dense">
+                        <thead style={{ backgroundColor: '#f8fafc' }}>
                             <tr>
-                                <th style={{ width: '35%', padding: '8px' }}>Ürün (Grup - Kat - Ad)</th>
-                                <th style={{ width: '10%', padding: '8px' }}>Renk</th>
-                                <th style={{ width: '10%', padding: '8px' }}>Ebat</th>
-                                <th style={{ width: '8%', padding: '8px' }}>Minder</th>
-                                <th style={{ width: '6%', padding: '8px' }}>Adet</th>
-                                <th style={{ width: '8%', padding: '8px' }}>Fiyat</th>
-                                <th style={{ width: '10%', padding: '8px' }}>Temin</th>
-                                <th style={{ width: '8%', padding: '8px' }}>Stok</th>
-                                <th style={{ width: '5%', padding: '8px' }}>+</th>
+                                <th style={{ width: '30%' }}>Ürün Seçimi (Grup - Kat - Ad)</th>
+                                <th style={{ width: '10%' }}>Renk</th>
+                                <th style={{ width: '10%' }}>Ebat</th>
+                                <th style={{ width: '10%' }}>Minder</th>
+                                <th style={{ width: '6%', textAlign: 'center' }}>Adet</th>
+                                <th style={{ width: '8%' }}>Fiyat</th>
+                                <th style={{ width: '10%' }}>Temin</th>
+                                <th style={{ width: '8%', textAlign: 'center' }}>Stok</th>
+                                <th style={{ width: '5%' }}>+</th>
                             </tr>
                         </thead>
                         <tbody>
                             {/* --- GİRİŞ SATIRI 1 --- */}
-                            <tr style={{ backgroundColor: getStockStatusColor(), borderTop: '2px solid #3498db' }}>
+                            <tr style={{ backgroundColor: getStockStatusColor(), borderTop: '2px solid #3b82f6' }}>
                                 <td style={cellStyle}>
-                                    <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
-                                        <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} style={filterSelectStyle}>
+                                    <div style={{ display: 'flex', alignItems: 'center' }}>
+                                        <select value={lineItem.groupId} onChange={e => handleGroupChange(e.target.value)} className="soft-input" style={filterSelectStyle}>
                                             <option value="">Grup</option>{groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
                                         </select>
-                                        <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} style={filterSelectStyle} disabled={!lineItem.groupId}>
+                                        <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} className="soft-input" style={filterSelectStyle} disabled={!lineItem.groupId}>
                                             <option value="">Kat</option>{categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
                                         </select>
-                                        <select value={selectedProductId} onChange={e => handleProductChange(e.target.value)} style={{ ...selectStyle, flex: 1, fontWeight: 'bold' }} disabled={!lineItem.categoryId}>
+                                        <select value={selectedProductId} onChange={e => handleProductChange(e.target.value)} className="soft-input" style={{ ...selectStyle, flex: 1, fontWeight: 'bold' }} disabled={!lineItem.categoryId}>
                                             <option value="">Ürün Seç...</option>{productsInCat.map(p => <option key={p.id} value={p.id}>{p.productName}</option>)}
                                         </select>
                                     </div>
                                 </td>
 
                                 <td style={cellStyle}>
-                                    <select value={selectedColorId} onChange={e => handleColorChange(e.target.value)} style={selectStyle} disabled={!selectedProductId}>
+                                    <select value={selectedColorId} onChange={e => handleColorChange(e.target.value)} className="soft-input" style={selectStyle} disabled={!selectedProductId}>
                                         <option value="">Seç</option>{allColors.map(c => <option key={c.id} value={c.id}>{c.colorName}</option>)}
                                     </select>
                                 </td>
                                 <td style={cellStyle}>
-                                    <select value={selectedDimensionId} onChange={e => handleDimensionChange(e.target.value)} style={selectStyle} disabled={!selectedColorId}>
+                                    <select value={selectedDimensionId} onChange={e => handleDimensionChange(e.target.value)} className="soft-input" style={selectStyle} disabled={!selectedColorId}>
                                         <option value="">Seç</option>{allDimensions.map(d => <option key={d.id} value={d.id}>{d.dimensionName}</option>)}
                                     </select>
                                 </td>
                                 <td style={cellStyle}>
-                                    <select name="cushionId" value={lineItem.cushionId} onChange={handleLineChange} style={selectStyle}>
+                                    <select name="cushionId" value={lineItem.cushionId} onChange={handleLineChange} className="soft-input" style={selectStyle}>
                                         <option value="">Yok</option>{cushions.map(c => <option key={c.id} value={c.id}>{c.cushionName}</option>)}
                                     </select>
                                 </td>
                                 <td style={cellStyle}>
-                                    <input type="number" ref={quantityInputRef} name="quantity" value={lineItem.quantity} onChange={handleLineChange} style={{ ...smallInput, fontWeight: 'bold' }} />
+                                    <input type="number" ref={quantityInputRef} name="quantity" value={lineItem.quantity} onChange={handleLineChange} className="soft-input" style={{ ...smallInput, fontWeight: 'bold' }} />
                                 </td>
                                 <td style={cellStyle}>
-                                    <input type="number" name="price" value={lineItem.price} onChange={handleLineChange} style={mediumInput} />
+                                    <input type="number" name="price" value={lineItem.price} onChange={handleLineChange} className="soft-input" style={mediumInput} />
                                 </td>
                                 <td style={cellStyle}>
-                                    <select name="supplyMethod" value={lineItem.supplyMethod} onChange={handleLineChange} style={{ ...selectStyle, fontSize: '11px', fontWeight: 'bold', color: lineItem.supplyMethod === 'Stoktan' ? '#27ae60' : '#e74c3c' }}>
+                                    <select name="supplyMethod" value={lineItem.supplyMethod} onChange={handleLineChange} className="soft-input" style={{ ...selectStyle, fontSize: '11px', fontWeight: 'bold', color: lineItem.supplyMethod === 'Stoktan' ? '#16a34a' : '#dc2626' }}>
                                         <option value="Stoktan">Depo</option>
                                         <option value="Merkezden">Merkez</option>
                                     </select>
                                 </td>
-                                <td style={{ ...cellStyle, textAlign: 'center', fontSize: '11px', color: '#555' }}>
+                                <td style={{ ...cellStyle, textAlign: 'center', fontSize: '12px', color: '#64748b' }}>
                                     {selectedProductId && selectedColorId ? (
                                         <>
-                                            <div><b>{currentFreeStock}</b></div>
-                                            {currentFreeStock < requestedQty && <div style={{ color: 'red', fontWeight: 'bold', fontSize: '9px' }}>Eksik</div>}
+                                            <div style={{ fontWeight: 'bold', fontSize: '14px' }}>{currentFreeStock}</div>
+                                            {currentFreeStock < requestedQty && <div style={{ color: '#dc2626', fontWeight: 'bold', fontSize: '10px' }}>Yetersiz</div>}
                                         </>
                                     ) : "-"}
                                 </td>
@@ -383,37 +398,71 @@ const SaleAdd = () => {
                             </tr>
 
                             {/* --- GİRİŞ SATIRI 2 (ÜRÜN NOTU) --- */}
-                            <tr style={{ backgroundColor: getStockStatusColor(), borderBottom: '2px solid #3498db' }}>
-                                <td colSpan={8} style={{ padding: '0 4px 4px 4px' }}>
+                            <tr style={{ backgroundColor: getStockStatusColor(), borderBottom: '2px solid #3b82f6' }}>
+                                <td colSpan={8} style={{ padding: '0 6px 6px 6px' }}>
                                     <input
                                         type="text"
                                         name="productNote"
                                         value={lineItem.productNote}
                                         onChange={handleLineChange}
-                                        style={{ width: '90%', padding: '4px 8px', fontSize: '12px', height: '28px', borderRadius: '4px', border: '1px solid #ccc', fontStyle: 'italic', color: '#555', backgroundColor: 'rgba(255,255,255,0.7)' }}
+                                        className="soft-input"
+                                        style={{ width: '100%', height: '32px', fontSize: '12px', fontStyle: 'italic', color: '#64748b' }}
                                         placeholder="Ürün Notu (Varsa)..."
+                                        onKeyDown={e => e.key === 'Enter' && addLineItem()}
                                     />
                                 </td>
-                                <td style={{ padding: '0 4px 4px 0', verticalAlign: 'top' }}>
-                                    <button onClick={addLineItem} className="btn btn-primary" style={{ padding: '0', width: '100%', height: '28px', fontSize: '16px', lineHeight: '1', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
+                                <td style={{ padding: '0 6px 6px 0', verticalAlign: 'top' }}>
+                                    <button onClick={addLineItem} className="modern-btn btn-primary" style={{ padding: '0', width: '100%', height: '32px', fontSize: '18px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>+</button>
                                 </td>
                             </tr>
 
-                            {/* --- EKLENEN LİSTE --- */}
+                            {/* --- SEPET LİSTESİ --- */}
                             {addedItems.map((item, idx) => (
-                                <tr key={idx} style={{ borderBottom: '1px solid #eee' }}>
-                                    <td style={{ padding: '6px 8px' }}>
-                                        <div style={{ fontWeight: '600', color: '#2c3e50', fontSize: '13px' }}>{item.productName}</div>
-                                        {item.productNote && <div style={{ fontSize: '11px', color: '#7f8c8d', fontStyle: 'italic', marginTop: '1px' }}>↳ {item.productNote}</div>}
+                                <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+
+                                    {/* 1. SÜTUN: Ürün Bilgisi + Ebat + Kategori (YAN YANA) */}
+                                    <td style={{ padding: '10px 12px' }}>
+                                        <div>
+                                            <span style={{ fontWeight: 'bold', color: '#333', marginRight: '5px' }}>
+                                                {item.productName.split('-')[0].trim()}
+                                            </span>
+                                            {item.dimensionId && (
+                                                <span style={{ color: '#d35400', fontWeight: '600', marginRight: '5px' }}>
+                                                    {getName(allDimensions, item.dimensionId, 'dimensionName')}
+                                                </span>
+                                            )}
+                                            <span style={{ fontSize: '12px', color: '#7f8c8d' }}>
+                                                ({getName(categories, item.categoryId, 'categoryName')})
+                                            </span>
+                                        </div>
+                                        {item.productNote && (
+                                            <div style={{ fontSize: '11px', color: '#e74c3c', fontStyle: 'italic', marginTop: '2px' }}>
+                                                ↳ {item.productNote}
+                                            </div>
+                                        )}
                                     </td>
-                                    <td style={{ padding: '6px', fontSize: '12px' }}>{allColors.find(c => c.id === item.colorId)?.colorName}</td>
-                                    <td style={{ padding: '6px', fontSize: '12px' }}>{allDimensions.find(d => d.id === item.dimensionId)?.dimensionName || "-"}</td>
-                                    <td style={{ padding: '6px', fontSize: '12px' }}>{cushions.find(c => c.id === item.cushionId)?.cushionName || "-"}</td>
-                                    <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '13px' }}>{item.quantity}</td>
-                                    <td style={{ fontSize: '13px' }}>{item.price} ₺</td>
-                                    <td><span className={`badge ${item.supplyMethod === 'Stoktan' ? 'badge-success' : 'badge-danger'}`} style={{ fontSize: '10px', padding: '2px 6px' }}>{item.supplyMethod}</span></td>
+
+                                    {/* 2. SÜTUN: Renk */}
+                                    <td style={{ padding: '10px 12px', fontSize: '13px', color: '#475569' }}>
+                                        {getName(allColors, item.colorId, 'colorName')}
+                                    </td>
+
+                                    {/* 3. SÜTUN: Ebat (Boş bırakıyoruz çünkü ilk sütunda yazıyor) */}
+                                    <td style={{ textAlign: 'center', color: '#ccc' }}>-</td>
+
+                                    {/* 4. SÜTUN: Minder */}
+                                    <td style={{ padding: '10px 12px', fontSize: '13px', color: '#475569' }}>
+                                        {item.cushionId ? getName(cushions, item.cushionId, 'cushionName') : '-'}
+                                    </td>
+
+                                    {/* Diğer Sütunlar */}
+                                    <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', padding: '10px' }}>{item.quantity}</td>
+                                    <td style={{ fontSize: '13px', fontWeight: '600', color: '#1e293b' }}>{item.price} ₺</td>
+                                    <td><span className={`status-badge ${item.supplyMethod === 'Stoktan' ? 'success' : 'danger'}`} style={{ fontSize: '10px' }}>{item.supplyMethod}</span></td>
                                     <td>-</td>
-                                    <td><button onClick={() => { const n = [...addedItems]; n.splice(idx, 1); setAddedItems(n) }} style={{ color: 'red', border: 'none', background: 'none', cursor: 'pointer', fontSize: '16px' }}>×</button></td>
+                                    <td style={{ textAlign: 'center' }}>
+                                        <button onClick={() => { const n = [...addedItems]; n.splice(idx, 1); setAddedItems(n) }} style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>×</button>
+                                    </td>
                                 </tr>
                             ))}
                         </tbody>

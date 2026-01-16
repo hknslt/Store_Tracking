@@ -87,7 +87,7 @@ const PersonnelList = () => {
                     </select>
                 ) : (
                     <div style={{ padding: '10px 20px', backgroundColor: '#e2e8f0', borderRadius: '8px', color: '#475569', fontWeight: '600', fontSize: '14px' }}>
-                        📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+                        {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
                     </div>
                 )}
 

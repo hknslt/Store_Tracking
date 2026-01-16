@@ -15,7 +15,6 @@ import ProductList from "./pages/products/ProductList";
 import GroupAdd from "./pages/definitions/groups/GroupAdd";
 import DefinitionsPage from "./pages/definitions/groups/DefinitionsPage";
 import PriceList from "./pages/prices/PriceList";
-import StockList from "./pages/stocks/StockList";
 import PurchaseList from "./pages/purchases/PurchaseList";
 import PurchaseAdd from "./pages/purchases/PurchaseAdd";
 import StoreList from "./pages/stores/StoreList";
@@ -40,8 +39,9 @@ import StoreDashboard from "./pages/stores/StoreDashboard";
 import DebtList from "./pages/debts/DebtList";
 import PurchaseDetail from "./pages/purchases/PurchaseDetail";
 import PersonnelDetail from "./pages/personnel/PersonnelDetail";
+import StoreCashRegisters from "./pages/finance/StoreCashRegisters";
 
-// --- CUSTOM COMPONENT: Store Back Button ---
+// --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
 const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -68,12 +68,42 @@ const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
         outline: 'none'
       }}
     >
-      {/* SVG Arrow Icon */}
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
         <path d="M19 12H5" />
         <path d="M12 19l-7-7 7-7" />
       </svg>
       Mağaza Paneline Dön
+    </button>
+  );
+};
+
+// --- CUSTOM COMPONENT: Admin Back Button (Süper Admin İçin - YENİ) ---
+const AdminBackButton = ({ onClick }: { onClick: () => void }) => {
+  const [isHovered, setIsHovered] = useState(false);
+
+  return (
+    <button
+      onClick={onClick}
+      onMouseEnter={() => setIsHovered(true)}
+      onMouseLeave={() => setIsHovered(false)}
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: '8px',
+        background: isHovered ? '#f0fdf4' : 'white',
+        border: isHovered ? '1px solid #4ade80' : '1px solid #cbd5e1',
+        padding: '8px 16px',
+        borderRadius: '10px',
+        cursor: 'pointer',
+        color: isHovered ? '#052e16' : '#64748b',
+        fontSize: '13px',
+        fontWeight: '600',
+        transition: 'all 0.2s',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
+        marginBottom: '15px' // Altındaki içerikle mesafe
+      }}
+    >
+      <span style={{ fontSize: '16px', lineHeight: 0, marginTop: '-2px' }}>‹</span> Geri Dön
     </button>
   );
 };
@@ -96,8 +126,13 @@ const ProtectedLayout = () => {
     ? location.pathname === `/stores/${userData.storeId}`
     : false;
 
+  // SÜPER ADMIN GERİ BUTONU KONTROLÜ
+  // 1. Mağaza Müdürü değilse
+  // 2. Ana Sayfada (/) değilse
+  const showAdminBackButton = !isStoreAdmin && location.pathname !== '/';
+
   return (
-    <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden' }}>
+    <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
 
       {/* Show Sidebar ONLY if NOT a Store Admin */}
       {!isStoreAdmin && <Sidebar />}
@@ -107,11 +142,11 @@ const ProtectedLayout = () => {
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
-        backgroundColor: '#f5f6fa',
-        overflow: 'hidden'
+        overflow: 'hidden',
+        minWidth: 0 // Flexbox taşma önleyici
       }}>
 
-        {/* 👇 SPECIAL BACK NAVIGATION BAR FOR STORE ADMINS */}
+        {/* --- MAĞAZA MÜDÜRÜ İÇİN ÖZEL GERİ BUTONU --- */}
         {isStoreAdmin && !isAtDashboard && (
           <div style={{
             padding: '12px 24px',
@@ -122,15 +157,11 @@ const ProtectedLayout = () => {
             justifyContent: 'space-between',
             boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.05)',
             zIndex: 20,
-            position: 'sticky',
-            top: 0
+            flexShrink: 0
           }}>
-            {/* Custom Beautiful Button */}
             <StoreBackButton onClick={() => navigate(`/stores/${userData?.storeId}`)} />
 
-            {/* User Info Badge */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              {/* 👇 DÜZELTME BURADA YAPILDI: Hatalı 'sm' özelliği kaldırıldı */}
               <div style={{ textAlign: 'right' }}>
                 <div style={{ fontSize: '13px', fontWeight: 'bold', color: '#344054' }}>
                   {userData?.fullName}
@@ -139,7 +170,6 @@ const ProtectedLayout = () => {
                   Mağaza Yöneticisi
                 </div>
               </div>
-              {/* Avatar Circle */}
               <div style={{
                 width: '36px', height: '36px',
                 backgroundColor: '#e0f2f1', color: '#1e703a',
@@ -149,6 +179,13 @@ const ProtectedLayout = () => {
                 {userData?.fullName?.charAt(0).toUpperCase()}
               </div>
             </div>
+          </div>
+        )}
+
+        {/* --- SÜPER ADMIN İÇİN GERİ BUTONU --- */}
+        {showAdminBackButton && (
+          <div style={{ padding: '25px 25px 0 25px', flexShrink: 0 }}>
+            <AdminBackButton onClick={() => navigate(-1)} />
           </div>
         )}
 
@@ -184,7 +221,6 @@ function App() {
           {/* A) PUBLIC AREA */}
           <Route element={<PublicLayout />}>
             <Route path="/login" element={<Login />} />
-
           </Route>
 
           {/* B) PROTECTED AREA */}
@@ -205,7 +241,6 @@ function App() {
             {/* Price, Stock & Purchase */}
             <Route path="/prices/list" element={<PriceList />} />
             <Route path="/prices/manage" element={<PriceManager />} />
-            <Route path="/stocks" element={<StockList />} />
             <Route path="/store-stocks" element={<StoreStockManager />} />
             <Route path="/purchases" element={<PurchaseList />} />
             <Route path="/purchases/add" element={<PurchaseAdd />} />
@@ -215,6 +250,7 @@ function App() {
             <Route path="/stores" element={<StoreList />} />
             <Route path="/stores/add" element={<StoreAdd />} />
             <Route path="/stores/:id" element={<StoreDashboard />} />
+            <Route path="/finance/cash-registers" element={<StoreCashRegisters />} />
 
             <Route path="/personnel" element={<PersonnelList />} />
             <Route path="/personnel/add" element={<PersonnelAdd />} />

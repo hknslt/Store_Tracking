@@ -7,7 +7,6 @@ import { doc, getDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import { getPaymentsByStore } from "../../services/paymentService";
 
-// 👇 SystemUser eklendi
 import type { PaymentDocument, Store, SystemUser } from "../../types";
 import "../../App.css";
 
@@ -21,27 +20,34 @@ const PaymentList = () => {
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
-    // Detay satırı açma/kapama
     const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
 
-    // 👇 YENİ: Filtreler
+    // BUGÜNÜN TARİHİ (YYYY-MM-DD Formatında)
+    const getTodayString = () => {
+        const d = new Date();
+        const year = d.getFullYear();
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    };
+
+    const TODAY = getTodayString();
+
+    // Filtreler (Varsayılan olarak BUGÜN seçili gelir ama değiştirilebilir)
     const [searchTerm, setSearchTerm] = useState("");
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
-    const [endDate, setEndDate] = useState(new Date().toISOString().split('T')[0]);
+    const [startDate, setStartDate] = useState(TODAY);
+    const [endDate, setEndDate] = useState(TODAY);
 
     // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
             if (!currentUser) return;
             try {
-                // Mağazaları çek
                 const sData = await getStores();
                 setStores(sData);
 
-                // Kullanıcı yetkisini kontrol et
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                 if (userDoc.exists()) {
-                    // 👇 Tip Güvenliği: SystemUser
                     const u = userDoc.data() as SystemUser;
                     if (['admin', 'control', 'report'].includes(u.role)) {
                         setIsAdmin(true);
@@ -50,22 +56,12 @@ const PaymentList = () => {
                         if (u.storeId) setSelectedStoreId(u.storeId);
                     }
                 }
-
-                // Varsayılan Tarih: Son 30 gün
-                const d = new Date();
-                d.setDate(d.getDate() - 30);
-                setStartDate(d.toISOString().split('T')[0]);
-
-            } catch (error) {
-                console.error(error);
-            } finally {
-                setLoading(false);
-            }
+            } catch (error) { console.error(error); } finally { setLoading(false); }
         };
         init();
     }, [currentUser]);
 
-    // Mağaza değişince listeyi yenile
+    // Verileri Çek
     useEffect(() => {
         if (selectedStoreId) {
             getPaymentsByStore(selectedStoreId).then(setPayments);
@@ -74,17 +70,14 @@ const PaymentList = () => {
         }
     }, [selectedStoreId]);
 
-    // --- FİLTRELEME MANTIĞI ---
+    // --- 1. LİSTE FİLTRESİ (Kullanıcının seçtiği tarihe göre) ---
     const filteredPayments = payments.filter(p => {
-        // 1. Tarih Filtresi
         const pDate = new Date(p.date);
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        end.setHours(23, 59, 59); // Gün sonunu kapsasın
+        const start = new Date(`${startDate}T00:00:00`);
+        const end = new Date(`${endDate}T23:59:59`);
 
         const isDateInRange = pDate >= start && pDate <= end;
 
-        // 2. Arama Filtresi (Makbuz No, Personel veya İçerik Açıklaması)
         const lowerSearch = searchTerm.toLowerCase();
         const matchesSearch =
             p.receiptNo.toLowerCase().includes(lowerSearch) ||
@@ -94,13 +87,17 @@ const PaymentList = () => {
         return isDateInRange && matchesSearch;
     });
 
-    // --- ÖZET HESAPLAMA (Filtrelenmiş Veriye Göre) ---
-    const calculateSummary = () => {
+    // --- 2. GÜNLÜK ÖZET HESAPLAMA (Her zaman BUGÜNÜN verisi) ---
+    // Filtreden bağımsız, sadece 'TODAY' ile eşleşenleri toplar.
+    const calculateDailySummary = () => {
         let tahsilat = 0;
         let masraf = 0;
         let merkez = 0;
 
-        for (const p of filteredPayments) {
+        // Tüm ödemeler içinde sadece tarihi BUGÜN olanları bul
+        const todaysData = payments.filter(p => p.date.startsWith(TODAY));
+
+        for (const p of todaysData) {
             for (const item of p.items) {
                 const val = Number(item.amount);
                 if (item.type === 'Tahsilat') tahsilat += val;
@@ -111,7 +108,7 @@ const PaymentList = () => {
         return { tahsilat, masraf, merkez };
     };
 
-    const summary = calculateSummary();
+    const dailyStats = calculateDailySummary(); // <-- Kartlarda bunu kullanacağız
 
     // --- YARDIMCILAR ---
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
@@ -121,161 +118,179 @@ const PaymentList = () => {
         else setExpandedRowId(id);
     };
 
-    if (loading) return <div className="page-container">Yükleniyor...</div>;
+    if (loading) return <div className="page-container" style={{ textAlign: 'center', paddingTop: '100px' }}>Yükleniyor...</div>;
 
     return (
         <div className="page-container">
-            <div className="page-header">
-                <div className="page-title">
+            <div className="modern-header">
+                <div>
                     <h2>Kasa Hareketleri</h2>
                     <p>Ödeme, Tahsilat ve Masraf Listesi</p>
                 </div>
-                <Link to="/payments/add" className="btn btn-success">+ Yeni İşlem Ekle</Link>
+                <Link to="/payments/add" className="modern-btn btn-primary">
+                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem
+                </Link>
             </div>
 
-            {/* FİLTRE BARI */}
-            <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
-                <div style={{ display: 'flex', gap: '15px', alignItems: 'center', flexWrap: 'wrap' }}>
-
-                    {/* Mağaza Seçimi */}
-                    {isAdmin ? (
-                        <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ maxWidth: '200px' }}>
-                            <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
-                        </select>
-                    ) : (
-                        <div style={{ fontWeight: 'bold', color: '#2980b9', padding: '10px', backgroundColor: '#ecf0f1', borderRadius: '5px' }}>
-                            📍 {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
-                        </div>
-                    )}
-
-                    {/* Tarih Aralığı */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                        <input type="date" className="form-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                        <span>-</span>
-                        <input type="date" className="form-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
-                    </div>
-
-                    {/* Arama Kutusu */}
-                    <input
-                        type="text"
-                        placeholder="🔍 Makbuz, Personel veya Açıklama..."
-                        className="form-input"
-                        value={searchTerm}
-                        onChange={e => setSearchTerm(e.target.value)}
-                        style={{ flex: 1, minWidth: '200px' }}
-                    />
-                </div>
-            </div>
-
-            {/* ÖZET KARTLARI (Filtreye Göre Değişir) */}
+            {/* --- ÖZET KARTLARI (SABİT BUGÜNÜ GÖSTERİR) --- */}
+            {/* Bu kısım filtrelerden etkilenmez, her zaman bugünün canlı verisidir */}
             {selectedStoreId && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-                    <div className="card" style={{ backgroundColor: '#e8f8f5', borderLeft: '5px solid #2ecc71', padding: '15px' }}>
-                        <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>TOPLAM TAHSİLAT</div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#27ae60' }}>+{summary.tahsilat.toFixed(2)} ₺</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
+
+                    {/* GÜNLÜK TAHSİLAT */}
+                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #10b981', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>GÜNLÜK TAHSİLAT</div>
+                            <span className="status-badge success" style={{ fontSize: '10px' }}>BUGÜN</span>
+                        </div>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#10b981' }}>+{dailyStats.tahsilat.toFixed(2)} ₺</div>
                     </div>
-                    <div className="card" style={{ backgroundColor: '#fef9e7', borderLeft: '5px solid #f1c40f', padding: '15px' }}>
-                        <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>TOPLAM MASRAF</div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#f39c12' }}>-{summary.masraf.toFixed(2)} ₺</div>
+
+                    {/* GÜNLÜK MASRAF */}
+                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #f59e0b', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>GÜNLÜK MASRAF</div>
+                            <span className="status-badge warning" style={{ fontSize: '10px' }}>BUGÜN</span>
+                        </div>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#f59e0b' }}>-{dailyStats.masraf.toFixed(2)} ₺</div>
                     </div>
-                    <div className="card" style={{ backgroundColor: '#fdedec', borderLeft: '5px solid #e74c3c', padding: '15px' }}>
-                        <div style={{ fontSize: '12px', color: '#555', fontWeight: 'bold' }}>MERKEZE TRANSFER</div>
-                        <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#c0392b' }}>-{summary.merkez.toFixed(2)} ₺</div>
+
+                    {/* GÜNLÜK MERKEZ */}
+                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #ef4444', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>MERKEZE TRANSFER</div>
+                            <span className="status-badge danger" style={{ fontSize: '10px' }}>BUGÜN</span>
+                        </div>
+                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#ef4444' }}>-{dailyStats.merkez.toFixed(2)} ₺</div>
                     </div>
                 </div>
             )}
 
-            {/* LİSTE */}
-            <div className="card">
-                <div className="card-body" style={{ padding: 0 }}>
-                    {selectedStoreId ? (
-                        <table className="data-table">
-                            <thead>
-                                <tr style={{ backgroundColor: '#f8f9fa' }}>
-                                    <th style={{ width: '5%' }}></th>
-                                    <th style={{ width: '15%' }}>Tarih</th>
-                                    <th style={{ width: '15%' }}>Makbuz No</th>
-                                    <th style={{ width: '20%' }}>İşlemi Yapan</th>
-                                    <th>Özet / Açıklama</th>
-                                    <th style={{ width: '15%', textAlign: 'right' }}>Toplam Tutar</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {filteredPayments.length > 0 ? (
-                                    filteredPayments.map(p => (
-                                        <>
-                                            {/* ANA SATIR */}
-                                            <tr key={p.id} onClick={() => toggleRow(p.id!)} className="hover-row" style={{ cursor: 'pointer', borderBottom: expandedRowId === p.id ? 'none' : '1px solid #eee' }}>
-                                                <td style={{ textAlign: 'center', fontSize: '12px', color: '#999' }}>
-                                                    {expandedRowId === p.id ? '▼' : '▶'}
-                                                </td>
-                                                <td>{formatDate(p.date)}</td>
-                                                <td style={{ fontWeight: 'bold', color: '#2c3e50' }}>{p.receiptNo}</td>
-                                                <td>{p.personnelName}</td>
-                                                <td style={{ fontSize: '12px', color: '#777', fontStyle: 'italic' }}>
-                                                    {p.items.length} adet işlem içeriyor...
-                                                </td>
-                                                <td style={{ textAlign: 'right', fontWeight: 'bold' }}>
-                                                    {p.totalAmount.toFixed(2)} ₺
-                                                </td>
-                                            </tr>
+            {/* --- FİLTRE BARI (LİSTEYİ ETKİLER) --- */}
+            <div className="filter-bar">
+                {/* Mağaza Seçimi */}
+                {isAdmin ? (
+                    <select className="soft-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ minWidth: '200px' }}>
+                        <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                    </select>
+                ) : (
+                    <div className="status-badge neutral" style={{ padding: '10px 15px', fontSize: '14px' }}>
+                        {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+                    </div>
+                )}
 
-                                            {/* DETAY SATIRI */}
-                                            {expandedRowId === p.id && (
-                                                <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
-                                                    <td colSpan={6} style={{ padding: '10px 20px 20px 40px' }}>
-                                                        <table className="data-table dense" style={{ border: '1px solid #eee', backgroundColor: 'white', fontSize: '13px' }}>
+                {/* Tarih Aralığı */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <input type="date" className="soft-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
+                    <span style={{ color: '#94a3b8' }}>-</span>
+                    <input type="date" className="soft-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                </div>
+
+                {/* Arama Kutusu */}
+                <input
+                    type="text"
+                    placeholder="Makbuz, Personel veya Açıklama..."
+                    className="soft-input"
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{ flex: 1, minWidth: '200px' }}
+                />
+            </div>
+
+            {/* --- LİSTE (SEÇİLEN TARİHE GÖRE) --- */}
+            <div className="modern-table-container">
+                {selectedStoreId ? (
+                    <table className="modern-table">
+                        <thead>
+                            <tr>
+                                <th style={{ width: '50px' }}></th>
+                                <th>Tarih</th>
+                                <th>Makbuz No</th>
+                                <th>İşlemi Yapan</th>
+                                <th>Özet</th>
+                                <th style={{ textAlign: 'right' }}>Toplam Tutar</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {filteredPayments.length > 0 ? (
+                                filteredPayments.map(p => (
+                                    <>
+                                        {/* ANA SATIR */}
+                                        <tr key={p.id} onClick={() => toggleRow(p.id!)} className="modern-row">
+                                            <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '10px' }}>
+                                                {expandedRowId === p.id ? '▼' : '▶'}
+                                            </td>
+                                            <td style={{ color: '#64748b' }}>{formatDate(p.date)}</td>
+                                            <td style={{ fontWeight: '600', color: '#1e293b' }}>{p.receiptNo}</td>
+                                            <td style={{ color: '#475569' }}>{p.personnelName}</td>
+                                            <td style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                {p.items.length} adet işlem...
+                                            </td>
+                                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
+                                                {p.totalAmount.toFixed(2)} ₺
+                                            </td>
+                                        </tr>
+
+                                        {/* DETAY SATIRI */}
+                                        {expandedRowId === p.id && (
+                                            <tr style={{ backgroundColor: '#f8fafc' }}>
+                                                <td colSpan={6} style={{ padding: '0 20px 20px 20px', border: 'none' }}>
+                                                    <div className="detail-content">
+                                                        <table className="modern-table" style={{ fontSize: '13px' }}>
                                                             <thead>
-                                                                <tr style={{ backgroundColor: '#ecf0f1' }}>
-                                                                    <th style={{ width: '15%' }}>İşlem Türü</th>
-                                                                    <th style={{ width: '20%' }}>İlgili Kişi / Fiş</th>
-                                                                    <th style={{ width: '15%' }}>Ödeme Yöntemi</th>
+                                                                <tr>
+                                                                    <th style={{ width: '100px' }}>Tür</th>
+                                                                    <th>İlgili Kişi</th>
+                                                                    <th>Ödeme Yöntemi</th>
                                                                     <th>Açıklama</th>
-                                                                    <th style={{ width: '15%', textAlign: 'right' }}>Tutar</th>
+                                                                    <th style={{ textAlign: 'right' }}>Tutar</th>
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
                                                                 {p.items.map((item, idx) => (
-                                                                    <tr key={idx} style={{ borderBottom: '1px solid #f5f5f5' }}>
-                                                                        <td>
-                                                                            <span className={`badge ${item.type === 'Tahsilat' ? 'badge-success' :
-                                                                                    item.type === 'Merkez' ? 'badge-danger' :
-                                                                                        item.type === 'Masraf' ? 'badge-warning' : 'badge-secondary'
+                                                                    <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
+                                                                        <td style={{ padding: '10px' }}>
+                                                                            <span className={`status-badge ${item.type === 'Tahsilat' ? 'success' :
+                                                                                    item.type === 'Merkez' ? 'danger' :
+                                                                                        item.type === 'Masraf' ? 'warning' : 'neutral'
                                                                                 }`}>
                                                                                 {item.type}
                                                                             </span>
                                                                         </td>
-                                                                        <td>
+                                                                        <td style={{ padding: '10px' }}>
                                                                             {item.customerName ? (
                                                                                 <div>
                                                                                     <strong>{item.customerName}</strong>
-                                                                                    <div style={{ fontSize: '11px', color: '#777' }}>Fiş: {item.saleReceiptNo}</div>
+                                                                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Fiş: {item.saleReceiptNo}</div>
                                                                                 </div>
                                                                             ) : "-"}
                                                                         </td>
-                                                                        <td>{item.paymentMethodId}</td>
-                                                                        <td>{item.description}</td>
-                                                                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: item.type === 'Tahsilat' ? '#27ae60' : '#c0392b' }}>
+                                                                        <td style={{ padding: '10px', color: '#475569' }}>{item.paymentMethodId}</td>
+                                                                        <td style={{ padding: '10px', color: '#475569' }}>{item.description}</td>
+                                                                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: item.type === 'Tahsilat' ? '#16a34a' : '#dc2626', padding: '10px' }}>
                                                                             {item.type === 'Tahsilat' ? '+' : '-'}{Number(item.amount).toFixed(2)} ₺
                                                                         </td>
                                                                     </tr>
                                                                 ))}
                                                             </tbody>
                                                         </table>
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </>
-                                    ))
-                                ) : (
-                                    <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>Bu kriterlere uygun kayıt bulunamadı.</td></tr>
-                                )}
-                            </tbody>
-                        </table>
-                    ) : (
-                        <div style={{ textAlign: 'center', padding: '50px', color: '#95a5a6' }}><div style={{ fontSize: '40px', marginBottom: '10px' }}>🏬</div><p>Lütfen mağaza seçiniz.</p></div>
-                    )}
-                </div>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        )}
+                                    </>
+                                ))
+                            ) : (
+                                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Seçilen tarihte kayıt bulunamadı.</td></tr>
+                            )}
+                        </tbody>
+                    </table>
+                ) : (
+                    <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }}>🏬</div>
+                        <p>İşlem yapmak için lütfen yukarıdan bir mağaza seçiniz.</p>
+                    </div>
+                )}
             </div>
         </div>
     );

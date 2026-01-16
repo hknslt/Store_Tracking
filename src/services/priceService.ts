@@ -21,7 +21,6 @@ export const getAllPrices = async (): Promise<Price[]> => {
 // Fiyat Kaydet (Tekil veya Ebatlı)
 export const saveProductPrice = async (productId: string, dimensionId: string | null, amount: number) => {
     try {
-        // ID Formatı: "URUNID_EBATID" veya "URUNID_std"
         const docId = dimensionId ? `${productId}_${dimensionId}` : `${productId}_std`;
         const priceRef = doc(db, PRICE_COLLECTION, docId);
 

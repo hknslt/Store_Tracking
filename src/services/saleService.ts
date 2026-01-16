@@ -1,6 +1,6 @@
 // src/services/saleService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, runTransaction, collectionGroup } from "firebase/firestore";
 import type { Sale, DeliveryStatus, PendingRequest, Debt } from "../types";
 
 export const addSale = async (sale: Sale) => {
@@ -320,5 +320,30 @@ export const deleteSaleComplete = async (storeId: string, saleId: string) => {
     } catch (error) {
         console.error("Silme hatası:", error);
         throw error;
+    }
+};
+
+export const getSales = async (): Promise<Sale[]> => {
+    try {
+        // "receipts" ismindeki tüm alt koleksiyonları bulup tarihe göre sıralar
+        const q = query(
+            collectionGroup(db, "receipts"),
+            orderBy("createdAt", "desc")
+        );
+
+        const snapshot = await getDocs(q);
+
+        return snapshot.docs.map(doc => {
+            const data = doc.data();
+            return {
+                id: doc.id,
+                ...data,
+                // Tarih verisi Timestamp ise Date/String formatına çeviriyoruz ki patlamasın
+                createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+            } as Sale;
+        });
+    } catch (error) {
+        console.error("Tüm satışlar çekilirken hata:", error);
+        return [];
     }
 };
