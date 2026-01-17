@@ -31,8 +31,6 @@ export const addSale = async (sale: Sale) => {
             // Satış ID'sini şimdiden belirliyoruz
             const saleRef = doc(collection(db, "sales", sale.storeId, "receipts"));
 
-            const debtRef = doc(collection(db, "stores", sale.storeId, "debts")); // ID otomatik olsun veya saleRef.id kullanabiliriz
-
             const newDebt: Debt = {
                 storeId: sale.storeId,
                 saleId: saleRef.id,
@@ -204,7 +202,7 @@ export const updateShippingCost = async (storeId: string, saleId: string, newCos
 
             // Yeni Grand Total Hesapla
             const itemsTotal = sale.items.reduce((acc, item) => acc + item.total, 0);
-            const newGrandTotal = itemsTotal + newCost;
+            const newGrandTotal = itemsTotal;
 
             transaction.update(saleRef, {
                 shippingCost: newCost,

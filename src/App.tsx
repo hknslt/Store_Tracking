@@ -40,6 +40,8 @@ import DebtList from "./pages/debts/DebtList";
 import PurchaseDetail from "./pages/purchases/PurchaseDetail";
 import PersonnelDetail from "./pages/personnel/PersonnelDetail";
 import StoreCashRegisters from "./pages/finance/StoreCashRegisters";
+import ReportsDashboard from "./pages/reports/ReportsDashboard";
+import StoreSalesReport from "./pages/reports/StoreSalesReport";
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
 const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
@@ -274,6 +276,10 @@ function App() {
 
             {/* Borç / Cari Takip */}
             <Route path="/debts" element={<DebtList />} />
+
+            {/* RAPORLAR */}
+            <Route path="/reports" element={<ReportsDashboard />} />
+            <Route path="/reports/sales" element={<StoreSalesReport />} />
           </Route>
 
           {/* Fallback Route */}

@@ -2,15 +2,12 @@ import { useState, useEffect } from "react";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth, db } from "../../firebase";
 import { doc, setDoc } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
 import { getStores } from "../../services/storeService";
 import type { Store } from "../../types";
 import "./Auth.css"; // CSS dosyasını import et
 
 const Register = () => {
-    const navigate = useNavigate();
     const [stores, setStores] = useState<Store[]>([]);
-
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
     const [fullName, setFullName] = useState("");

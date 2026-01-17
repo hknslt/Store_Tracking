@@ -1,6 +1,6 @@
 // src/services/debtService.ts
 import { db } from "../firebase";
-import { collection, getDocs, doc, getDoc, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, doc, getDoc } from "firebase/firestore";
 import type { Debt } from "../types";
 
 // Mağazaya göre borçları getir

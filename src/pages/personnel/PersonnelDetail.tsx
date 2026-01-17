@@ -4,7 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
-import type { Personnel, Store, SystemUser } from "../../types";
+import type { Personnel, SystemUser } from "../../types";
 import "../../App.css";
 
 const PersonnelDetail = () => {

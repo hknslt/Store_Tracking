@@ -29,7 +29,6 @@ const AttendanceManager = () => {
     const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
 
     const [isAdmin, setIsAdmin] = useState(false);
-    const [loading, setLoading] = useState(true);
     const [hasChanges, setHasChanges] = useState(false);
 
     // Ayın günleri
@@ -53,7 +52,6 @@ const AttendanceManager = () => {
                     if (u.storeId) setSelectedStoreId(u.storeId);
                 }
             }
-            setLoading(false)
         };
         init();
     }, [currentUser]);
@@ -67,7 +65,6 @@ const AttendanceManager = () => {
             return;
         }
 
-        setLoading(true);
         try {
             const pQuery = query(collection(db, "personnel"), where("storeId", "==", selectedStoreId), where("isActive", "==", true));
             const pSnap = await getDocs(pQuery);
@@ -87,8 +84,6 @@ const AttendanceManager = () => {
 
         } catch (error) {
             console.error(error);
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -128,7 +123,6 @@ const AttendanceManager = () => {
     // --- KAYDETME ---
     const handleSave = async () => {
         if (!hasChanges) return;
-        setLoading(true);
         try {
             await saveBulkAttendance(selectedStoreId, selectedYear, selectedMonth, localMap);
             setOriginalMap(localMap); // Başarılı kayıttan sonra local veriyi original yap (artık kilitli olur)
@@ -136,8 +130,6 @@ const AttendanceManager = () => {
             alert("✅ Kayıt Başarılı!");
         } catch (error) {
             alert("Kayıt sırasında hata oluştu!");
-        } finally {
-            setLoading(false);
         }
     };
 
@@ -178,7 +170,7 @@ const AttendanceManager = () => {
                 </div>
                 {hasChanges && (
                     <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 25px', fontSize: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                    DEĞİŞİKLİKLERİ KAYDET
+                        DEĞİŞİKLİKLERİ KAYDET
                     </button>
                 )}
             </div>

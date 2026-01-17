@@ -27,6 +27,8 @@ import sofaIcon from "../assets/icons/sofa.svg";       // Minder
 import cardIcon from "../assets/icons/credit-card.svg";// Ödeme Yöntemi
 import addIcon from "../assets/icons/user-add.svg";        // Ekle
 import logoutIcon from "../assets/icons/logout.svg";   // Çıkış
+import reportsIcon from "../assets/icons/data-report.svg";   // Çıkış
+
 
 const Sidebar = () => {
   const { currentUser, userRole } = useAuth();
@@ -120,6 +122,13 @@ const Sidebar = () => {
           <span className="nav-icon"><img src={walletIcon} alt="" /></span>
           <span className="nav-text">Kasa & Finans</span>
         </NavLink>
+
+        <NavLink to="/reports" className="nav-item">
+          <span className="nav-icon"><img src={reportsIcon} alt="" /></span>
+          <span className="nav-text">Raporlar</span>
+        </NavLink>
+
+
 
         <NavLink to="/ssh/list" className="nav-item">
           <span className="nav-icon"><img src={toolsIcon} alt="" /></span>

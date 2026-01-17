@@ -3,10 +3,10 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { getCategories, getColors, getDimensions, getCushions, getGroups } from "../../services/definitionService";
+import { getCategories, getColors, getDimensions, getCushions } from "../../services/definitionService";
 import { cancelSaleComplete, deleteSaleComplete } from "../../services/saleService";
 import { useAuth } from "../../context/AuthContext"; // userRole için
-import type { Sale, Category, Color, Dimension, Cushion, Group } from "../../types";
+import type { Sale, Category, Color, Dimension, Cushion} from "../../types";
 import "../../App.css";
 
 // LOGO
