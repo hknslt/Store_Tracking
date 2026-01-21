@@ -44,6 +44,10 @@ const Home = () => {
       }
       return;
     }
+    if (userRole === 'report') {
+       navigate('/reports', { replace: true });
+       return;
+    }
 
     if (userRole === 'admin' || userRole === 'control') {
       getDashboardData()

@@ -1,9 +1,31 @@
 {
   "name": "flexy-magaza-desktop",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "main": "main.cjs",
+  "description": "Bahçemo Mağaza Yönetim Paneli",
+  "author": "Flexy Magaza",
+  "build": {
+    "appId": "com.flexymagaza.app",
+    "productName": "Bahçemo Magaza",
+    "icon": "build/icon.ico",
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "build/icon.ico",
+      "artifactName": "${productName} Setup ${version}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Bahçemo Magaza"
+    }
+  },
   "scripts": {
     "dev": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build": "tsc -b && vite build && electron-builder",

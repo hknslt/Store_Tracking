@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink, useNavigate, useLocation } from "react-router-dom"; // useLocation eklendi
 import { useAuth } from "../context/AuthContext";
 import { signOut } from "firebase/auth";
 import { auth } from "../firebase";
@@ -8,32 +8,42 @@ import "./styles/Sidebar.css";
 // LOGO
 import logo from "../assets/logo/Bahçemo_white.png";
 
-// 👇 1. İKONLARI BURAYA IMPORT ET (Dosya isimlerini kendine göre düzenle)
-import homeIcon from "../assets/icons/home.svg";       // Ana Sayfa
-import storeIcon from "../assets/icons/store.svg";     // Mağazalar
-import userIcon from "../assets/icons/users.svg";      // Personel
-import stockIcon from "../assets/icons/boxes.svg";       // Stok
-import productIcon from "../assets/icons/product.svg"; // Ürün
-import priceIcon from "../assets/icons/tags.svg";       // Fiyat
-import salesIcon from "../assets/icons/receipt.svg";   // Satış
-import cartIcon from "../assets/icons/inbox-in.svg";       // Alış
-import walletIcon from "../assets/icons/wallet.svg";   // Ödeme
-import toolsIcon from "../assets/icons/customer-service.svg";  // Servis
-import timeIcon from "../assets/icons/calendar-clock.svg";      // Puantaj
-import folderIcon from "../assets/icons/folder.svg";   // Gruplar
-import paletteIcon from "../assets/icons/palette.svg"; // Renkler
-import rulerIcon from "../assets/icons/ruler.svg";     // Ebatlar
-import sofaIcon from "../assets/icons/sofa.svg";       // Minder
-import cardIcon from "../assets/icons/credit-card.svg";// Ödeme Yöntemi
-import addIcon from "../assets/icons/user-add.svg";        // Ekle
-import logoutIcon from "../assets/icons/logout.svg";   // Çıkış
-import reportsIcon from "../assets/icons/data-report.svg";   // Çıkış
-
+// İKONLAR
+import homeIcon from "../assets/icons/home.svg";
+import storeIcon from "../assets/icons/store.svg";
+import userIcon from "../assets/icons/users.svg";
+import stockIcon from "../assets/icons/boxes.svg";
+import productIcon from "../assets/icons/product.svg";
+import priceIcon from "../assets/icons/tags.svg";
+import salesIcon from "../assets/icons/receipt.svg";
+import cartIcon from "../assets/icons/inbox-in.svg";
+import walletIcon from "../assets/icons/wallet.svg";
+import toolsIcon from "../assets/icons/customer-service.svg";
+import timeIcon from "../assets/icons/calendar-clock.svg";
+import folderIcon from "../assets/icons/folder.svg";
+import paletteIcon from "../assets/icons/palette.svg";
+import rulerIcon from "../assets/icons/ruler.svg";
+import sofaIcon from "../assets/icons/sofa.svg";
+import cardIcon from "../assets/icons/credit-card.svg";
+import addIcon from "../assets/icons/user-add.svg";
+import logoutIcon from "../assets/icons/logout.svg";
+import reportsIcon from "../assets/icons/data-report.svg";
+// 👇 Yeni Ayarlar İkonu (Eğer yoksa mevcut bir ikonu geçici kullan)
+import settingsIcon from "../assets/icons/settings.svg"; // Dosya adını kontrol et
+import listIcon from "../assets/icons/square.svg"; // Tanımlamalar ana ikon
 
 const Sidebar = () => {
   const { currentUser, userRole } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation(); // Mevcut URL'i kontrol etmek için
+
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  // 👇 Tanımlamalar menüsü açık mı kapalı mı?
+  // Eğer şu anki sayfa definitions altındaysa otomatik açık kalsın
+  const [isDefinitionsOpen, setIsDefinitionsOpen] = useState(
+    location.pathname.includes('/definitions')
+  );
 
   const handleLogout = async () => {
     try {
@@ -55,7 +65,6 @@ const Sidebar = () => {
         className="sidebar-toggle-btn"
         onClick={() => setIsCollapsed(!isCollapsed)}
       >
-        {/* Açıkken < (Kapat), Kapalıyken > (Aç) */}
         {isCollapsed ? "❯" : "❮"}
       </button>
 
@@ -67,7 +76,6 @@ const Sidebar = () => {
       <nav className="sidebar-nav">
 
         <NavLink to="/" className="nav-item" end>
-          {/* 👇 2. EMOJİ YERİNE IMG KULLAN */}
           <span className="nav-icon"><img src={homeIcon} alt="" /></span>
           <span className="nav-text">Ana Sayfa</span>
         </NavLink>
@@ -128,8 +136,6 @@ const Sidebar = () => {
           <span className="nav-text">Raporlar</span>
         </NavLink>
 
-
-
         <NavLink to="/ssh/list" className="nav-item">
           <span className="nav-icon"><img src={toolsIcon} alt="" /></span>
           <span className="nav-text">SSH / Servis</span>
@@ -140,32 +146,60 @@ const Sidebar = () => {
           <span className="nav-text">Puantaj</span>
         </NavLink>
 
-        <div className="nav-section"><span>TANIMLAMALAR</span></div>
+        {/* 👇 GÜNCELLENEN TANIMLAMALAR BÖLÜMÜ (ACCORDION) */}
+        <div className="nav-section"><span>SİSTEM</span></div>
 
-        <NavLink to="/definitions/general" className="nav-item">
-          <span className="nav-icon"><img src={folderIcon} alt="" /></span>
-          <span className="nav-text">Gruplar</span>
+        {/* Ana Tanımlamalar Butonu */}
+        <div
+          className={`nav-item ${isDefinitionsOpen ? 'active-parent' : ''}`}
+          onClick={() => setIsDefinitionsOpen(!isDefinitionsOpen)}
+          style={{ cursor: 'pointer', justifyContent: 'space-between' }}
+        >
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <span className="nav-icon"><img src={listIcon} alt="" /></span>
+            <span className="nav-text">Tanımlamalar</span>
+          </div>
+          {/* Ok İşareti */}
+          <span className="nav-text" style={{ fontSize: '10px', transform: isDefinitionsOpen ? 'rotate(90deg)' : 'rotate(0deg)', transition: '0.3s' }}>▶</span>
+        </div>
+
+        {/* Alt Menüler (Sadece isDefinitionsOpen true ise görünür) */}
+        {isDefinitionsOpen && (
+          <div className="submenu" style={{ paddingLeft: isCollapsed ? '0' : '20px', background: 'rgba(0,0,0,0.05)' }}>
+            <NavLink to="/definitions/general" className="nav-item small-item">
+              <span className="nav-icon"><img src={folderIcon} alt="" style={{ width: '18px' }} /></span>
+              <span className="nav-text">Gruplar</span>
+            </NavLink>
+
+            <NavLink to="/definitions/colors" className="nav-item small-item">
+              <span className="nav-icon"><img src={paletteIcon} alt="" style={{ width: '18px' }} /></span>
+              <span className="nav-text">Renkler</span>
+            </NavLink>
+
+            <NavLink to="/definitions/dimensions" className="nav-item small-item">
+              <span className="nav-icon"><img src={rulerIcon} alt="" style={{ width: '18px' }} /></span>
+              <span className="nav-text">Ebatlar</span>
+            </NavLink>
+
+            <NavLink to="/definitions/cushions" className="nav-item small-item">
+              <span className="nav-icon"><img src={sofaIcon} alt="" style={{ width: '18px' }} /></span>
+              <span className="nav-text">Minderler</span>
+            </NavLink>
+
+            <NavLink to="/definitions/payment-methods" className="nav-item small-item">
+              <span className="nav-icon"><img src={cardIcon} alt="" style={{ width: '18px' }} /></span>
+              <span className="nav-text">Ödeme Yönt.</span>
+            </NavLink>
+          </div>
+        )}
+
+        {/* 👇 YENİ AYARLAR SAYFASI */}
+        <NavLink to="/settings" className="nav-item">
+          <span className="nav-icon"><img src={settingsIcon} alt="" /></span>
+          <span className="nav-text">Ayarlar</span>
         </NavLink>
 
-        <NavLink to="/definitions/colors" className="nav-item">
-          <span className="nav-icon"><img src={paletteIcon} alt="" /></span>
-          <span className="nav-text">Renkler</span>
-        </NavLink>
-
-        <NavLink to="/definitions/dimensions" className="nav-item">
-          <span className="nav-icon"><img src={rulerIcon} alt="" /></span>
-          <span className="nav-text">Ebatlar</span>
-        </NavLink>
-
-        <NavLink to="/definitions/cushions" className="nav-item">
-          <span className="nav-icon"><img src={sofaIcon} alt="" /></span>
-          <span className="nav-text">Minderler</span>
-        </NavLink>
-
-        <NavLink to="/definitions/payment-methods" className="nav-item">
-          <span className="nav-icon"><img src={cardIcon} alt="" /></span>
-          <span className="nav-text">Ödeme Yöntemleri</span>
-        </NavLink>
+        <div style={{ marginTop: '20px' }}></div>
 
         <NavLink to="/register" className="nav-item highlight-item">
           <span className="nav-icon"><img src={addIcon} alt="" /></span>

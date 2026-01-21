@@ -118,7 +118,7 @@ const Register = () => {
                             </div>
                             <div className="form-group">
                                 <label className="form-label">Adres (Kısa)</label>
-                                <input type="text" value={address} onChange={e => setAddress(e.target.value)} className="form-input" placeholder="İlçe/İl" />
+                                <input type="text" value={address} onChange={e => setAddress(e.target.value)} className="form-input" placeholder="İl/İlçe" />
                             </div>
                         </div>
                     </div>

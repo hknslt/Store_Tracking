@@ -35,13 +35,17 @@ import SaleDetail from "./pages/sales/SaleDetail";
 import PaymentMethods from "./pages/definitions/Payment/PaymentMethods";
 import PaymentAdd from "./pages/payments/PaymentAdd";
 import PaymentList from "./pages/payments/PaymentList";
-import StoreDashboard from "./pages/stores/StoreDashboard";
+import StoreDashboard from "./pages/Dashboard/StoreDashboard";
 import DebtList from "./pages/debts/DebtList";
 import PurchaseDetail from "./pages/purchases/PurchaseDetail";
 import PersonnelDetail from "./pages/personnel/PersonnelDetail";
 import StoreCashRegisters from "./pages/finance/StoreCashRegisters";
 import ReportsDashboard from "./pages/reports/ReportsDashboard";
 import StoreSalesReport from "./pages/reports/StoreSalesReport";
+import Settings from "./pages/settings/Settings";
+import FinanceReport from "./pages/reports/FinanceReport";
+import StockReport from "./pages/reports/StockReport";
+import PersonnelReport from "./pages/reports/PersonnelReport";
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
 const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
@@ -251,7 +255,6 @@ function App() {
             {/* Management */}
             <Route path="/stores" element={<StoreList />} />
             <Route path="/stores/add" element={<StoreAdd />} />
-            <Route path="/stores/:id" element={<StoreDashboard />} />
             <Route path="/finance/cash-registers" element={<StoreCashRegisters />} />
 
             <Route path="/personnel" element={<PersonnelList />} />
@@ -280,6 +283,16 @@ function App() {
             {/* RAPORLAR */}
             <Route path="/reports" element={<ReportsDashboard />} />
             <Route path="/reports/sales" element={<StoreSalesReport />} />
+            <Route path="/reports/finance" element={<FinanceReport />} />
+            <Route path="/reports/stocks" element={<StockReport />} />
+            <Route path="/reports/personnel" element={<PersonnelReport />} />
+
+            {/* Ayarlar */}
+            <Route path="/settings" element={<Settings />} />
+
+            {/* Dashboard Routes */}
+            <Route path="/reports" element={<ReportsDashboard />} />
+            <Route path="/stores/:id" element={<StoreDashboard />} />
           </Route>
 
           {/* Fallback Route */}

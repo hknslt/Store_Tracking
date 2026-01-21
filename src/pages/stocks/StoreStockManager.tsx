@@ -13,6 +13,8 @@ import { getCategories, getColors, getDimensions } from "../../services/definiti
 import type { Store, Product, Category, Color, Dimension, StoreStock, SystemUser } from "../../types";
 import "../../App.css";
 
+import StoreIcon from "../../assets/icons/store.svg";
+
 const StoreStockManager = () => {
     const { currentUser } = useAuth();
 
@@ -174,7 +176,7 @@ const StoreStockManager = () => {
                         </table>
                     ) : (
                         <div style={{ padding: '40px', textAlign: 'center', color: '#999' }}>
-                            <div style={{ fontSize: '40px', marginBottom: '10px' }}>🏬</div>
+                            <div style={{ fontSize: '40px', marginBottom: '10px' }}><img src={StoreIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div>
                             Lütfen mağaza seçiniz.
                         </div>
                     )}

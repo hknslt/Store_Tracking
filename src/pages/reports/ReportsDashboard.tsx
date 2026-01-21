@@ -8,7 +8,6 @@ import chartIcon from "../../assets/icons/trend-up.svg";
 import walletIcon from "../../assets/icons/wallet.svg";
 import boxIcon from "../../assets/icons/boxes.svg";
 import userIcon from "../../assets/icons/users.svg";
-import mapIcon from "../../assets/icons/store.svg";
 
 const ReportsDashboard = () => {
   const navigate = useNavigate();
@@ -37,24 +36,16 @@ const ReportsDashboard = () => {
       desc: 'Kritik stoklar, stok devir hızı ve depo transferleri.',
       icon: boxIcon,
       path: '/reports/stocks',
-      color: '#f59e0b' // Turuncu
+      color: '#8b5cf6' // Mor
     },
     {
       id: 'personnel',
       title: 'Personel Performans',
-      desc: 'Satış personeli performansı, prim hak edişleri ve puantaj.',
+      desc: 'Satış personeli performansı, prim hak edişleri.',
       icon: userIcon,
       path: '/reports/personnel',
-      color: '#8b5cf6' // Mor
+      color: '#f59e0b' // Turuncu
     },
-    {
-      id: 'stores',
-      title: 'Mağaza Karşılaştırma',
-      desc: 'Şubelerin ciro ve karlılık karşılaştırmaları.',
-      icon: mapIcon,
-      path: '/reports/stores',
-      color: '#ec4899' // Pembe
-    }
   ];
 
   return (

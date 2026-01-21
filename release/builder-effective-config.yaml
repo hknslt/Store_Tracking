@@ -1,0 +1,18 @@
+directories:
+  output: release
+  buildResources: build
+appId: com.flexymagaza.app
+productName: Bahçemo Magaza
+icon: build/icon.ico
+win:
+  target: nsis
+  icon: build/icon.ico
+  artifactName: ${productName} Setup ${version}.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Bahçemo Magaza
+files: []
+electronVersion: 39.2.7

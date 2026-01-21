@@ -17,6 +17,8 @@ import {
 import type { Sale, Store, SystemUser, Category, Cushion, Color, Dimension, DeliveryStatus } from "../../types";
 import "../../App.css";
 
+import StoreIcon from "../../assets/icons/store.svg";
+
 const SaleList = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
@@ -333,7 +335,7 @@ const SaleList = () => {
                             </tbody>
                         </table>
                     ) : (
-                        <div style={{ textAlign: 'center', padding: '50px', color: '#95a5a6' }}><div style={{ fontSize: '40px', marginBottom: '10px' }}>🏬</div><p>Lütfen mağaza seçiniz.</p></div>
+                        <div style={{ textAlign: 'center', padding: '50px', color: '#95a5a6' }}><div style={{ fontSize: '40px', marginBottom: '10px' }}><img src={StoreIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div><p>Lütfen mağaza seçiniz.</p></div>
                     )}
                 </div>
             </div>

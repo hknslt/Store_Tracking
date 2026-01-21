@@ -1,6 +1,5 @@
 // src/pages/reports/StoreSalesReport.tsx
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { collectionGroup, getDocs, query, where } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getStores } from "../../services/storeService";
@@ -19,7 +18,6 @@ interface ReportData {
 const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#6366f1', '#14b8a6', '#f43f5e'];
 
 const StoreSalesReport = () => {
-    const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
 
     const [dateFilter, setDateFilter] = useState('month');
@@ -166,9 +164,6 @@ const StoreSalesReport = () => {
                     ))}
                 </div>
 
-                <button onClick={() => navigate('/reports')} style={{ background: 'white', border: '1px solid #cbd5e1', padding: '8px 15px', borderRadius: '8px', color: '#64748b', fontWeight: '600', cursor: 'pointer' }}>
-                    Geri Dön
-                </button>
             </div>
 
             {/* KPI ÖZET */}
@@ -235,7 +230,7 @@ const StoreSalesReport = () => {
 
                 {/* 2. PASTA GRAFİK (Özet Veri) */}
                 <div className="card" style={{ padding: '20px', height: '450px' }}>
-                    <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#334155', marginBottom: '20px' }}>🍰 Ciro Payı (İlk 5)</h3>
+                    <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#334155', marginBottom: '20px' }}>Ciro Payı (İlk 5)</h3>
                     <div style={{ width: '100%', height: '100%' }}>
                         <ResponsiveContainer>
                             <PieChart>

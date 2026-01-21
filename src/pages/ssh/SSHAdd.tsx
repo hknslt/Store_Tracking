@@ -283,7 +283,7 @@ const SSHAdd = () => {
                         <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr auto', gap: '10px', marginBottom: '15px' }}>
                             <input
                                 type="text" className="form-input"
-                                placeholder="İşlem Açıklaması (Örn: Kumaş değişimi)"
+                                placeholder="İşlem Açıklaması   "
                                 value={currentItem.description}
                                 onChange={e => setCurrentItem({ ...currentItem, description: e.target.value })}
                             />

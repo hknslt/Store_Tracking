@@ -10,6 +10,9 @@ import { getPaymentsByStore } from "../../services/paymentService";
 import type { PaymentDocument, Store, SystemUser } from "../../types";
 import "../../App.css";
 
+
+import StoreIcon from "../../assets/icons/store.svg";
+
 const PaymentList = () => {
     const { currentUser } = useAuth();
 
@@ -287,7 +290,7 @@ const PaymentList = () => {
                     </table>
                 ) : (
                     <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-                        <div style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }}>🏬</div>
+                        <div style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }}><img src={StoreIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div>
                         <p>İşlem yapmak için lütfen yukarıdan bir mağaza seçiniz.</p>
                     </div>
                 )}

@@ -867,3 +867,26 @@ body {
     /* Mobilde alt alta */
   }
 }
+
+.sneat-card {
+  background: white;
+  border-radius: 10px;
+  /* Biraz daha oval */
+  padding: 24px;
+  box-shadow: 0 4px 12px 0 rgba(67, 89, 113, 0.08);
+  /* Sneat'in imza gölgesi */
+  border: none;
+  transition: all 0.3s ease-in-out;
+  position: relative;
+}
+
+.sneat-card:hover {
+  box-shadow: 0 6px 15px 0 rgba(67, 89, 113, 0.15);
+  transform: translateY(-2px);
+}
+
+.sneat-card-hover:hover {
+  border-color: #696cff !important;
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px 0 rgba(105, 108, 255, 0.15) !important;
+}
