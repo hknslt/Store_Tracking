@@ -40,12 +40,14 @@ import DebtList from "./pages/debts/DebtList";
 import PurchaseDetail from "./pages/purchases/PurchaseDetail";
 import PersonnelDetail from "./pages/personnel/PersonnelDetail";
 import StoreCashRegisters from "./pages/finance/StoreCashRegisters";
-import ReportsDashboard from "./pages/reports/ReportsDashboard";
+import ReportsMain from "./pages/reports/ReportsMain";
 import StoreSalesReport from "./pages/reports/StoreSalesReport";
 import Settings from "./pages/settings/Settings";
 import FinanceReport from "./pages/reports/FinanceReport";
 import StockReport from "./pages/reports/StockReport";
 import PersonnelReport from "./pages/reports/PersonnelReport";
+import ReportsDashboard from "./pages/Dashboard/ReportsDashboard";
+
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
 const StoreBackButton = ({ onClick }: { onClick: () => void }) => {
@@ -281,7 +283,7 @@ function App() {
             <Route path="/debts" element={<DebtList />} />
 
             {/* RAPORLAR */}
-            <Route path="/reports" element={<ReportsDashboard />} />
+            <Route path="/reports" element={<ReportsMain />} />
             <Route path="/reports/sales" element={<StoreSalesReport />} />
             <Route path="/reports/finance" element={<FinanceReport />} />
             <Route path="/reports/stocks" element={<StockReport />} />
@@ -291,7 +293,7 @@ function App() {
             <Route path="/settings" element={<Settings />} />
 
             {/* Dashboard Routes */}
-            <Route path="/reports" element={<ReportsDashboard />} />
+            <Route path="/reports/dashboard" element={<ReportsDashboard/>} />
             <Route path="/stores/:id" element={<StoreDashboard />} />
           </Route>
 

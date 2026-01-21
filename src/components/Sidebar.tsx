@@ -56,7 +56,7 @@ const Sidebar = () => {
 
   const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
 
-  if (userRole === 'store_admin' || userRole === 'staff') return null;
+  if (userRole === 'store_admin' || userRole === 'staff' || userRole === 'report') return null;
 
   return (
     <div className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>
@@ -214,7 +214,6 @@ const Sidebar = () => {
             <div className="user-avatar">{userInitial}</div>
             <div className="user-details">
               <span className="user-email">{currentUser?.email}</span>
-              <span className="user-role">Süper Admin</span>
             </div>
           </div>
           <button onClick={handleLogout} className="logout-btn" title="Çıkış">
