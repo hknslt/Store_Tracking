@@ -28,9 +28,10 @@ import cardIcon from "../assets/icons/credit-card.svg";
 import addIcon from "../assets/icons/user-add.svg";
 import logoutIcon from "../assets/icons/logout.svg";
 import reportsIcon from "../assets/icons/data-report.svg";
-// 👇 Yeni Ayarlar İkonu (Eğer yoksa mevcut bir ikonu geçici kullan)
-import settingsIcon from "../assets/icons/settings.svg"; // Dosya adını kontrol et
-import listIcon from "../assets/icons/square.svg"; // Tanımlamalar ana ikon
+import settingsIcon from "../assets/icons/settings.svg"; 
+import listIcon from "../assets/icons/square.svg";
+import targetIcon from "../assets/icons/target.svg";
+import commissionIcon from "../assets/icons/commission.svg";
 
 const Sidebar = () => {
   const { currentUser, userRole } = useAuth();
@@ -100,6 +101,16 @@ const Sidebar = () => {
         <NavLink to="/finance/cash-registers" className="nav-item">
           <span className="nav-icon"><img src={walletIcon} alt="" /></span>
           <span className="nav-text">Mağaza Kasaları</span>
+        </NavLink>
+
+        <NavLink to="/targets" className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}>
+          <span className="nav-icon"><img src={targetIcon} alt="" /></span>
+          <span className="nav-text">Mağaza Hedefleri</span>
+        </NavLink>
+
+        <NavLink to="/commissions" className="nav-item">
+          <span className="nav-icon"><img src={commissionIcon} alt="" /></span>
+          <span className="nav-text">Personel Primleri</span>
         </NavLink>
 
         <div className="nav-section"><span>KATALOG & ÜRÜN</span></div>

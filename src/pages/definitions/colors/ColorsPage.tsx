@@ -1,14 +1,13 @@
-// src/pages/definitions/colors/ColorsPage.tsx
 import { useEffect, useState } from "react";
 import { getColors, addColor, updateColor, deleteColor } from "../../../services/definitionService";
 import type { Color } from "../../../types";
 import "../../../App.css";
-import "../Definitions.css"; // <-- Yeni CSS
+import "../Definitions.css";
+
+import EditIcon from "../../../assets/icons/edit.svg";
+import TrashIcon from "../../../assets/icons/trash.svg";
 
 const ColorsPage = () => {
-    // ... (State ve Fonksiyonlar aynı, sadece HTML değişecek)
-    // Kısaltmak için sadece return kısmını ve gerekli state'leri yazıyorum
-    // useAuth vb. yoksa direkt state'leri kopyala
     const [colors, setColors] = useState<Color[]>([]);
     const [loading, setLoading] = useState(true);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -16,18 +15,25 @@ const ColorsPage = () => {
     const [colorName, setColorName] = useState("");
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    const showToast = (type: 'success' | 'error', text: string) => {
-        setMessage({ type, text });
-        setTimeout(() => setMessage(null), 3000);
-    };
+    const [confirmModal, setConfirmModal] = useState<{ show: boolean, id: string | null }>({ show: false, id: null });
 
     useEffect(() => {
-        getColors().then(data => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
+
+    useEffect(() => { loadData(); }, []);
+
+    const loadData = async () => {
+        try {
+            const data = await getColors();
             data.sort((a, b) => a.colorName.localeCompare(b.colorName));
             setColors(data);
-            setLoading(false);
-        });
-    }, []);
+        } catch (err) { setMessage({ type: 'error', text: 'Veri yüklenemedi' }); }
+        finally { setLoading(false); }
+    };
 
     const handleSave = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -35,23 +41,26 @@ const ColorsPage = () => {
         try {
             if (editingColor && editingColor.id) {
                 await updateColor(editingColor.id, colorName);
-                showToast('success', "Güncellendi");
+                setMessage({ type: 'success', text: 'Renk güncellendi' });
             } else {
                 await addColor({ colorName });
-                showToast('success', "Eklendi");
+                setMessage({ type: 'success', text: 'Renk eklendi' });
             }
-            const data = await getColors();
-            setColors(data.sort((a, b) => a.colorName.localeCompare(b.colorName)));
+            await loadData();
             closeModal();
-        } catch { showToast('error', "Hata"); }
+        } catch { setMessage({ type: 'error', text: 'İşlem başarısız' }); }
     };
 
-    const handleDelete = async (id: string) => {
-        if (window.confirm("Silinsin mi?")) {
-            await deleteColor(id);
-            setColors(prev => prev.filter(c => c.id !== id));
-            showToast('success', "Silindi");
-        }
+    const requestDelete = (id: string) => { setConfirmModal({ show: true, id }); };
+
+    const confirmDelete = async () => {
+        if (!confirmModal.id) return;
+        try {
+            await deleteColor(confirmModal.id);
+            setColors(prev => prev.filter(c => c.id !== confirmModal.id));
+            setMessage({ type: 'success', text: 'Renk silindi' });
+        } catch { setMessage({ type: 'error', text: 'Silinemedi' }); }
+        finally { setConfirmModal({ show: false, id: null }); }
     };
 
     const openAdd = () => { setEditingColor(null); setColorName(""); setIsModalOpen(true); };
@@ -62,26 +71,43 @@ const ColorsPage = () => {
 
     return (
         <div className="page-container">
-            {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'} toast-container`}>{message.text}</div>}
+            {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
+
+            {confirmModal.show && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ width: '300px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 10px 0' }}>Emin misiniz?</h3>
+                        <p style={{ color: '#666', fontSize: '14px' }}>Kayıt silinecek.</p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px', marginTop: '20px' }}>
+                            <button onClick={() => setConfirmModal({ show: false, id: null })} className="btn btn-secondary">Vazgeç</button>
+                            <button onClick={confirmDelete} className="btn btn-danger">Evet, Sil</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="page-header">
                 <div className="page-title">
                     <h2>Renk Tanımları</h2>
-                    <p>Toplam {colors.length} renk</p>
+                    <p>Sistemdeki mevcut renk seçenekleri</p>
                 </div>
                 <button onClick={openAdd} className="btn btn-primary">+ Yeni Renk</button>
             </div>
 
             <div className="definitions-grid">
                 {colors.map(c => (
-                    <div key={c.id} className="definition-card">
+                    <div key={c.id} className="definition-card card-type-color">
                         <div className="card-content">
-                            <div className="card-icon" style={{ backgroundColor: '#ecf0f1' }}>🎨</div>
-                            <h4 className="card-title">{c.colorName}</h4>
+                            <span className="card-title">{c.colorName}</span>
                         </div>
                         <div className="card-actions">
-                            <button onClick={() => openEdit(c)} className="action-btn edit">Düzenle</button>
-                            <button onClick={() => c.id && handleDelete(c.id)} className="action-btn delete">Sil</button>
+                            <button onClick={() => openEdit(c)} className="action-btn" title="Düzenle">
+                                <img src={EditIcon} style={{ filter: 'invert(35%) sepia(93%) saturate(368%) hue-rotate(173deg)' }} />
+                            </button>
+                            <button onClick={() => c.id && requestDelete(c.id)} className="action-btn" title="Sil">
+                                <img src={TrashIcon} style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg)' }} />
+                            </button>
                         </div>
                     </div>
                 ))}
@@ -89,16 +115,19 @@ const ColorsPage = () => {
 
             {isModalOpen && (
                 <div className="modal-overlay">
-                    <div className="modal-content" style={{ width: '350px' }}>
-                        <h3>{editingColor ? "Düzenle" : "Yeni Ekle"}</h3>
+                    <div className="modal-content">
+                        <div className="modal-header">
+                            <h3>{editingColor ? "Rengi Düzenle" : "Yeni Renk Ekle"}</h3>
+                            <button onClick={closeModal} className="close-btn">×</button>
+                        </div>
                         <form onSubmit={handleSave}>
                             <div className="form-group">
-                                <label className="form-label">Renk Adı</label>
+                                <label>Renk Adı</label>
                                 <input type="text" className="form-input" value={colorName} onChange={e => setColorName(e.target.value)} autoFocus required />
                             </div>
                             <div className="modal-actions">
                                 <button type="button" onClick={closeModal} className="btn btn-secondary">İptal</button>
-                                <button type="submit" className="btn btn-success">Kaydet</button>
+                                <button type="submit" className="btn btn-primary">Kaydet</button>
                             </div>
                         </form>
                     </div>

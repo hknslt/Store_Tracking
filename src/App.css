@@ -890,3 +890,49 @@ body {
   transform: translateY(-3px);
   box-shadow: 0 8px 20px 0 rgba(105, 108, 255, 0.15) !important;
 }
+
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 15px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #eceef1;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #566a7f;
+  font-weight: 600;
+}
+
+/* Kapatma Butonu (X) */
+.close-btn {
+  background: transparent;
+  border: none;
+  font-size: 24px;
+  line-height: 1;
+  color: #a1acb8;
+  /* Pasif Gri */
+  cursor: pointer;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  /* Yuvarlak yapı */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease-in-out;
+}
+
+/* Mouse üzerine gelince */
+.close-btn:hover {
+  color: #ff3e1d;
+  /* Kırmızı */
+  background-color: #ffe0db;
+  /* Çok açık kırmızı zemin */
+  transform: rotate(90deg);
+  /* Hafif dönme efekti (opsiyonel, şık durur) */
+}

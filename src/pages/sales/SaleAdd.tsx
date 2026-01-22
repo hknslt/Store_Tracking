@@ -3,17 +3,17 @@ import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { addSale } from "../../services/saleService";
+import { addSale, getNextReceiptNo } from "../../services/saleService";
 import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getStoreStocks } from "../../services/storeStockService";
 import {
     getGroups,
-    getCategoriesByGroupId,
+    getCategories, // 🔥 DEĞİŞİKLİK: Tüm kategorileri çekiyoruz
     getCushions,
     getColors,
     getDimensions
 } from "../../services/definitionService";
-import { getProductsByCategoryId } from "../../services/productService";
+import { getProducts } from "../../services/productService"; // 🔥 DEĞİŞİKLİK: Tüm ürünleri çekiyoruz
 import { useNavigate } from "react-router-dom";
 
 // ŞEHİR VERİSİ
@@ -29,8 +29,15 @@ const SaleAdd = () => {
     // Listeler
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [productsInCat, setProductsInCat] = useState<Product[]>([]);
+
+    // 🔥 TÜM VERİLER (Filtreleme için hafızada tutuyoruz)
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
+    const [allProducts, setAllProducts] = useState<Product[]>([]);
+
+    // 🔥 GÖRÜNEN LİSTELER (Seçime göre değişen)
+    const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
+    const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
+
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
@@ -42,7 +49,7 @@ const SaleAdd = () => {
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Header
+    // Header State
     const [headerData, setHeaderData] = useState({
         date: new Date().toISOString().split('T')[0],
         receiptNo: "",
@@ -51,12 +58,15 @@ const SaleAdd = () => {
         personnelName: "",
         customerName: "",
         phone: "",
-        city: "",        // İl
-        district: "",    // İlçe
+        city: "",
+        district: "",
         address: "",
-        deadline: new Date().toISOString().split('T')[0], // Termin Tarihi
-        shippingCost: 0
+        deadline: new Date().toISOString().split('T')[0],
+        shippingCost: 0,
+        explanation: ""
     });
+
+    const [phoneCode, setPhoneCode] = useState("+90");
 
     const [selectedProductId, setSelectedProductId] = useState("");
     const [selectedColorId, setSelectedColorId] = useState("");
@@ -78,24 +88,9 @@ const SaleAdd = () => {
     // YARDIMCILAR
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
 
-    // FORMATLAYICILAR
-    const formatPhone = (value: string) => {
-        const input = value.replace(/\D/g, '');
-        const match = input.match(/^(\d{0,3})(\d{0,3})(\d{0,2})(\d{0,2})$/);
-        if (match) {
-            let formatted = '';
-            if (match[1]) formatted += `(${match[1]}`;
-            if (match[2]) formatted += `) ${match[2]}`;
-            if (match[3]) formatted += ` ${match[3]}`;
-            if (match[4]) formatted += ` ${match[4]}`;
-            return formatted;
-        }
-        return value;
-    };
+    const formatPhone = (value: string) => value.replace(/\D/g, '');
 
-    const capitalizeWords = (str: string) => {
-        return str.replace(/\b\w/g, char => char.toUpperCase());
-    };
+    const capitalizeWords = (str: string) => str.replace(/\b\w/g, char => char.toUpperCase());
 
     // Stok Kontrolü
     const getCurrentStockQuantity = () => {
@@ -114,13 +109,18 @@ const SaleAdd = () => {
         return '#f0fff4';
     };
 
-    // Veri Yükleme
+    // --- 1. VERİLERİ YÜKLE (Tüm Kategorileri ve Ürünleri de çekiyoruz) ---
     useEffect(() => {
         const initData = async () => {
-            const [g, c, col, dim] = await Promise.all([
-                getGroups(), getCushions(), getColors(), getDimensions()
+            const [g, c, col, dim, cats, prods] = await Promise.all([
+                getGroups(), getCushions(), getColors(), getDimensions(), getCategories(), getProducts()
             ]);
-            setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim);
+            setGroups(g);
+            setCushions(c);
+            setAllColors(col);
+            setAllDimensions(dim);
+            setAllCategories(cats); // Hepsini hafızaya al
+            setAllProducts(prods);  // Hepsini hafızaya al
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -141,6 +141,7 @@ const SaleAdd = () => {
         initData();
     }, [currentUser]);
 
+    // Mağaza Değişince Çalışanlar, Stoklar ve FİŞ NO Getir
     useEffect(() => {
         if (headerData.storeId) {
             getStoreStocks(headerData.storeId).then(setStoreStocks);
@@ -148,9 +149,15 @@ const SaleAdd = () => {
                 const sorted = data.sort((a, b) => a.fullName.localeCompare(b.fullName));
                 setStorePersonnel(sorted as (Personnel | SystemUser)[]);
             });
+
+            getNextReceiptNo(headerData.storeId).then(nextNo => {
+                setHeaderData(prev => ({ ...prev, receiptNo: nextNo }));
+            });
+
         } else {
             setStorePersonnel([]);
             setStoreStocks([]);
+            setHeaderData(prev => ({ ...prev, receiptNo: "" }));
         }
     }, [headerData.storeId]);
 
@@ -184,14 +191,53 @@ const SaleAdd = () => {
 
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    // Seçim Zinciri
-    const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
-    const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
-    const updateLineItem = (prodId: string, colId: string, dimId: string) => { const prod = productsInCat.find(p => p.id === prodId); if (prod) { let name = prod.productName; setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name })); } };
+    // --- SEÇİM ZİNCİRİ (CLIENT SIDE FILTERING) ---
+
+    // Grup Seçilince -> Kategorileri Filtrele
+    const handleGroupChange = (groupId: string) => {
+        setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
+        setSelectedProductId("");
+
+        if (groupId) {
+            const filtered = allCategories.filter(c => c.groupId === groupId);
+            setFilteredCategories(filtered);
+        } else {
+            setFilteredCategories([]);
+        }
+        setFilteredProducts([]); // Grup değişince ürünleri de sıfırla
+    };
+
+    // Kategori Seçilince -> Ürünleri Filtrele
+    const handleCategoryChange = (categoryId: string) => {
+        setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
+        setSelectedProductId("");
+
+        if (categoryId) {
+            const filtered = allProducts.filter(p => p.categoryId === categoryId);
+            setFilteredProducts(filtered);
+        } else {
+            setFilteredProducts([]);
+        }
+    };
+
+    const updateLineItem = (prodId: string, colId: string, dimId: string) => {
+        const prod = filteredProducts.find(p => p.id === prodId); // filteredProducts'dan bul
+        if (prod) {
+            let name = prod.productName;
+            setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name }));
+        }
+    };
+
     const handleProductChange = (val: string) => { setSelectedProductId(val); updateLineItem(val, selectedColorId, selectedDimensionId); };
     const handleColorChange = (val: string) => { setSelectedColorId(val); updateLineItem(selectedProductId, val, selectedDimensionId); };
     const handleDimensionChange = (val: string) => { setSelectedDimensionId(val); updateLineItem(selectedProductId, selectedColorId, val); };
-    useEffect(() => { if (selectedProductId && selectedColorId) { if (currentFreeStock <= 0) { setLineItem(prev => ({ ...prev, supplyMethod: 'Merkezden' })); } else { setLineItem(prev => ({ ...prev, supplyMethod: 'Stoktan' })); } } }, [selectedProductId, selectedColorId, selectedDimensionId, currentFreeStock]);
+
+    useEffect(() => {
+        if (selectedProductId && selectedColorId) {
+            if (currentFreeStock <= 0) { setLineItem(prev => ({ ...prev, supplyMethod: 'Merkezden' })); }
+            else { setLineItem(prev => ({ ...prev, supplyMethod: 'Stoktan' })); }
+        }
+    }, [selectedProductId, selectedColorId, selectedDimensionId, currentFreeStock]);
 
     const addLineItem = () => {
         if (!lineItem.productId || !selectedColorId || !lineItem.quantity || !lineItem.price) {
@@ -207,14 +253,14 @@ const SaleAdd = () => {
         if (!headerData.storeId || !headerData.customerName) { setMessage({ type: 'error', text: 'Mağaza ve Müşteri bilgileri zorunludur.' }); return; }
         if (!headerData.personnelId) { setMessage({ type: 'error', text: 'Lütfen Satış Personeli seçiniz.' }); return; }
         if (addedItems.length === 0) { setMessage({ type: 'error', text: 'Ürün ekleyiniz.' }); return; }
-        if (!headerData.receiptNo.trim()) {
-            setMessage({ type: 'error', text: 'Lütfen Fiş No giriniz.' });
-            return;
-        }
+        if (!headerData.receiptNo.trim()) { setMessage({ type: 'error', text: 'Lütfen Fiş No giriniz.' }); return; }
+
         const grandTotal = addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost);
+        const combinedPhone = `${phoneCode} ${headerData.phone}`;
 
         const saleData: Sale = {
             ...headerData,
+            phone: combinedPhone,
             shippingCost: Number(headerData.shippingCost),
             personnelId: headerData.personnelId,
             personnelName: headerData.personnelName,
@@ -254,15 +300,23 @@ const SaleAdd = () => {
                 </div>
             </div>
 
-            {/* --- SİPARİŞ BİLGİLERİ (ESKİ KART STİLİNE DÖNÜLDÜ) --- */}
+            {/* --- SİPARİŞ BİLGİLERİ --- */}
             <div className="card" style={{ marginBottom: '15px', padding: '20px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '15px' }}>
 
-                    {/* 1. Satır: Tarih, Mağaza, Fiş No, Personel */}
                     <div>
-                        <label className="form-label">Tarih</label>
-                        <input type="date" name="date" value={headerData.date} onChange={handleHeaderChange} className="form-input" />
+                        <label className="form-label">Tarih {isAdmin && <span style={{ fontSize: '10px', color: 'green' }}>(Admin)</span>}</label>
+                        <input
+                            type="date"
+                            name="date"
+                            value={headerData.date}
+                            onChange={handleHeaderChange}
+                            className="form-input"
+                            disabled={!isAdmin}
+                            style={{ backgroundColor: !isAdmin ? '#f1f5f9' : 'white' }}
+                        />
                     </div>
+
                     <div>
                         <label className="form-label">Mağaza</label>
                         {isAdmin ?
@@ -270,10 +324,12 @@ const SaleAdd = () => {
                             : <input disabled value={currentUserData?.storeId ? "Mağazam" : "..."} className="form-input" style={{ backgroundColor: '#f1f5f9' }} />
                         }
                     </div>
+
                     <div>
                         <label className="form-label">Fiş No <span style={{ color: 'red' }}>*</span></label>
-                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="Örn: 2024-001" />
+                        <input name="receiptNo" value={headerData.receiptNo} onChange={handleHeaderChange} className="form-input" placeholder="Otomatik..." />
                     </div>
+
                     <div>
                         <label className="form-label">Satış Personeli</label>
                         <select name="personnelId" value={headerData.personnelId} onChange={handleHeaderChange} className="form-input" disabled={!headerData.storeId}>
@@ -284,15 +340,42 @@ const SaleAdd = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
-                    {/* 2. Satır: Müşteri Adı, Telefon, İl, İlçe */}
+
                     <div>
                         <label className="form-label">Müşteri Adı</label>
                         <input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" placeholder="Ad Soyad" />
                     </div>
+
                     <div>
                         <label className="form-label">Telefon</label>
-                        <input name="phone" value={headerData.phone} onChange={handleHeaderChange} className="form-input" placeholder="(5XX) XXX XX XX" maxLength={15} />
+                        <div style={{ display: 'flex', gap: '5px' }}>
+                            <select
+                                value={phoneCode}
+                                onChange={(e) => setPhoneCode(e.target.value)}
+                                className="form-input"
+                                style={{ width: '70px', padding: '0 5px' }}
+                            >
+                                <option value="+90">+90</option> // Türkiye
+                                <option value="+49">+49</option> // Almanya
+                                <option value="+44">+44</option> // İngiltere
+                                <option value="+1">+1</option> // ABD
+                                <option value="+30">+30</option> // Yunanistan
+                                <option value="+33">+33</option> // Fransa
+                                <option value="+39">+39</option> // İtalya
+                                <option value="+7">+7</option> // Rusya
+                                <option value="+972">+972</option> // İsrail
+                            </select>   
+                            <input
+                                name="phone"
+                                value={headerData.phone}
+                                onChange={handleHeaderChange}
+                                className="form-input"
+                                placeholder="5XX XXX XX XX"
+                                maxLength={15}
+                            />
+                        </div>
                     </div>
+
                     <div>
                         <label className="form-label">İl</label>
                         <select name="city" value={headerData.city} onChange={handleHeaderChange} className="form-input">
@@ -310,7 +393,6 @@ const SaleAdd = () => {
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: '3fr 1fr', gap: '15px' }}>
-                    {/* 3. Satır: Adres (Geniş), Termin Tarihi */}
                     <div>
                         <label className="form-label">Açık Adres</label>
                         <input name="address" value={headerData.address} onChange={handleHeaderChange} className="form-input" placeholder="Mahalle, Cadde, Sokak, No..." />
@@ -319,6 +401,17 @@ const SaleAdd = () => {
                         <label className="form-label">Termin Tarihi</label>
                         <input type="date" name="deadline" value={headerData.deadline} onChange={handleHeaderChange} className="form-input" />
                     </div>
+                </div>
+
+                <div style={{ marginTop: '15px' }}>
+                    <label className="form-label">Sipariş Açıklaması / Notu</label>
+                    <textarea
+                        name="explanation"
+                        value={headerData.explanation}
+                        onChange={handleHeaderChange}
+                        className="form-input"
+                        rows={1}
+                    />
                 </div>
             </div>
 
@@ -351,10 +444,10 @@ const SaleAdd = () => {
                                             <option value="">Grup</option>{groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
                                         </select>
                                         <select value={lineItem.categoryId} onChange={e => handleCategoryChange(e.target.value)} className="soft-input" style={filterSelectStyle} disabled={!lineItem.groupId}>
-                                            <option value="">Kat</option>{categories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
+                                            <option value="">Kat</option>{filteredCategories.map(c => <option key={c.id} value={c.id}>{c.categoryName}</option>)}
                                         </select>
                                         <select value={selectedProductId} onChange={e => handleProductChange(e.target.value)} className="soft-input" style={{ ...selectStyle, flex: 1, fontWeight: 'bold' }} disabled={!lineItem.categoryId}>
-                                            <option value="">Ürün Seç...</option>{productsInCat.map(p => <option key={p.id} value={p.id}>{p.productName}</option>)}
+                                            <option value="">Ürün Seç...</option>{filteredProducts.map(p => <option key={p.id} value={p.id}>{p.productName}</option>)}
                                         </select>
                                     </div>
                                 </td>
@@ -432,7 +525,7 @@ const SaleAdd = () => {
                                                 </span>
                                             )}
                                             <span style={{ fontSize: '12px', color: '#7f8c8d' }}>
-                                                ({getName(categories, item.categoryId, 'categoryName')})
+                                                ({getName(allCategories, item.categoryId, 'categoryName')})
                                             </span>
                                         </div>
                                         {item.productNote && (

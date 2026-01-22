@@ -10,7 +10,8 @@ import {
     orderBy,
     runTransaction,
     increment,
-    where
+    where,
+    updateDoc
 } from "firebase/firestore";
 import type { PaymentMethod, PaymentDocument, Debt } from "../types";
 
@@ -27,6 +28,11 @@ export const getPaymentMethods = async (): Promise<PaymentMethod[]> => {
 
 export const deletePaymentMethod = async (id: string) => {
     await deleteDoc(doc(db, "definitions", "payment_methods", "items", id));
+};
+
+export const updatePaymentMethod = async (id: string, name: string) => {
+    const ref = doc(db, "definitions", "payment_methods", "items", id);
+    await updateDoc(ref, { name });
 };
 
 // --- ÖDEME FİŞİ KAYDETME ---

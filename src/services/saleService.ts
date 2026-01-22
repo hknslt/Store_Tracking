@@ -1,6 +1,6 @@
 // src/services/saleService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction, collectionGroup } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, runTransaction, collectionGroup, limit } from "firebase/firestore";
 import type { Sale, DeliveryStatus, PendingRequest, Debt } from "../types";
 
 export const addSale = async (sale: Sale) => {
@@ -226,10 +226,10 @@ export const cancelSaleComplete = async (storeId: string, saleId: string) => {
             if (!saleDoc.exists()) throw "Satış bulunamadı.";
             const sale = saleDoc.data() as Sale;
 
-            // 2. Stokları İade Et (Rezerve -> Serbest)
+            // 2. Stokları Geri Al
             for (const item of sale.items) {
-                // Eğer ürün zaten teslim edildiyse, iptal yerine "İade" süreci gerekir. 
-                // Biz burada henüz teslim edilmemiş veya teslim edilse bile stoğa geri sokulacak varsayıyoruz.
+                // İptal edilmiş satırları atla
+                if (item.status === 'İptal' || item.deliveryStatus === 'İptal') continue;
 
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                 const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
@@ -239,34 +239,55 @@ export const cancelSaleComplete = async (storeId: string, saleId: string) => {
                     const currentData = stockDoc.data();
                     const qty = Number(item.quantity);
 
-                    // Satış yapılırken: Free azalmış, Reserved artmıştı.
-                    // İptalde: Free artmalı, Reserved azalmalı.
-
-                    const newFree = (currentData.freeStock || 0) + qty;
-
-                    // Eğer ürün teslim edildiyse rezerve zaten düşmüştür, değilse rezerveden düş.
-                    let newReserved = currentData.reservedStock || 0;
-                    if (item.deliveryStatus !== 'Teslim Edildi') {
-                        newReserved = Math.max(0, newReserved - qty);
+                    // A) Eğer ürün "Merkezden" istendiyse ve henüz teslim edilmediyse:
+                    // "Gelecek (Müşteri)" stoktan düşülmeli.
+                    if (item.supplyMethod === 'Merkezden' && item.deliveryStatus !== 'Teslim Edildi') {
+                        const newIncomingReserved = Math.max(0, (currentData.incomingReservedStock || 0) - qty);
+                        transaction.update(stockRef, {
+                            incomingReservedStock: newIncomingReserved
+                        });
                     }
+                    // B) Eğer ürün "Stoktan" verildiyse (veya Merkezden gelip depoya girdiyse):
+                    // "Rezerve" düşülmeli, "Serbest" artırılmalı.
+                    else {
+                        const newFree = (currentData.freeStock || 0) + qty;
+                        let newReserved = currentData.reservedStock || 0;
 
-                    transaction.update(stockRef, {
-                        freeStock: newFree,
-                        reservedStock: newReserved
-                    });
+                        // Teslim edilmediyse rezerveden düş
+                        if (item.deliveryStatus !== 'Teslim Edildi') {
+                            newReserved = Math.max(0, newReserved - qty);
+                        }
+
+                        transaction.update(stockRef, {
+                            freeStock: newFree,
+                            reservedStock: newReserved
+                        });
+                    }
                 }
             }
 
-            // 3. Borcu Sil (Veya İptal İşaretle - Biz siliyoruz ki bakiyeyi etkilemesin)
+            // 3. Borcu Sil
             const debtRef = doc(db, "stores", storeId, "debts", saleId);
             transaction.delete(debtRef);
 
-            // 4. Satışın Durumunu Güncelle (Silmiyoruz, İptal Statüsüne Çekiyoruz)
-            // Not: Sale tipine 'status' alanı eklenmeli veya items içindeki statüler güncellenmeli.
-            // Biz items içindeki her ürünü 'İptal' yapalım.
-            const updatedItems = sale.items.map(i => ({ ...i, deliveryStatus: 'İptal' }));
-            transaction.update(saleRef, { items: updatedItems, grandTotal: 0, shippingCost: 0 }); // Tutarı sıfırla
+            // 4. Satışın Statüsünü 'İptal' Olarak İşaretle
+            // (Not: Komple silmek yerine iptal statüsüne çekiyoruz ki kayıtlarda kalsın)
+            const updatedItems = sale.items.map(i => ({ ...i, deliveryStatus: 'İptal' as DeliveryStatus, status: 'İptal' as any }));
+            transaction.update(saleRef, {
+                items: updatedItems,
+                grandTotal: 0,
+                shippingCost: 0,
+                status: 'İptal' // Eğer Sale tipinde status varsa
+            });
         });
+
+        // NOT: Bekleyen Talepler (Pending Requests) koleksiyonundan silme işlemi
+        // Transaction dışında yapılabilir çünkü query gerektirir.
+        // İsteğe bağlı: Bekleyen talepleri temizle
+        // const q = query(collection(db, "stores", storeId, "pending_requests"), where("saleId", "==", saleId));
+        // const snaps = await getDocs(q);
+        // snaps.forEach(d => deleteDoc(d.ref));
+
     } catch (error) {
         console.error("İptal hatası:", error);
         throw error;
@@ -345,3 +366,51 @@ export const getSales = async (): Promise<Sale[]> => {
         return [];
     }
 };
+
+
+export const getNextReceiptNo = async (storeId: string): Promise<string> => {
+    try {
+        // En son oluşturulan fişi çek (createdAt'e göre)
+        const q = query(
+            collection(db, "sales", storeId, "receipts"),
+            orderBy("createdAt", "desc"),
+            limit(1)
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            return `1`;
+        }
+
+        const lastReceipt = snapshot.docs[0].data().receiptNo;
+
+        // Fiş numarasındaki son sayısal kısmı bul ve artır
+        // Örn: "2024-055" -> "2024-056", "F-12" -> "F-13"
+        return incrementString(lastReceipt);
+
+    } catch (error) {
+        console.error("Fiş no getirme hatası:", error);
+        return "";
+    }
+};
+
+// Yardımcı: String içindeki sayıyı artırır
+function incrementString(str: string): string {
+    // Stringin sonundaki sayıyı bul
+    const match = str.match(/(\d+)$/);
+    if (match) {
+        const numberStr = match[0];
+        const numberLength = numberStr.length;
+        const number = parseInt(numberStr, 10);
+        const nextNumber = number + 1;
+
+        // Sıfır dolgusunu koru (001 -> 002)
+        const nextNumberStr = nextNumber.toString().padStart(numberLength, '0');
+
+        // Eski sayıyı yeni sayıyla değiştir
+        return str.substring(0, str.length - numberLength) + nextNumberStr;
+    }
+    // Sayı bulunamazsa sonuna -1 ekle
+    return str + "-1";
+}

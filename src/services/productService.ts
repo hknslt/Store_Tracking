@@ -7,8 +7,10 @@ import {
     query,
     where,
     orderBy,
-    doc,     // <-- EKLENDİ
-    getDoc   // <-- EKLENDİ
+    doc,    
+    getDoc,  
+    updateDoc,
+    deleteDoc
 } from "firebase/firestore";
 import type { Product } from "../types";
 
@@ -27,7 +29,7 @@ export const addProduct = async (product: Product) => {
     }
 };
 
-// orderBy kaldırıldı (Index hatasını önlemek için)
+
 export const getProductsByCategoryId = async (categoryId: string): Promise<Product[]> => {
     try {
         const q = query(
@@ -40,7 +42,6 @@ export const getProductsByCategoryId = async (categoryId: string): Promise<Produ
             ...doc.data()
         })) as Product[];
 
-        // JavaScript tarafında sıralama
         return list.sort((a, b) => a.productName.localeCompare(b.productName));
     } catch (error) {
         console.error("Ürün çekme hatası:", error);
@@ -59,7 +60,6 @@ export const getProducts = async (): Promise<Product[]> => {
     }
 };
 
-// 👇 EKSİK OLAN FONKSİYON BURAYA EKLENDİ 👇
 export const getProductById = async (id: string): Promise<Product | null> => {
     try {
         const docRef = doc(db, COLLECTION_NAME, id);
@@ -73,6 +73,29 @@ export const getProductById = async (id: string): Promise<Product | null> => {
         }
     } catch (error) {
         console.error("Tekil ürün çekme hatası:", error);
+        throw error;
+    }
+};
+
+
+// Ürün Güncelle
+export const updateProduct = async (id: string, data: Partial<Product>) => {
+    try {
+        const docRef = doc(db, COLLECTION_NAME, id);
+        await updateDoc(docRef, data);
+    } catch (error) {
+        console.error("Ürün güncelleme hatası:", error);
+        throw error;
+    }
+};
+
+// Ürün Sil
+export const deleteProduct = async (id: string) => {
+    try {
+        const docRef = doc(db, COLLECTION_NAME, id);
+        await deleteDoc(docRef);
+    } catch (error) {
+        console.error("Ürün silme hatası:", error);
         throw error;
     }
 };

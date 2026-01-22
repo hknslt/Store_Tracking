@@ -1,6 +1,6 @@
 // src/services/storeStockService.ts
 import { db } from "../firebase";
-import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc } from "firebase/firestore";
+import { collection, getDocs, doc, updateDoc, deleteDoc, getDoc, addDoc, where, query } from "firebase/firestore";
 import type { StoreStock } from "../types";
 
 // Mağazanın tüm varyant stoklarını getirir
@@ -56,5 +56,58 @@ export const checkAndCleanupStock = async (storeId: string, stockId: string) => 
         ) {
             await deleteDoc(stockRef); // Veritabanından sil
         }
+    }
+};
+
+
+export const manualAddOrUpdateStock = async (
+    storeId: string,
+    stockData: {
+        productId: string;
+        productName: string;
+        colorId: string;
+        dimensionId: string | null;
+        freeStock: number;
+        reservedStock: number;
+        incomingStock: number;
+        incomingReservedStock: number;
+    }
+) => {
+    try {
+        const stocksRef = collection(db, "stores", storeId, "stocks");
+
+        // 1. Bu varyant bu mağazada zaten var mı kontrol et
+        let q = query(
+            stocksRef,
+            where("productId", "==", stockData.productId),
+            where("colorId", "==", stockData.colorId)
+        );
+
+        // Ebat varsa onu da sorguya ekle, yoksa null kontrolü (Firestore null sorgusu hassastır, genelde ebat yoksa null kaydedilir)
+        if (stockData.dimensionId) {
+            q = query(q, where("dimensionId", "==", stockData.dimensionId));
+        } else {
+            q = query(q, where("dimensionId", "==", null));
+        }
+
+        const snapshot = await getDocs(q);
+
+        if (!snapshot.empty) {
+            // VARSA: Güncelle (İlk bulunanı alıyoruz)
+            const docId = snapshot.docs[0].id;
+            await updateStoreStock(storeId, docId, {
+                freeStock: stockData.freeStock,
+                reservedStock: stockData.reservedStock,
+                incomingStock: stockData.incomingStock,
+                incomingReservedStock: stockData.incomingReservedStock
+            });
+        } else {
+            // YOKSA: Yeni Ekle
+            await addDoc(stocksRef, stockData);
+        }
+
+    } catch (error) {
+        console.error("Manuel stok işlem hatası:", error);
+        throw error;
     }
 };

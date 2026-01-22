@@ -12,7 +12,6 @@ import Login from "./pages/auth/Login";
 import Register from "./pages/auth/Register";
 import ProductAdd from "./pages/products/ProductAdd";
 import ProductList from "./pages/products/ProductList";
-import GroupAdd from "./pages/definitions/groups/GroupAdd";
 import DefinitionsPage from "./pages/definitions/groups/DefinitionsPage";
 import PriceList from "./pages/prices/PriceList";
 import PurchaseList from "./pages/purchases/PurchaseList";
@@ -47,6 +46,8 @@ import FinanceReport from "./pages/reports/FinanceReport";
 import StockReport from "./pages/reports/StockReport";
 import PersonnelReport from "./pages/reports/PersonnelReport";
 import ReportsDashboard from "./pages/Dashboard/ReportsDashboard";
+import StoreTargets from "./pages/targets/StoreTargets";
+import PersonnelCommissions from "./pages/personnel/PersonnelCommissions";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -241,7 +242,6 @@ function App() {
 
             {/* Definitions */}
             <Route path="/definitions/general" element={<DefinitionsPage />} />
-            <Route path="/definitions/groups/add" element={<GroupAdd />} />
             <Route path="/definitions/dimensions" element={<DimensionsPage />} />
             <Route path="/definitions/colors" element={<ColorsPage />} />
             <Route path="/definitions/cushions" element={<CushionsPage />} />
@@ -263,6 +263,7 @@ function App() {
             <Route path="/personnel/add" element={<PersonnelAdd />} />
             <Route path="/personnel/:id" element={<PersonnelDetail />} />
             <Route path="/attendance" element={<AttendanceManager />} />
+            <Route path="/commissions" element={<PersonnelCommissions />} />
             <Route path="/register" element={<Register />} />
 
             {/* Sales Module */}
@@ -295,6 +296,11 @@ function App() {
             {/* Dashboard Routes */}
             <Route path="/reports/dashboard" element={<ReportsDashboard/>} />
             <Route path="/stores/:id" element={<StoreDashboard />} />
+
+            {/* Mağaza Hedefleri (KPI) */}
+            <Route path="/targets" element={<StoreTargets />} />
+
+
           </Route>
 
           {/* Fallback Route */}

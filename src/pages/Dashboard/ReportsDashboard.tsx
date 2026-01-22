@@ -38,7 +38,7 @@ const ReportsDashboard = () => {
 
     // Grafik Verileri (Şimdilik statik kalabilir veya geliştirilebilir)
     const [revenueData, setRevenueData] = useState<any[]>([]);
-    const [categoryData, setCategoryData] = useState<any[]>([
+    const [categoryData] = useState<any[]>([
         { name: 'Mobilya', value: 40 },
         { name: 'Tekstil', value: 30 },
         { name: 'Aksesuar', value: 20 },
@@ -276,7 +276,7 @@ const ReportsDashboard = () => {
                                         paddingAngle={5}
                                         dataKey="value"
                                     >
-                                        {categoryData.map((entry, index) => (
+                                        {categoryData.map(( index) => (
                                             <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                         ))}
                                     </Pie>

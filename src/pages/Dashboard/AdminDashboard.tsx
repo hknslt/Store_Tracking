@@ -7,14 +7,13 @@ import { motion } from "framer-motion";
 // SERVİS
 import { getDashboardData, type DashboardData } from "../../services/homeService";
 
-import "../App.css";
+import "../../App.css";
 
 // İKONLAR
-import storeIcon from "../assets/icons/wallet-money.svg";
-import walletIcon from "../assets/icons/wallet.svg";
-import timeIcon from "../assets/icons/calendar-clock.svg";
-import userIcon from "../assets/icons/users.svg";
-
+import storeIcon from "../../assets/icons/wallet-money.svg";
+import walletIcon from "../../assets/icons/wallet.svg";
+import timeIcon from "../../assets/icons/calendar-clock.svg";
+import userIcon from "../../assets/icons/users.svg";
 // RENK TEMASI
 const THEME = {
     darkGreen: "#052e16",

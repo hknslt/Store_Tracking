@@ -44,6 +44,7 @@ export interface Store {
     address?: string;
     phone?: string;
     currentBalance?: StoreBalance;
+    commissionModel?: 'target_based' | 'flat_rate';
 }
 
 
@@ -56,6 +57,7 @@ export interface SystemUser {
     phone?: string;
     address?: string;
     isActive: boolean;
+    commissionRate?: number;
 }
 export interface Personnel {
     id?: string;
@@ -67,7 +69,7 @@ export interface Personnel {
     phone: string;
     address?: string;
     isActive: boolean;
-    // Email ve Password YOK
+    commissionRate?: number;
 }
 
 // --- MAĞAZA STOK MODÜLÜ (4'lü Stok Yapısı) ---
@@ -177,6 +179,7 @@ export interface Sale {
 
     shippingCost: number;
     grandTotal: number;
+    explanation?: string;
 
     items: SaleItem[];
     createdAt?: any;
@@ -327,4 +330,21 @@ export interface Debt {
 
     status: 'Ödenmedi' | 'Kısmi Ödeme' | 'Ödendi';
     lastPaymentDate?: string;
+}
+
+// --- HEDEFLER ---
+export interface StoreTarget {
+    id?: string; // storeId ile aynı olacak
+    storeId: string;
+    targetAmount: number; // Hedef Ciro (TL)+
+    updatedAt?: any;
+}
+
+export interface CommissionResult {
+    personnelId: string;
+    personnelName: string;
+    totalSales: number;      // Yaptığı Satış
+    commissionRate: number;  // Prim Oranı (%)
+    commissionAmount: number;// Hakediş (TL)
+    isEligible: boolean;     // Hedef tuttu mu? (Almaya hak kazandı mı?)
 }

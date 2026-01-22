@@ -7,6 +7,12 @@ import {
 } from "../../../services/definitionService";
 import type { Category, Group } from "../../../types";
 import "../../../App.css";
+import "../Definitions.css"; // Ortak CSS
+
+// İkonlar
+import EditIcon from "../../../assets/icons/edit.svg";
+import TrashIcon from "../../../assets/icons/trash.svg";
+import PlusIcon from "../../../assets/icons/plus.svg";
 
 const DefinitionsPage = () => {
     // --- STATE'LER ---
@@ -14,12 +20,15 @@ const DefinitionsPage = () => {
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Mesaj (Toast) State'i
+    // Mesaj State'i
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // Modal Kontrolü
     const [modalType, setModalType] = useState<'group' | 'category' | null>(null);
     const [modalMode, setModalMode] = useState<'add' | 'edit'>('add');
+
+    // Onay Modalı State'i (Silme işlemi için)
+    const [confirmModal, setConfirmModal] = useState<{ show: boolean, type: 'group' | 'category', id: string } | null>(null);
 
     // Form Verileri
     const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
@@ -30,26 +39,29 @@ const DefinitionsPage = () => {
     const [catGroupId, setCatGroupId] = useState("");
 
     // --- YARDIMCI FONKSİYON: MESAJ GÖSTER ---
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
+
     const showToast = (type: 'success' | 'error', text: string) => {
         setMessage({ type, text });
-        // 3 saniye sonra mesajı temizle
-        setTimeout(() => {
-            setMessage(null);
-        }, 3000);
     };
 
     // --- VERİ YÜKLEME ---
-    useEffect(() => {
-        loadData();
-    }, []);
+    useEffect(() => { loadData(); }, []);
 
     const loadData = async () => {
         try {
             const [catsData, groupsData] = await Promise.all([getCategories(), getGroups()]);
+            groupsData.sort((a, b) => a.groupName.localeCompare(b.groupName));
+            catsData.sort((a, b) => a.categoryName.localeCompare(b.categoryName));
+            
             setCategories(catsData);
             setGroups(groupsData);
         } catch (error) {
-            console.error(error);
             showToast('error', "Veriler yüklenirken hata oluştu.");
         } finally {
             setLoading(false);
@@ -59,12 +71,12 @@ const DefinitionsPage = () => {
     // --- GRUP İŞLEMLERİ ---
     const handleGroupSave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!groupName) return;
+        if (!groupName.trim()) return;
 
         try {
             if (modalMode === 'add') {
                 await addGroup({ groupName });
-                showToast('success', "Grup başarıyla eklendi.");
+                showToast('success', "Grup eklendi.");
             } else if (modalMode === 'edit' && selectedGroup?.id) {
                 await updateGroup(selectedGroup.id, { groupName });
                 showToast('success', "Grup güncellendi.");
@@ -72,22 +84,40 @@ const DefinitionsPage = () => {
             await loadData(); 
             closeModal();
         } catch (error) {
-            console.error(error);
-            showToast('error', "Grup işlemi başarısız oldu.");
+            showToast('error', "İşlem başarısız.");
         }
     };
 
-    const handleDeleteGroup = async (id: string) => {
-        if (window.confirm("Bu grubu silmek istediğinize emin misiniz?")) {
-            try {
-                await deleteGroup(id);
-                setGroups(prev => prev.filter(g => g.id !== id));
+    // --- SİLME İŞLEMİ (ONAY SONRASI) ---
+    const confirmDelete = async () => {
+        if (!confirmModal) return;
+
+        try {
+            if (confirmModal.type === 'group') {
+                await deleteGroup(confirmModal.id);
+                setGroups(prev => prev.filter(g => g.id !== confirmModal.id));
                 showToast('success', "Grup silindi.");
-            } catch (error) {
-                showToast('error', "Silme işlemi sırasında hata oluştu.");
+            } else {
+                await deleteCategory(confirmModal.id);
+                setCategories(prev => prev.filter(c => c.id !== confirmModal.id));
+                showToast('success', "Kategori silindi.");
             }
+        } catch (error) {
+            showToast('error', "Silme hatası.");
+        } finally {
+            setConfirmModal(null); // Modalı kapat
         }
     };
+
+    // Butonlardan çağrılan fonksiyonlar (Sadece Modalı Açar)
+    const handleDeleteGroupClick = (id: string) => {
+        setConfirmModal({ show: true, type: 'group', id });
+    };
+
+    const handleDeleteCategoryClick = (id: string) => {
+        setConfirmModal({ show: true, type: 'category', id });
+    };
+
 
     const openGroupModal = (mode: 'add' | 'edit', group?: Group) => {
         setModalType('group');
@@ -104,12 +134,12 @@ const DefinitionsPage = () => {
     // --- KATEGORİ İŞLEMLERİ ---
     const handleCategorySave = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!catName || !catGroupId) return;
+        if (!catName.trim() || !catGroupId) return;
 
         try {
             if (modalMode === 'add') {
                 await addCategory({ categoryName: catName, groupId: catGroupId });
-                showToast('success', "Kategori başarıyla eklendi.");
+                showToast('success', "Kategori eklendi.");
             } else if (modalMode === 'edit' && selectedCategory?.id) {
                 await updateCategory(selectedCategory.id, { categoryName: catName, groupId: catGroupId });
                 showToast('success', "Kategori güncellendi.");
@@ -117,20 +147,7 @@ const DefinitionsPage = () => {
             await loadData();
             closeModal();
         } catch (error) {
-            console.error(error);
-            showToast('error', "Kategori işlemi başarısız oldu.");
-        }
-    };
-
-    const handleDeleteCategory = async (id: string) => {
-        if (window.confirm("Kategoriyi silmek istediğinize emin misiniz?")) {
-            try {
-                await deleteCategory(id);
-                setCategories(prev => prev.filter(c => c.id !== id));
-                showToast('success', "Kategori silindi.");
-            } catch (error) {
-                showToast('error', "Silme hatası.");
-            }
+            showToast('error', "İşlem başarısız.");
         }
     };
 
@@ -160,98 +177,101 @@ const DefinitionsPage = () => {
 
     return (
         <div className="page-container">
-            
-            {/* --- TOAST MESSAGE COMPONENT (SAĞ ÜST KÖŞE) --- */}
-            {message && (
-                <div className="toast-container">
-                    <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>
-                        {message.type === 'success' ? '✅' : '⚠️'} {message.text}
+            {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
+
+            {/* --- ONAY MODALI (CONFIRMATION) --- */}
+            {confirmModal && confirmModal.show && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ width: '350px', textAlign: 'center' }}>
+                        <div style={{ marginBottom: '15px', fontSize: '40px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#2c3e50' }}>Emin misiniz?</h3>
+                        <p style={{ color: '#555', fontSize: '14px', marginBottom: '20px' }}>
+                            {confirmModal.type === 'group' 
+                                ? "Bu grubu ve bağlı kategorileri silmek üzeresiniz." 
+                                : "Bu kategoriyi silmek üzeresiniz."}
+                            <br/>Bu işlem geri alınamaz.
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                            <button 
+                                onClick={() => setConfirmModal(null)} 
+                                className="btn btn-secondary"
+                            >
+                                Vazgeç
+                            </button>
+                            <button 
+                                onClick={confirmDelete} 
+                                className="btn btn-danger"
+                            >
+                                Evet, Sil
+                            </button>
+                        </div>
                     </div>
                 </div>
             )}
 
-            {/* --- HEADER --- */}
             <div className="page-header">
                 <div className="page-title">
-                    <h2>Tanımlamalar</h2>
-                    <p>Grup ve Kategori Yönetimi</p>
+                    <h2>Grup & Kategori</h2>
+                    <p>Ürün ağacı yönetimi</p>
                 </div>
-                <button 
-                    onClick={() => openGroupModal('add')} 
-                    className="btn btn-primary"
-                >
-                    + Yeni Grup Ekle
+                <button onClick={() => openGroupModal('add')} className="btn btn-primary">
+                    + Yeni Grup
                 </button>
             </div>
 
-            {/* --- GRUPLAR LİSTESİ --- */}
-            <div className="dashboard-grid">
+            <div className="definitions-grid">
                 {groups.map(group => {
                     const groupCategories = categories.filter(c => c.groupId === group.id);
 
                     return (
-                        <div key={group.id} className="card">
-                            <div className="card-header" style={{ flexWrap: 'wrap', gap: '10px' }}>
-                                <div style={{ flex: 1 }}>
-                                    <h3 className="card-title">{group.groupName}</h3>
-                                    <span style={{ fontSize: '11px', color: '#7f8c8d' }}>
-                                        {groupCategories.length} Kategori
-                                    </span>
+                        <div key={group.id} className="definition-card card-type-group" style={{display:'block', height:'auto'}}>
+                            
+                            <div className="group-card-header">
+                                <div style={{display:'flex', alignItems:'baseline'}}>
+                                    <h3 className="group-title">{group.groupName}</h3>
+                                    <span className="group-meta">({groupCategories.length})</span>
                                 </div>
-                                <div style={{ display: 'flex', gap: '5px' }}>
-                                    <button 
-                                        onClick={() => openCategoryModal('add', group.id)} 
-                                        className="btn btn-success"
-                                        style={{ fontSize: '11px', padding: '5px 8px' }}
-                                        title="Kategori Ekle"
-                                    >
-                                        + Kat. Ekle
+                                <div className="card-actions">
+                                    <button onClick={() => openCategoryModal('add', group.id)} className="action-btn" title="Kategori Ekle">
+                                        <img src={PlusIcon} style={{filter: 'invert(46%) sepia(90%) saturate(399%) hue-rotate(87deg) brightness(97%) contrast(92%)'}} /> 
                                     </button>
-                                    <button 
-                                        onClick={() => openGroupModal('edit', group)} 
-                                        className="btn btn-warning"
-                                        style={{ fontSize: '11px', padding: '5px 8px' }}
-                                        title="Grubu Düzenle"
-                                    >
-                                        ✎
+                                    <button onClick={() => openGroupModal('edit', group)} className="action-btn" title="Grubu Düzenle">
+                                        <img src={EditIcon} style={{filter: 'invert(35%) sepia(93%) saturate(368%) hue-rotate(173deg)'}} /> 
                                     </button>
-                                    <button 
-                                        onClick={() => handleDeleteGroup(group.id!)} 
-                                        className="btn btn-danger"
-                                        style={{ fontSize: '11px', padding: '5px 8px' }}
-                                        title="Grubu Sil"
-                                    >
-                                        🗑
+                                    <button onClick={() => group.id && handleDeleteGroupClick(group.id)} className="action-btn" title="Grubu Sil">
+                                        <img src={TrashIcon} style={{filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg)'}} />
                                     </button>
                                 </div>
                             </div>
-                            
-                            <div className="card-body">
+
+                            <div className="group-card-body">
                                 {groupCategories.length === 0 ? (
-                                    <div style={{ padding: '15px', color: '#999', fontSize: '13px', fontStyle: 'italic', textAlign: 'center' }}>
+                                    <div style={{ padding: '10px', color: '#bdc3c7', fontStyle: 'italic', fontSize:'13px', textAlign:'center' }}>
                                         Kategori yok.
                                     </div>
                                 ) : (
-                                    <table className="data-table">
+                                    <table className="category-table">
                                         <tbody>
                                             {groupCategories.map(cat => (
                                                 <tr key={cat.id}>
-                                                    <td style={{ fontSize: '14px' }}>{cat.categoryName}</td>
-                                                    <td style={{ textAlign: 'right', width: '80px' }}>
-                                                        <button 
-                                                            onClick={() => openCategoryModal('edit', undefined, cat)} 
-                                                            style={{ cursor: 'pointer', background: 'none', border: 'none', marginRight: '5px', fontSize: '16px' }}
-                                                            title="Düzenle"
-                                                        >
-                                                            ✎
-                                                        </button>
-                                                        <button 
-                                                            onClick={() => handleDeleteCategory(cat.id!)} 
-                                                            style={{ cursor: 'pointer', background: 'none', border: 'none', color: 'red', fontSize: '16px' }}
-                                                            title="Sil"
-                                                        >
-                                                            ×
-                                                        </button>
+                                                    <td>{cat.categoryName}</td>
+                                                    <td style={{ width: '60px', textAlign: 'right' }}>
+                                                        <div style={{display:'flex', justifyContent:'flex-end', gap:'2px'}}>
+                                                            <button 
+                                                                onClick={() => openCategoryModal('edit', undefined, cat)} 
+                                                                className="action-btn" 
+                                                                title="Düzenle"
+                                                            >
+                                                                <img src={EditIcon} style={{width:'14px', height:'14px', opacity:0.5}} />
+                                                            </button>
+                                                            <button 
+                                                                onClick={() => cat.id && handleDeleteCategoryClick(cat.id)} 
+                                                                className="action-btn" 
+                                                                title="Sil"
+                                                            >
+                                                                <img src={TrashIcon} style={{width:'14px', height:'14px', opacity:0.5, filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg)'}} />
+                                                            </button>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))}
@@ -268,10 +288,13 @@ const DefinitionsPage = () => {
             {modalType === 'group' && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h3>{modalMode === 'add' ? 'Yeni Grup Ekle' : 'Grup Düzenle'}</h3>
+                        <div className="modal-header">
+                            <h3>{modalMode === 'add' ? 'Yeni Grup Ekle' : 'Grup Düzenle'}</h3>
+                            <button onClick={closeModal} className="close-btn">×</button>
+                        </div>
                         <form onSubmit={handleGroupSave}>
                             <div className="form-group">
-                                <label className="form-label">Grup Adı</label>
+                                <label>Grup Adı</label>
                                 <input 
                                     type="text" className="form-input" 
                                     value={groupName} onChange={e => setGroupName(e.target.value)} 
@@ -291,10 +314,13 @@ const DefinitionsPage = () => {
             {modalType === 'category' && (
                 <div className="modal-overlay">
                     <div className="modal-content">
-                        <h3>{modalMode === 'add' ? 'Yeni Kategori Ekle' : 'Kategori Düzenle'}</h3>
+                        <div className="modal-header">
+                            <h3>{modalMode === 'add' ? 'Yeni Kategori Ekle' : 'Kategori Düzenle'}</h3>
+                            <button onClick={closeModal} className="close-btn">×</button>
+                        </div>
                         <form onSubmit={handleCategorySave}>
                             <div className="form-group">
-                                <label className="form-label">Bağlı Olduğu Grup</label>
+                                <label>Bağlı Olduğu Grup</label>
                                 <select 
                                     className="form-input" 
                                     value={catGroupId} 
@@ -308,7 +334,7 @@ const DefinitionsPage = () => {
                                 </select>
                             </div>
                             <div className="form-group">
-                                <label className="form-label">Kategori Adı</label>
+                                <label>Kategori Adı</label>
                                 <input 
                                     type="text" className="form-input" 
                                     value={catName} onChange={e => setCatName(e.target.value)} 
