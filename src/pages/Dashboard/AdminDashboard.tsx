@@ -4,8 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 
-// SERVİS
+// SERVİSLER
 import { getDashboardData, type DashboardData } from "../../services/homeService";
+import { getStores } from "../../services/storeService"; // 🔥 EKLENDİ
+import type { Store } from "../../types"; // 🔥 EKLENDİ
 
 import "../../App.css";
 
@@ -13,11 +15,13 @@ import "../../App.css";
 import storeIcon from "../../assets/icons/wallet-money.svg";
 import walletIcon from "../../assets/icons/wallet.svg";
 import timeIcon from "../../assets/icons/calendar-clock.svg";
-import userIcon from "../../assets/icons/users.svg";
+import commissionIcon from "../../assets/icons/commission.svg";
+
 // RENK TEMASI
 const THEME = {
     darkGreen: "#052e16",
     lightGreen: "#4ade80",
+    bahcemoGreen: "#1e703a", // Ana Yeşil
     hoverBg: "#f0fdf4",
     borderColor: "#166534"
 };
@@ -27,48 +31,61 @@ const AdminDashboard = () => {
     const navigate = useNavigate();
 
     const [data, setData] = useState<DashboardData | null>(null);
+    const [stores, setStores] = useState<Store[]>([]); // 🔥 Mağaza Listesi State'i
     const [isLoadingData, setIsLoadingData] = useState(true);
 
     // Slider State
     const [currentSlide, setCurrentSlide] = useState(0);
     const sliderRef = useRef<HTMLDivElement>(null);
 
+    // --- VERİ ÇEKME ---
     useEffect(() => {
-        // Sadece veri çekme işlemi
-        getDashboardData()
-            .then(result => {
-                setData(result);
-                setIsLoadingData(false);
-            })
-            .catch(err => {
+        const loadAll = async () => {
+            try {
+                // Paralel olarak verileri çek
+                const [dashboardResult, storesResult] = await Promise.all([
+                    getDashboardData(),
+                    getStores()
+                ]);
+
+                setData(dashboardResult);
+                setStores(storesResult);
+            } catch (err) {
                 console.error(err);
+            } finally {
                 setIsLoadingData(false);
-            });
+            }
+        };
+        loadAll();
     }, []);
 
-    // --- SLIDER FONKSİYONLARI ---
-    const handleScroll = () => {
-        if (sliderRef.current) {
-            const index = Math.round(sliderRef.current.scrollLeft / sliderRef.current.clientWidth);
-            setCurrentSlide(index);
-        }
-    };
+    // --- OTOMATİK SLIDER (5 Saniye) ---
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setCurrentSlide((prev) => (prev < 2 ? prev + 1 : 0));
+        }, 5000); // 5000ms = 5 Saniye
 
-    const slideTo = (index: number) => {
+        return () => clearInterval(interval);
+    }, []);
+
+    // State değişince scroll işlemini yap
+    useEffect(() => {
         if (sliderRef.current) {
             const width = sliderRef.current.clientWidth;
-            sliderRef.current.scrollTo({ left: width * index, behavior: 'smooth' });
-            setCurrentSlide(index);
+            sliderRef.current.scrollTo({ left: width * currentSlide, behavior: 'smooth' });
         }
-    };
+    }, [currentSlide]);
 
-    const nextSlide = () => {
-        if (currentSlide < 2) slideTo(currentSlide + 1);
-        else slideTo(0);
-    };
 
-    const prevSlide = () => {
-        if (currentSlide > 0) slideTo(currentSlide - 1);
+    // --- SLIDER FONKSİYONLARI (Manuel) ---
+    const nextSlide = () => setCurrentSlide((prev) => (prev < 2 ? prev + 1 : 0));
+    const prevSlide = () => setCurrentSlide((prev) => (prev > 0 ? prev - 1 : 2));
+
+    // --- YARDIMCI: ID'den Mağaza İsmi Bulma ---
+    const getStoreName = (storeId: string) => {
+        if (!storeId) return "Merkez";
+        const store = stores.find(s => s.id === storeId);
+        return store ? store.storeName : "Bilinmeyen Şube";
     };
 
     if (isLoadingData) {
@@ -127,7 +144,8 @@ const AdminDashboard = () => {
                                         <tr key={sale.id} className="hover-row">
                                             <td style={{ padding: '12px 20px', fontWeight: '600', color: '#475569' }}>{sale.receiptNo}</td>
                                             <td>{sale.customerName}</td>
-                                            <td><span className="status-badge neutral" style={{ fontSize: '11px' }}>{sale.storeId ? 'Şube' : 'Merkez'}</span></td>
+                                            {/* 🔥 DÜZELTİLDİ: Gerçek Mağaza İsmi */}
+                                            <td><span className="status-badge neutral" style={{ fontSize: '11px' }}>{getStoreName(sale.storeId)}</span></td>
                                             <td style={{ textAlign: 'right', paddingRight: '20px', fontWeight: 'bold', color: '#16a34a' }}>
                                                 +{Number(sale.grandTotal || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </td>
@@ -163,7 +181,8 @@ const AdminDashboard = () => {
                                         <tr key={pur.id} className="hover-row">
                                             <td style={{ padding: '12px 20px', fontWeight: '600', color: '#475569' }}>{pur.receiptNo}</td>
                                             <td>{pur.personnelName || '-'}</td>
-                                            <td><span className="status-badge neutral" style={{ fontSize: '11px' }}>{pur.storeId ? 'Şube' : 'Merkez'}</span></td>
+                                            {/* 🔥 DÜZELTİLDİ: Gerçek Mağaza İsmi */}
+                                            <td><span className="status-badge neutral" style={{ fontSize: '11px' }}>{getStoreName(pur.storeId)}</span></td>
                                             <td style={{ textAlign: 'right', paddingRight: '20px', fontWeight: 'bold', color: '#0284c7' }}>
                                                 {Number(pur.totalAmount || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </td>
@@ -187,71 +206,85 @@ const AdminDashboard = () => {
                             <QuickBtn title="Mağaza Kasaları" icon={storeIcon} onClick={() => navigate('/finance/cash-registers')} />
                             <QuickBtn title="Kasa Hareketleri" icon={walletIcon} onClick={() => navigate('/payments/list')} />
                             <QuickBtn title="Puantaj" icon={timeIcon} onClick={() => navigate('/attendance')} />
-                            <QuickBtn title="Personel" icon={userIcon} onClick={() => navigate('/personnel')} />
+                            <QuickBtn title="Primler" icon={commissionIcon} onClick={() => navigate('/commissions')} />
                         </div>
                     </div>
 
-                    {/* 2. CAROUSEL */}
-                    <div className="card" style={{ padding: '0', overflow: 'hidden', position: 'relative', height: '280px', display: 'flex', flexDirection: 'column' }}>
-                        <div style={{ padding: '15px 20px', borderBottom: '1px solid #eee', background: '#fcfcfc', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <h4 style={{ margin: 0, fontSize: '13px', color: '#64748b', fontWeight: '700' }}>📊 GÜNLÜK ÖZET</h4>
-                            <div style={{ display: 'flex', gap: '5px', alignItems: 'center' }}>
-                                <button onClick={prevSlide} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', color: currentSlide === 0 ? '#ddd' : '#64748b' }}>◀</button>
+                    {/* 2. GÜNLÜK ÖZET CAROUSEL (YENİ TASARIM - YEŞİL & OTOMATİK) */}
+                    <div className="card" style={{
+                        padding: '0',
+                        overflow: 'hidden',
+                        position: 'relative',
+                        height: '280px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        background: `linear-gradient(135deg, ${THEME.bahcemoGreen} 0%, #064e3b 100%)`, // 🔥 YEŞİL GRADIENT
+                        color: 'white',
+                        boxShadow: '0 10px 30px -10px rgba(30, 112, 58, 0.5)'
+                    }}>
+
+                        {/* Başlık Alanı */}
+                        <div style={{ padding: '15px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <h4 style={{ margin: 0, fontSize: '13px', color: '#fff', fontWeight: '700', opacity: 0.9 }}>📊 GÜNLÜK ÖZET</h4>
+                            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                <button onClick={prevSlide} style={{ border: 'none', background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◀</button>
+
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                     {[0, 1, 2].map(idx => (
-                                        <div key={idx} onClick={() => slideTo(idx)} style={{
-                                            width: idx === currentSlide ? '8px' : '4px', height: '4px', borderRadius: '2px',
-                                            background: idx === currentSlide ? THEME.lightGreen : '#cbd5e1', transition: 'all 0.3s', cursor: 'pointer'
+                                        <div key={idx} onClick={() => setCurrentSlide(idx)} style={{
+                                            width: idx === currentSlide ? '16px' : '6px', height: '6px', borderRadius: '3px',
+                                            background: idx === currentSlide ? '#4ade80' : 'rgba(255,255,255,0.3)', transition: 'all 0.3s', cursor: 'pointer'
                                         }}></div>
                                     ))}
                                 </div>
-                                <button onClick={nextSlide} style={{ border: 'none', background: 'none', cursor: 'pointer', fontSize: '14px', color: '#64748b' }}>▶</button>
+
+                                <button onClick={nextSlide} style={{ border: 'none', background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</button>
                             </div>
                         </div>
 
+                        {/* Slider İçeriği */}
                         <div
                             ref={sliderRef}
-                            onScroll={handleScroll}
                             style={{
-                                display: 'flex', overflowX: 'auto', scrollSnapType: 'x mandatory', scrollbarWidth: 'none', msOverflowStyle: 'none', scrollBehavior: 'smooth', flex: 1
+                                display: 'flex', overflowX: 'hidden', scrollSnapType: 'x mandatory', flex: 1, scrollBehavior: 'smooth'
                             }}
                         >
-                            {/* SLIDE 1 */}
+                            {/* SLIDE 1: FİNANSAL */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
-                                <div style={{ fontSize: '12px', color: '#166534', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <div style={{ fontSize: '12px', color: '#86efac', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span>💰</span> FİNANSAL HAREKETLER
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <SummaryRow label="Bugünkü Satış" value={`${data?.stats.todayRevenue.toLocaleString()} ₺`} color="#16a34a" />
-                                    <SummaryRow label="Bugünkü Alış" value={`${data?.stats.todayExpense.toLocaleString()} ₺`} color="#0284c7" />
-                                    <div style={{ height: '1px', background: '#eee' }}></div>
-                                    <div style={{ fontSize: '11px', color: '#94a3b8', fontStyle: 'italic' }}>* Sadece bugünün işlemleri</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    <SummaryRowWhite label="Bugünkü Satış" value={`+${data?.stats.todayRevenue.toLocaleString()} ₺`} />
+                                    <SummaryRowWhite label="Bugünkü Alış" value={`-${data?.stats.todayExpense.toLocaleString()} ₺`} />
+                                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                                    <div style={{ fontSize: '11px', color: '#cbd5e1', fontStyle: 'italic', textAlign: 'right' }}>* Sadece bugünün işlemleri</div>
                                 </div>
                             </div>
 
-                            {/* SLIDE 2 */}
+                            {/* SLIDE 2: İŞLEM ADETLERİ */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
-                                <div style={{ fontSize: '12px', color: '#1e40af', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <div style={{ fontSize: '12px', color: '#93c5fd', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span>🔢</span> İŞLEM ADETLERİ
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <SummaryRow label="Satış Fişi" value={`${data?.stats.todaySalesCount} Adet`} color="#2563eb" />
-                                    <SummaryRow label="Alış Fişi" value={`${data?.stats.todayPurchasesCount} Adet`} color="#0284c7" />
-                                    <div style={{ height: '1px', background: '#eee' }}></div>
-                                    <SummaryRow label="Aktif Personel" value={data?.stats.totalPersonnel} color="#475569" />
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    <SummaryRowWhite label="Satış Fişi" value={`${data?.stats.todaySalesCount} Adet`} />
+                                    <SummaryRowWhite label="Alış Fişi" value={`${data?.stats.todayPurchasesCount} Adet`} />
+                                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                                    <SummaryRowWhite label="Aktif Personel" value={data?.stats.totalPersonnel} />
                                 </div>
                             </div>
 
-                            {/* SLIDE 3 */}
+                            {/* SLIDE 3: ENVANTER */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
-                                <div style={{ fontSize: '12px', color: '#b45309', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                <div style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
                                     <span>🏢</span> GENEL ENVANTER
                                 </div>
-                                <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                                    <SummaryRow label="Toplam Şube" value={data?.stats.totalStores} color="#b45309" />
-                                    <SummaryRow label="Toplam Ürün" value={data?.stats.totalProducts} color="#b45309" />
-                                    <div style={{ height: '1px', background: '#eee' }}></div>
-                                    <div style={{ fontSize: '11px', color: '#92400e', textAlign: 'right' }}>Sistem Aktif ●</div>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
+                                    <SummaryRowWhite label="Toplam Şube" value={data?.stats.totalStores} />
+                                    <SummaryRowWhite label="Toplam Ürün" value={data?.stats.totalProducts} />
+                                    <div style={{ height: '1px', background: 'rgba(255,255,255,0.1)' }}></div>
+                                    <div style={{ fontSize: '11px', color: '#86efac', textAlign: 'right' }}>Sistem Aktif ●</div>
                                 </div>
                             </div>
                         </div>
@@ -287,10 +320,11 @@ const QuickBtn = ({ title, icon, onClick }: any) => (
     </button>
 );
 
-const SummaryRow = ({ label, value, color, isBold }: any) => (
+// Yeni Beyaz Satır Bileşeni (Yeşil Kart İçin)
+const SummaryRowWhite = ({ label, value }: any) => (
     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <span style={{ fontSize: '13px', color: '#64748b' }}>{label}</span>
-        <span style={{ fontSize: '15px', color: color, fontWeight: isBold ? '800' : '600' }}>{value}</span>
+        <span style={{ fontSize: '14px', color: '#e2e8f0' }}>{label}</span>
+        <span style={{ fontSize: '16px', color: 'white', fontWeight: '700' }}>{value}</span>
     </div>
 );
 

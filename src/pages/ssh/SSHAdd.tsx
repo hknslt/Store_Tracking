@@ -196,7 +196,7 @@ const SSHAdd = () => {
                             <input
                                 type="text"
                                 className="form-input"
-                                placeholder="Örn: 2024-001 veya Ahmet..."
+                                placeholder="Fiş No veya Müşteri Ara"
                                 value={searchTerm}
                                 onChange={(e) => {
                                     setSearchTerm(e.target.value);

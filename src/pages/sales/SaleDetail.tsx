@@ -5,8 +5,8 @@ import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getCategories, getColors, getDimensions, getCushions } from "../../services/definitionService";
 import { cancelSaleComplete, deleteSaleComplete } from "../../services/saleService";
-import { useAuth } from "../../context/AuthContext"; // userRole için
-import type { Sale, Category, Color, Dimension, Cushion} from "../../types";
+import { useAuth } from "../../context/AuthContext";
+import type { Sale, Category, Color, Dimension, Cushion } from "../../types";
 import "../../App.css";
 
 // LOGO
@@ -16,8 +16,6 @@ const SaleDetail = () => {
     const { storeId, id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
-
-    // 👇 Kullanıcı Rolünü Çekiyoruz
     const { userRole } = useAuth();
 
     // Veri State'leri
@@ -29,6 +27,9 @@ const SaleDetail = () => {
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
+
+    // Onay Modalı State
+    const [modal, setModal] = useState<{ show: boolean, action: 'cancel' | 'delete' } | null>(null);
 
     useEffect(() => {
         const initData = async () => {
@@ -44,7 +45,6 @@ const SaleDetail = () => {
                     if (docSnap.exists()) {
                         setSale({ id: docSnap.id, ...docSnap.data() } as Sale);
                     } else {
-                        alert("Satış kaydı bulunamadı!");
                         navigate("/sales");
                     }
                 }
@@ -62,33 +62,21 @@ const SaleDetail = () => {
         window.print();
     };
 
-    const handleCancel = async () => {
-        if (!storeId || !id) return;
-        if (window.confirm("DİKKAT: Bu satışı İPTAL etmek üzeresiniz.\n\n- Stoklar geri yüklenecek.\n- Müşteri borcu silinecek.\n- Fiş tutarı 0lanacak.\n\nOnaylıyor musunuz?")) {
-            try {
-                setLoading(true);
+    const confirmAction = async () => {
+        if (!storeId || !id || !modal) return;
+        setLoading(true);
+        try {
+            if (modal.action === 'cancel') {
                 await cancelSaleComplete(storeId, id);
-                alert("Satış başarıyla iptal edildi.");
-                navigate("/sales");
-            } catch (error) {
-                alert("İptal sırasında hata oluştu.");
-                setLoading(false);
-            }
-        }
-    };
-
-    const handleDelete = async () => {
-        if (!storeId || !id) return;
-        if (window.confirm("BU İŞLEM GERİ ALINAMAZ!\n\nSatış kaydı tamamen SİLİNECEK.\nStoklar geri yüklenecek.\n\nEmin misiniz?")) {
-            try {
-                setLoading(true);
+            } else {
                 await deleteSaleComplete(storeId, id);
-                alert("Kayıt tamamen silindi.");
-                navigate("/sales");
-            } catch (error) {
-                alert("Silme sırasında hata oluştu.");
-                setLoading(false);
             }
+            navigate("/sales");
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+            setModal(null);
         }
     };
 
@@ -98,42 +86,49 @@ const SaleDetail = () => {
     // --- HESAPLAMALAR ---
     const subTotal = sale.items.reduce((acc, item) => acc + (Number(item.price) * Number(item.quantity)), 0);
     const totalDiscount = sale.items.reduce((acc, item) => acc + ((Number(item.discount) || 0) * Number(item.quantity)), 0);
-
-    // Durum Kontrolleri
-    const isCancelled = sale.items.every(i => i.deliveryStatus === 'İptal') || sale.grandTotal === 0;
-
-    // 👇 Tüm ürünler teslim edildiyse "Tamamlandı" sayılır.
+    const isCancelled = (sale as any).status === 'İptal' || sale.items.every(i => i.deliveryStatus === 'İptal');
     const isAllDelivered = sale.items.every(i => i.deliveryStatus === 'Teslim Edildi');
 
     return (
         <div className="page-container">
+
+            {/* ONAY MODALI */}
+            {modal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ width: '350px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 10px 0' }}>Emin misiniz?</h3>
+                        <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
+                            {modal.action === 'cancel'
+                                ? "Sipariş iptal edilecek, stoklar geri yüklenecek."
+                                : "Sipariş kalıcı olarak silinecek."}
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                            <button onClick={() => setModal(null)} className="btn btn-secondary">Vazgeç</button>
+                            <button onClick={confirmAction} className="btn btn-danger">Onayla</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ÜST BUTONLAR (Yazdırmada Gizlenir) */}
             <div className="no-print" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button onClick={() => navigate(-1)} className="btn btn-secondary">← Listeye Dön</button>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-
-                    {/* 👇 SADECE ADMIN GÖREBİLİR */}
                     {userRole === 'admin' && (
                         <>
-                            {/* İptal Butonu: Zaten iptal değilse VE Tamamlanmamışsa görünür */}
                             {!isCancelled && !isAllDelivered && (
-                                <button onClick={handleCancel} className="btn btn-warning" style={{ backgroundColor: '#f39c12' }}>
+                                <button onClick={() => setModal({ show: true, action: 'cancel' })} className="btn btn-warning" style={{ backgroundColor: '#f39c12' }}>
                                     İptal Et
                                 </button>
                             )}
-
-                            {/* Sil Butonu: Admin her zaman görebilir */}
-                            <button onClick={handleDelete} className="btn btn-danger">
+                            <button onClick={() => setModal({ show: true, action: 'delete' })} className="btn btn-danger">
                                 Sil
                             </button>
                         </>
                     )}
-
-                    <button onClick={handlePrint} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                        Yazdır / PDF
-                    </button>
+                    <button onClick={handlePrint} className="btn btn-primary">Yazdır / PDF</button>
                 </div>
             </div>
 
@@ -154,14 +149,14 @@ const SaleDetail = () => {
                     <div style={{
                         position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%) rotate(-15deg)',
                         fontSize: '100px', color: 'rgba(231, 76, 60, 0.2)', fontWeight: 'bold', border: '10px solid rgba(231, 76, 60, 0.2)',
-                        padding: '20px', borderRadius: '20px', pointerEvents: 'none'
+                        padding: '20px', borderRadius: '20px', pointerEvents: 'none', zIndex: 0
                     }}>
                         İPTAL
                     </div>
                 )}
 
                 {/* 1. BAŞLIK & LOGO */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f0f0f0', paddingBottom: '30px', marginBottom: '30px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f0f0f0', paddingBottom: '30px', marginBottom: '5px' }}>
                     <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                         <img src={logo} alt="Logo" style={{ height: '70px', objectFit: 'contain' }} />
                         <div>
@@ -175,16 +170,24 @@ const SaleDetail = () => {
                     </div>
                 </div>
 
-                {/* 2. MÜŞTERİ VE TESLİMAT BİLGİLERİ */}
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '40px', gap: '40px' }}>
+                {/* 2. MÜŞTERİ VE TESLİMAT BİLGİLERİ (GÜNCELLENDİ) */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '10px', gap: '40px' }}>
                     <div style={{ flex: 1 }}>
                         <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#95a5a6', borderBottom: '1px solid #eee', paddingBottom: '5px', marginBottom: '10px' }}>Müşteri Bilgileri</h4>
+
                         <div style={{ fontSize: '16px', fontWeight: 'bold', color: '#2c3e50', marginBottom: '5px' }}>{sale.customerName}</div>
-                        <div style={{ fontSize: '14px', color: '#555', lineHeight: '1.6' }}>
+
+                        {/* TC ve Mail Eklendi */}
+                        {sale.tc && <div style={{ fontSize: '13px', color: '#555' }}>TC: {sale.tc}</div>}
+                        {sale.email && <div style={{ fontSize: '13px', color: '#555' }}>E-Posta: {sale.email}</div>}
+
+                        <div style={{ marginTop: '10px', fontSize: '14px', fontWeight: '600' }}>{sale.phone}</div>
+
+                        <div style={{ marginTop: '10px', fontSize: '13px', color: '#555', lineHeight: '1.6', backgroundColor: '#f9f9f9', padding: '10px', borderRadius: '6px' }}>
+                            <strong>Teslimat Adresi:</strong><br />
                             {sale.address ? sale.address : 'Adres belirtilmedi'}<br />
                             {sale.city && sale.district ? `${sale.district} / ${sale.city}` : ''}
                         </div>
-                        <div style={{ marginTop: '10px', fontSize: '14px', fontWeight: '600' }}>{sale.phone}</div>
                     </div>
 
                     <div style={{ flex: 1, textAlign: 'right' }}>
@@ -193,11 +196,17 @@ const SaleDetail = () => {
                             <div><strong>Satış Temsilcisi:</strong> {sale.personnelName}</div>
                             <div><strong>Termin Tarihi:</strong> <span style={{ color: '#e67e22', fontWeight: 'bold' }}>{formatDate(sale.deadline)}</span></div>
 
+                            {/* Sipariş Notu Eklendi */}
+                            {sale.explanation && (
+                                <div style={{ marginTop: '15px', backgroundColor: '#fffbeb', border: '1px solid #fcd34d', padding: '10px', borderRadius: '6px', textAlign: 'left', fontSize: '13px', color: '#92400e' }}>
+                                    <strong>📝 Sipariş Notu:</strong><br />
+                                    {sale.explanation}
+                                </div>
+                            )}
                         </div>
                     </div>
                 </div>
 
-         
                 {/* 3. ÜRÜN TABLOSU */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
                     <thead>
@@ -213,8 +222,6 @@ const SaleDetail = () => {
                     <tbody>
                         {sale.items.map((item, index) => (
                             <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-
-                                {/* 1. SÜTUN: Ürün Adı + Ebat + Kategori */}
                                 <td style={{ padding: '15px 12px' }}>
                                     <div>
                                         <span style={{ fontWeight: 'bold', color: '#333', marginRight: '6px' }}>
@@ -226,7 +233,7 @@ const SaleDetail = () => {
                                             </span>
                                         )}
                                         <span style={{ fontSize: '13px', color: '#7f8c8d', fontWeight: '500' }}>
-                                            {getName(categories, item.categoryId, 'categoryName')}
+                                            ({getName(categories, item.categoryId, 'categoryName')})
                                         </span>
                                     </div>
                                     {item.productNote && (
@@ -235,35 +242,24 @@ const SaleDetail = () => {
                                         </div>
                                     )}
                                 </td>
-
-                                {/* 2. SÜTUN: Renk */}
                                 <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>
                                     {getName(colors, item.colorId, 'colorName')}
                                 </td>
-
-                                {/* 3. SÜTUN: Minder */}
                                 <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>
                                     {item.cushionId ? getName(cushions, item.cushionId, 'cushionName') : '-'}
                                 </td>
-
-                                {/* 4. SÜTUN: Adet */}
                                 <td style={{ padding: '15px 12px', textAlign: 'center', fontWeight: 'bold', fontSize: '15px' }}>
                                     {item.quantity}
                                 </td>
-
-                                {/* 5. SÜTUN: Birim Fiyat */}
                                 <td style={{ padding: '15px 12px', textAlign: 'right', fontSize: '14px' }}>
                                     {Number(item.price).toFixed(2)} ₺
                                     {Number(item.discount) > 0 && (
                                         <div style={{ fontSize: '10px', color: 'red' }}>-{Number(item.discount)} ind.</div>
                                     )}
                                 </td>
-
-                                {/* 6. SÜTUN: Toplam Fiyat */}
                                 <td style={{ padding: '15px 12px', textAlign: 'right', fontWeight: '600', fontSize: '15px', color: '#2c3e50' }}>
                                     {((Number(item.price) - (Number(item.discount) || 0)) * Number(item.quantity)).toFixed(2)} ₺
                                 </td>
-
                             </tr>
                         ))}
                     </tbody>
@@ -295,9 +291,9 @@ const SaleDetail = () => {
                     </div>
                 </div>
 
-                {/* 5. DİPNOT / FOOTER */}
+                {/* 5. FOOTER */}
                 <div style={{ marginTop: '60px', borderTop: '1px solid #eee', paddingTop: '20px', textAlign: 'center', color: '#95a5a6', fontSize: '12px' }}>
-                    <p><strong>Bahçemo Home Garden</strong> -www.bahcemo.com.tr</p>
+                    <p><strong>Bahçemo Home Garden</strong> - www.bahcemo.com.tr</p>
                 </div>
 
             </div>

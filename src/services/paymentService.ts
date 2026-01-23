@@ -11,7 +11,8 @@ import {
     runTransaction,
     increment,
     where,
-    updateDoc
+    updateDoc,
+    limit
 } from "firebase/firestore";
 import type { PaymentMethod, PaymentDocument, Debt } from "../types";
 
@@ -146,5 +147,44 @@ export const getPaymentsByStore = async (storeId: string): Promise<PaymentDocume
     } catch (error) {
         console.error("Ödeme listesi hatası:", error);
         return [];
+    }
+};
+
+export const getNextPaymentReceiptNo = async (storeId: string): Promise<string> => {
+    try {
+        // Mağazaya ait ödemeleri oluşturulma tarihine göre tersten çek (En yeniler)
+        const q = query(
+            collection(db, "payments"),
+            where("storeId", "==", storeId),
+            orderBy("createdAt", "desc"), // En son eklenenleri getir
+            limit(50) // Son 50 işlemi kontrol et (Sıralama hatasını önlemek için havuz)
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            return "1"; // İlk kayıt
+        }
+
+        let maxNumber = 0;
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // receiptNo alanını sayıya çevirmeyi dene
+            const receiptNo = Number(data.receiptNo);
+
+            // Eğer geçerli bir sayıysa ve şu anki max'tan büyükse, yeni max o'dur.
+            if (!isNaN(receiptNo) && receiptNo > maxNumber) {
+                maxNumber = receiptNo;
+            }
+        });
+
+        // En büyük sayıyı 1 artır ve string olarak döndür
+        return (maxNumber + 1).toString();
+
+    } catch (error) {
+        console.error("Makbuz no hatası:", error);
+        // Hata durumunda timestamp döndür (Çakışmayı önlemek için)
+        return Date.now().toString().slice(-6);
     }
 };

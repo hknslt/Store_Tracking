@@ -3,26 +3,40 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { cancelPurchaseComplete, deletePurchaseComplete } from "../../services/purchaseService";
 import { getCategories, getColors, getDimensions, getCushions } from "../../services/definitionService";
+import { useAuth } from "../../context/AuthContext";
 import type { Purchase, Category, Color, Dimension, Cushion } from "../../types";
 import "../../App.css";
 
-// LOGO
 import logo from "../../assets/logo/Bahçemo_green.png";
 
 const PurchaseDetail = () => {
     const { storeId, id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+    const { userRole } = useAuth();
 
     const [purchase, setPurchase] = useState<Purchase | null>(location.state?.purchase || null);
     const [loading, setLoading] = useState(!location.state?.purchase);
+
+    // Mesaj State'i
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // Tanımlar
     const [categories, setCategories] = useState<Category[]>([]);
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
+
+    const [modal, setModal] = useState<{ show: boolean, action: 'cancel' | 'delete' } | null>(null);
+
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
 
     useEffect(() => {
         const initData = async () => {
@@ -38,7 +52,6 @@ const PurchaseDetail = () => {
                     if (docSnap.exists()) {
                         setPurchase({ id: docSnap.id, ...docSnap.data() } as Purchase);
                     } else {
-                        alert("Alış kaydı bulunamadı!");
                         navigate("/purchases");
                     }
                 }
@@ -50,22 +63,86 @@ const PurchaseDetail = () => {
     const getName = (list: any[], id: string | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
     const formatDate = (date: string) => new Date(date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 
-    const handlePrint = () => {
-        window.print();
+    const handlePrint = () => { window.print(); };
+
+    const confirmAction = async () => {
+        if (!storeId || !id || !modal) return;
+        setLoading(true);
+        try {
+            if (modal.action === 'cancel') {
+                await cancelPurchaseComplete(storeId, id);
+                // Veriyi yenile
+                const docRef = doc(db, "purchases", storeId, "receipts", id);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    setPurchase({ id: docSnap.id, ...docSnap.data() } as Purchase);
+                }
+                setMessage({ type: 'success', text: "Sipariş başarıyla iptal edildi." });
+            } else {
+                await deletePurchaseComplete(storeId, id);
+                setMessage({ type: 'success', text: "Kayıt başarıyla silindi." });
+                setTimeout(() => navigate("/purchases"), 1500);
+            }
+        } catch (error: any) {
+            console.error(error);
+            setMessage({ type: 'error', text: error.message || "İşlem başarısız oldu." });
+        } finally {
+            setLoading(false);
+            setModal(null);
+        }
     };
 
     if (loading) return <div className="page-container" style={{ textAlign: 'center', paddingTop: '100px' }}>Yükleniyor...</div>;
     if (!purchase) return <div className="page-container">Kayıt bulunamadı.</div>;
 
+    const isCancelled = purchase.items.every(i => i.status === 'İptal');
+    const isCompleted = purchase.items.every(i => i.status === 'Tamamlandı');
+
     return (
         <div className="page-container">
+            {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
 
+            {modal && (
+                <div className="modal-overlay">
+                    <div className="modal-content" style={{ width: '350px', textAlign: 'center' }}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 10px 0' }}>Emin misiniz?</h3>
+                        <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
+                            {modal.action === 'cancel'
+                                ? "Alış iptal edilecek, stoklar geri düşülecek."
+                                : "Kayıt tamamen silinecek ve stoklar geri alınacak."}
+                        </p>
+                        <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
+                            <button onClick={() => setModal(null)} className="btn btn-secondary">Vazgeç</button>
+                            <button onClick={confirmAction} className="btn btn-danger">Onayla</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* ... (Geri kalan render kodları aynı) ... */}
             {/* ÜST BUTONLAR */}
             <div className="no-print" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button onClick={() => navigate(-1)} className="btn btn-secondary">← Listeye Dön</button>
-                <button onClick={handlePrint} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    Yazdır /PDF
-                </button>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {/* SADECE ADMIN */}
+                    {userRole === 'admin' && (
+                        <>
+                            {!isCancelled && !isCompleted && (
+                                <button onClick={() => setModal({ show: true, action: 'cancel' })} className="btn btn-warning" style={{ backgroundColor: '#f39c12' }}>
+                                    İptal Et
+                                </button>
+                            )}
+                            <button onClick={() => setModal({ show: true, action: 'delete' })} className="btn btn-danger">
+                                Sil
+                            </button>
+                        </>
+                    )}
+                    <button onClick={handlePrint} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                        Yazdır /PDF
+                    </button>
+                </div>
             </div>
 
             {/* FİŞ GÖRÜNÜMÜ */}
@@ -76,10 +153,20 @@ const PurchaseDetail = () => {
                 borderRadius: '8px',
                 boxShadow: '0 5px 30px rgba(0,0,0,0.05)',
                 maxWidth: '900px',
-                margin: '0 auto'
+                margin: '0 auto',
+                position: 'relative'
             }}>
 
-                {/* 1. BAŞLIK & LOGO */}
+                {isCancelled && (
+                    <div style={{
+                        position: 'absolute', top: '40%', left: '50%', transform: 'translate(-50%, -50%) rotate(-15deg)',
+                        fontSize: '100px', color: 'rgba(231, 76, 60, 0.2)', fontWeight: 'bold', border: '10px solid rgba(231, 76, 60, 0.2)',
+                        padding: '20px', borderRadius: '20px', pointerEvents: 'none', zIndex: 0
+                    }}>
+                        İPTAL
+                    </div>
+                )}
+
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', borderBottom: '2px solid #f0f0f0', paddingBottom: '30px', marginBottom: '30px' }}>
                     <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
                         <img src={logo} alt="Logo" style={{ height: '70px', objectFit: 'contain' }} />
@@ -96,7 +183,6 @@ const PurchaseDetail = () => {
                     </div>
                 </div>
 
-                {/* 2. TEDARİKÇİ / PERSONEL BİLGİLERİ */}
                 <div style={{ marginBottom: '40px' }}>
                     <h4 style={{ fontSize: '12px', textTransform: 'uppercase', color: '#95a5a6', borderBottom: '1px solid #eee', paddingBottom: '5px', marginBottom: '10px' }}>İşlem Detayları</h4>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px', fontSize: '14px', color: '#333' }}>
@@ -106,7 +192,6 @@ const PurchaseDetail = () => {
                     </div>
                 </div>
 
-                {/* 3. ÜRÜN TABLOSU */}
                 <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '30px' }}>
                     <thead>
                         <tr style={{ backgroundColor: '#145a32', color: 'white' }}>
@@ -121,77 +206,38 @@ const PurchaseDetail = () => {
                     <tbody>
                         {purchase.items.map((item, index) => (
                             <tr key={index} style={{ borderBottom: '1px solid #eee' }}>
-
-                                {/* 1. SÜTUN: Ürün Bilgisi (Yanyana Format) */}
                                 <td style={{ padding: '15px 12px' }}>
                                     <div>
                                         <span style={{ fontWeight: 'bold', color: '#333', marginRight: '6px' }}>
                                             {item.productName.split('-')[0].trim()}
                                         </span>
-
                                         {item.dimensionId && (
                                             <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '6px' }}>
                                                 {getName(dimensions, item.dimensionId, 'dimensionName')}
                                             </span>
                                         )}
-
                                         <span style={{ fontSize: '13px', color: '#7f8c8d', fontWeight: '500' }}>
-                                            {getName(categories, item.categoryId, 'categoryName')}
+                                            ({getName(categories, item.categoryId, 'categoryName')})
                                         </span>
                                     </div>
-
                                     {item.explanation && (
                                         <div style={{ fontSize: '11px', color: '#e74c3c', marginTop: '4px', fontStyle: 'italic' }}>
                                             *{item.explanation}
                                         </div>
                                     )}
                                 </td>
-
-                                {/* 2. SÜTUN: Renk */}
-                                <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>
-                                    {getName(colors, item.colorId, 'colorName')}
-                                </td>
-
-                                {/* 3. SÜTUN: Minder */}
-                                <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>
-                                    {item.cushionId ? getName(cushions, item.cushionId, 'cushionName') : '-'}
-                                </td>
-
-                                {/* 4. SÜTUN: Adet */}
-                                <td style={{ padding: '15px 12px', textAlign: 'center', fontWeight: 'bold' }}>
-                                    {item.quantity}
-                                </td>
-
-                                {/* 5. SÜTUN: Birim Fiyat (Tutar / Adet) */}
-                                <td style={{ padding: '15px 12px', textAlign: 'right' }}>
-                                    {Number(item.amount / item.quantity).toFixed(2)} ₺
-                                </td>
-
-                                {/* 6. SÜTUN: Toplam Tutar */}
-                                <td style={{ padding: '15px 12px', textAlign: 'right', fontWeight: '600' }}>
-                                    {Number(item.amount).toFixed(2)} ₺
-                                </td>
+                                <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>{getName(colors, item.colorId, 'colorName')}</td>
+                                <td style={{ padding: '15px 12px', textAlign: 'center', fontSize: '14px', color: '#555' }}>{item.cushionId ? getName(cushions, item.cushionId, 'cushionName') : '-'}</td>
+                                <td style={{ padding: '15px 12px', textAlign: 'center', fontWeight: 'bold', fontSize: '15px' }}>{item.quantity}</td>
+                                <td style={{ padding: '15px 12px', textAlign: 'right', fontSize: '14px' }}>{Number(item.amount / item.quantity).toFixed(2)} ₺</td>
+                                <td style={{ padding: '15px 12px', textAlign: 'right', fontWeight: '600', fontSize: '15px', color: '#2c3e50' }}>{Number(item.amount).toFixed(2)} ₺</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-
-                {/* 4. TOPLAM */}
-                <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                    <div style={{ width: '250px', borderTop: '2px solid #333', paddingTop: '15px', display: 'flex', justifyContent: 'space-between', fontSize: '18px', fontWeight: '600', color: '#2c3e50' }}>
-                        <span>GENEL TOPLAM:</span>
-                        <span>{Number(purchase.totalAmount).toFixed(2)} ₺</span>
-                    </div>
-                </div>
-
-                {/* 5. DİPNOT */}
-                <div style={{ marginTop: '60px', borderTop: '1px solid #eee', paddingTop: '20px', textAlign: 'center', color: '#95a5a6', fontSize: '12px' }}>
-                    <p><strong>Bahçemo Home Garden</strong> -www.bahcemo.com.tr</p>
-                </div>
-
             </div>
         </div>
     );
 };
 
-export default PurchaseDetail; 
+export default PurchaseDetail;

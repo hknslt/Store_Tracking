@@ -304,7 +304,7 @@ const SaleList = () => {
 
                     <input
                         type="text"
-                        placeholder="🔍 Müşteri veya Fiş No Ara..."
+                        placeholder="Müşteri veya Fiş No Ara..."
                         className="form-input"
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}

@@ -8,12 +8,12 @@ import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getStoreStocks } from "../../services/storeStockService";
 import {
     getGroups,
-    getCategories, // 🔥 DEĞİŞİKLİK: Tüm kategorileri çekiyoruz
+    getCategories,
     getCushions,
     getColors,
     getDimensions
 } from "../../services/definitionService";
-import { getProducts } from "../../services/productService"; // 🔥 DEĞİŞİKLİK: Tüm ürünleri çekiyoruz
+import { getProducts } from "../../services/productService";
 import { useNavigate } from "react-router-dom";
 
 // ŞEHİR VERİSİ
@@ -57,6 +57,8 @@ const SaleAdd = () => {
         personnelId: "",
         personnelName: "",
         customerName: "",
+        tc: "",
+        email: "",
         phone: "",
         city: "",
         district: "",
@@ -339,11 +341,30 @@ const SaleAdd = () => {
                     </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '15px', marginBottom: '15px' }}>
 
                     <div>
                         <label className="form-label">Müşteri Adı</label>
                         <input name="customerName" value={headerData.customerName} onChange={handleHeaderChange} className="form-input" placeholder="Ad Soyad" />
+                    </div>
+                    <div>
+                        <label className="form-label">TC Kimlik No <span style={{ fontSize: '11px', color: '#999' }}></span></label>
+                        <input
+                            name="tc"
+                            value={headerData.tc}
+                            onChange={(e) => {
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 11); 
+                                handleHeaderChange({ target: { name: 'tc', value: val } });
+                            }}
+                            className="form-input"
+                            placeholder="11 Haneli"
+                        />
+                    </div>
+
+                    {/*  E-Posta */}
+                    <div>
+                        <label className="form-label">E-Posta <span style={{ fontSize: '11px', color: '#999' }}></span></label>
+                        <input name="email" type="email" value={headerData.email} onChange={handleHeaderChange} className="form-input" placeholder="ornek@mail.com" />
                     </div>
 
                     <div>
@@ -364,7 +385,7 @@ const SaleAdd = () => {
                                 <option value="+39">+39</option> // İtalya
                                 <option value="+7">+7</option> // Rusya
                                 <option value="+972">+972</option> // İsrail
-                            </select>   
+                            </select>
                             <input
                                 name="phone"
                                 value={headerData.phone}

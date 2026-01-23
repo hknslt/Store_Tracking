@@ -172,6 +172,8 @@ export interface Sale {
 
     customerName: string;
     phone: string;
+    tc?: string;
+    email?: string;
     city: string;
     district: string;
     address: string;

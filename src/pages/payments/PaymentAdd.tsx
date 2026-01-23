@@ -5,7 +5,7 @@ import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import { getDebtsByStore } from "../../services/debtService";
-import { getPaymentMethods, addPaymentDocument } from "../../services/paymentService";
+import { getPaymentMethods, addPaymentDocument, getNextPaymentReceiptNo } from "../../services/paymentService";
 
 import type { Store, SystemUser, PaymentItem, PaymentMethod, Debt, TransactionType, Personnel } from "../../types";
 import "../../App.css";
@@ -95,10 +95,14 @@ const PaymentAdd = () => {
                 setPersonnelList(list);
             };
             fetchPersonnel();
+            getNextPaymentReceiptNo(headerData.storeId).then(nextNo => {
+                setHeaderData(prev => ({ ...prev, receiptNo: nextNo }));
+            });
 
         } else {
             setDebts([]);
             setPersonnelList([]);
+            setHeaderData(prev => ({ ...prev, receiptNo: "" }));
         }
     }, [headerData.storeId]);
 
@@ -247,8 +251,19 @@ const PaymentAdd = () => {
             <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
                     <div>
-                        <label style={labelStyle}>Tarih</label>
-                        <input type="date" style={inputStyle} value={headerData.date} onChange={e => setHeaderData({ ...headerData, date: e.target.value })} />
+                        <label style={labelStyle}>
+                            Tarih {isAdmin && <span style={{ fontSize: '10px', color: 'green' }}>(Admin)</span>}
+                        </label>
+                        <input
+                            type="date"
+                            style={{
+                                ...inputStyle,
+                                backgroundColor: !isAdmin ? '#f1f5f9' : 'white'
+                            }}
+                            value={headerData.date}
+                            onChange={e => setHeaderData({ ...headerData, date: e.target.value })}
+                            disabled={!isAdmin}
+                        />
                     </div>
                     <div>
                         <label style={labelStyle}>Mağaza</label>
@@ -262,9 +277,14 @@ const PaymentAdd = () => {
                         )}
                     </div>
                     <div>
-                        <label style={labelStyle}>Makbuz / Evrak No</label>
-                        <input style={inputStyle} value={headerData.receiptNo} onChange={e => setHeaderData({ ...headerData, receiptNo: e.target.value })} placeholder="Örn: T-2024-001" />
-                    </div>
+                        <label style={labelStyle}>Makbuz / Evrak No <span style={{color:'red'}}>*</span></label>
+                        <input 
+                            style={inputStyle} 
+                            value={headerData.receiptNo} 
+                            onChange={e => setHeaderData({ ...headerData, receiptNo: e.target.value })} 
+                            placeholder="Otomatik..." 
+                        />
+                    </div> 
                     <div>
                         <label style={labelStyle}>İşlemi Yapan Personel</label>
                         <select

@@ -1,6 +1,6 @@
 // src/services/purchaseService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch, limit } from "firebase/firestore";
 import type { PendingRequest, Purchase, PurchaseStatus } from "../types";
 
 // 1. YENİ ALIŞ FİŞİ KAYDETME
@@ -35,13 +35,25 @@ export const addPurchase = async (purchase: Purchase) => {
 
                 const qty = Number(item.quantity);
 
-                // Sadece Alış (Stok Girişi) Mantığı
+                // --- STOK GİRİŞ MANTIĞI (DÜZELTİLDİ) ---
+
                 if (item.itemType === 'Stok') {
-                    // Depo içinse: Beklenen Depo Artar
+                    // Depo için normal giriş: Beklenen Depo Artar
                     updates.incomingStock = (currentData.incomingStock || 0) + qty;
                 }
                 else if (item.itemType === 'Sipariş') {
-                    // Sipariş içinse: Zaten satışta artırıldı, işlem yok.
+                    // 🔥 KRİTİK DÜZELTME:
+                    // Eğer bu ürün "Bekleyen Taleplerden" (Pending Request) geldiyse (requestId varsa),
+                    // Satış anında zaten 'incomingReservedStock' artırılmıştı.
+                    // O yüzden burada TEKRAR ARTIRMA! (Çift kayıt olmasın)
+
+                    // Ancak, eğer manuel olarak "Sipariş" tipinde ürün eklediysek (requestId yoksa),
+                    // O zaman artırmamız gerekir.
+
+                    if (!(item as any).requestId) {
+                        updates.incomingReservedStock = (currentData.incomingReservedStock || 0) + qty;
+                    }
+                    // else: requestId varsa stok zaten artmıştır, dokunma.
                 }
 
                 stockWrites.push({ ref, data: updates });
@@ -61,7 +73,7 @@ export const addPurchase = async (purchase: Purchase) => {
     }
 };
 
-// 2. DURUM GÜNCELLEME (Aynı kalacak, sadece type kontrolü kalktı çünkü hepsi Alış)
+// 2. DURUM GÜNCELLEME
 export const updatePurchaseItemStatus = async (
     storeId: string,
     purchaseId: string,
@@ -91,26 +103,28 @@ export const updatePurchaseItemStatus = async (
 
             // --- STOK TRANSFER MANTIĞI ---
 
-            // A) TAMAMLANDI (Depoya Giriş)
+            // A) TAMAMLANDI (Depoya/Müşteriye Giriş)
             if (newStatus === 'Tamamlandı' && oldStatus !== 'Tamamlandı') {
                 if (item.itemType === 'Stok') {
-                    updates.incomingStock = (sData.incomingStock || 0) - qty;
+                    // Depo stoğu: Gelecekten düş -> Serbest Stoğa ekle
+                    updates.incomingStock = Math.max(0, (sData.incomingStock || 0) - qty);
                     updates.freeStock = (sData.freeStock || 0) + qty;
                 }
                 else if (item.itemType === 'Sipariş') {
-                    updates.incomingReservedStock = (sData.incomingReservedStock || 0) - qty;
+                    // Müşteri Siparişi: Gelecek Rezerve'den düş -> Rezerve Stoğa ekle
+                    updates.incomingReservedStock = Math.max(0, (sData.incomingReservedStock || 0) - qty);
                     updates.reservedStock = (sData.reservedStock || 0) + qty;
                 }
             }
 
-            // B) GERİ ALMA
+            // B) GERİ ALMA (Tamamlandı'dan geri alma)
             else if (oldStatus === 'Tamamlandı' && newStatus !== 'Tamamlandı') {
                 if (item.itemType === 'Stok') {
-                    updates.freeStock = (sData.freeStock || 0) - qty;
+                    updates.freeStock = Math.max(0, (sData.freeStock || 0) - qty);
                     updates.incomingStock = (sData.incomingStock || 0) + qty;
                 }
                 else if (item.itemType === 'Sipariş') {
-                    updates.reservedStock = (sData.reservedStock || 0) - qty;
+                    updates.reservedStock = Math.max(0, (sData.reservedStock || 0) - qty);
                     updates.incomingReservedStock = (sData.incomingReservedStock || 0) + qty;
                 }
             }
@@ -128,7 +142,7 @@ export const updatePurchaseItemStatus = async (
     }
 };
 
-// ... (GET fonksiyonları aynı) ...
+// 3. GET FONKSİYONLARI
 export const getPurchasesByStore = async (storeId: string) => {
     const q = query(collection(db, "purchases", storeId, "receipts"), orderBy("date", "desc"));
     const snapshot = await getDocs(q);
@@ -148,4 +162,143 @@ export const deletePendingRequests = async (storeId: string, requestIds: string[
         batch.delete(ref);
     });
     await batch.commit();
+};
+
+export const getNextPurchaseReceiptNo = async (storeId: string): Promise<string> => {
+    try {
+        const receiptsRef = collection(db, "purchases", storeId, "receipts");
+        const q = query(
+            receiptsRef,
+            orderBy("createdAt", "desc"),
+            limit(50)
+        );
+
+        const snapshot = await getDocs(q);
+
+        if (snapshot.empty) {
+            return "1";
+        }
+
+        let maxNumber = 0;
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            const receiptNo = Number(data.receiptNo);
+            if (!isNaN(receiptNo) && receiptNo > maxNumber) {
+                maxNumber = receiptNo;
+            }
+        });
+
+        return (maxNumber + 1).toString();
+
+    } catch (error) {
+        console.error("Fiş no getirme hatası:", error);
+        return Date.now().toString().slice(-6);
+    }
+};
+
+// 🔥 4. ALIŞ İPTAL ETME (Stokları Düzeltir)
+export const cancelPurchaseComplete = async (storeId: string, purchaseId: string) => {
+    try {
+        await runTransaction(db, async (transaction) => {
+            const purchaseRef = doc(db, "purchases", storeId, "receipts", purchaseId);
+            const purchaseDoc = await transaction.get(purchaseRef);
+            if (!purchaseDoc.exists()) throw "Kayıt bulunamadı.";
+
+            const purchase = purchaseDoc.data() as Purchase;
+
+            // Stokları Geri Al
+            for (const item of purchase.items) {
+                if (item.status === 'İptal') continue;
+
+                const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+                const stockDoc = await transaction.get(stockRef);
+
+                if (stockDoc.exists()) {
+                    const currentData = stockDoc.data();
+                    const qty = Number(item.quantity);
+                    const updates: any = {};
+
+                    // 1. Durum: Ürün 'Stok' tipindeyse (Depo girişi)
+                    if (item.itemType === 'Stok') {
+                        if (item.status === 'Tamamlandı') {
+                            updates.freeStock = Math.max(0, (currentData.freeStock || 0) - qty);
+                        } else {
+                            updates.incomingStock = Math.max(0, (currentData.incomingStock || 0) - qty);
+                        }
+                    }
+
+                    // 2. Durum: Ürün 'Sipariş' tipindeyse (Müşteri için)
+                    else if (item.itemType === 'Sipariş') {
+                        // 🔥 ÖNEMLİ: Eğer bu ürün satıştan geldiyse (requestId varsa),
+                        // Alış kaydı sırasında stok artırmamıştık.
+                        // O yüzden iptal ederken de stok DÜŞMEMELİYİZ.
+
+                        // Sadece manuel eklenen (requestId olmayan) siparişler için stok düşülmeli.
+                        if (!(item as any).requestId) {
+                            if (item.status === 'Tamamlandı') {
+                                updates.reservedStock = Math.max(0, (currentData.reservedStock || 0) - qty);
+                            } else {
+                                updates.incomingReservedStock = Math.max(0, (currentData.incomingReservedStock || 0) - qty);
+                            }
+                        } else {
+                            // Eğer requestId varsa, bu ürün satıştan gelmiştir.
+                            // Satış iptal edilmediği sürece bu stok "Gelecek Müşteri" olarak kalmalıdır.
+                            // ANCAK: Alış iptal olduğu için "Tedarik Süreci" durmuş olur.
+                            // Bu durumda stok ne olacak?
+                            // Mantıken satış hala "Merkezden" bekliyor durumunda.
+                            // Yani incomingReservedStock kalmalı mı? Evet.
+                            // Çünkü satış kaydı hala o ürünün geleceğini söylüyor.
+                            // Sadece bu alış fişi iptal oldu, belki başka bir alış fişiyle gelecek.
+                            // O yüzden requestId varsa STOK DÜŞME!
+                        }
+                    }
+
+                    if (Object.keys(updates).length > 0) {
+                        transaction.update(stockRef, updates);
+                    }
+                }
+            }
+
+            const updatedItems = purchase.items.map(i => ({ ...i, status: 'İptal' as any }));
+            transaction.update(purchaseRef, { items: updatedItems, totalAmount: 0 });
+        });
+    } catch (error) {
+        console.error("İptal hatası:", error);
+        throw error;
+    }
+};
+
+
+// 🔥 5. ALIŞ SİLME (Güvenli Mod)
+export const deletePurchaseComplete = async (storeId: string, purchaseId: string) => {
+    try {
+        await runTransaction(db, async (transaction) => {
+            const purchaseRef = doc(db, "purchases", storeId, "receipts", purchaseId);
+            const purchaseDoc = await transaction.get(purchaseRef);
+            if (!purchaseDoc.exists()) throw "Kayıt bulunamadı.";
+
+            const purchase = purchaseDoc.data() as Purchase;
+
+            // KONTROL GÜNCELLENDİ: 
+            // Fişteki tüm ürünler 'İptal' EDİLMİŞ Mİ VEYA 'Tamamlandı' MI?
+            // (Yani aktif süreçte -Beklemede, Üretim, Sevkiyat- olan bir şey silinmesin)
+
+            const isSafeToDelete = purchase.items.every(i =>
+                i.status === 'İptal' || i.status === 'Tamamlandı'
+            );
+
+            if (!isSafeToDelete) {
+                // Eğer hala aktif süreçte (Beklemede, Onaylandı vs.) olan varsa uyarı ver
+                throw new Error("Aktif süreçteki sipariş silinemez! Önce süreci tamamlayın veya iptal edin.");
+            }
+
+            // Güvenli ise sil
+            transaction.delete(purchaseRef);
+        });
+    } catch (error) {
+        console.error("Silme hatası:", error);
+        throw error;
+    }
 };
