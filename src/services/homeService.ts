@@ -1,6 +1,6 @@
 // src/services/homeService.ts
 import { db } from "../firebase";
-import { collection, getDocs, collectionGroup, query, where } from "firebase/firestore";
+import { collection, getDocs, collectionGroup, query, where, orderBy } from "firebase/firestore";
 import type { Sale, Purchase } from "../types";
 
 export interface DashboardData {
@@ -73,5 +73,64 @@ export const getDashboardData = async (): Promise<DashboardData> => {
     } catch (error) {
         console.error("Dashboard verisi çekilemedi:", error);
         throw error;
+    }
+};
+
+export const getLast7DaysSales = async () => {
+    try {
+        const today = new Date();
+        const sevenDaysAgo = new Date();
+        sevenDaysAgo.setDate(today.getDate() - 6); // Bugün dahil son 7 gün
+        
+        const dateString = sevenDaysAgo.toISOString().split('T')[0];
+
+        // Tüm "receipts" koleksiyonlarını çek (Satış + Alış)
+        // NOT: Eğer konsolda "Index required" hatası alırsanız linke tıklayıp index oluşturun.
+        const q = query(
+            collectionGroup(db, "receipts"),
+            where("date", ">=", dateString),
+            orderBy("date", "asc")
+        );
+
+        const snapshot = await getDocs(q);
+        
+        // Son 7 günü sıfır değeriyle hazırla
+        const dataMap = new Map<string, number>();
+        const chartData = [];
+        
+        for (let i = 6; i >= 0; i--) {
+            const d = new Date();
+            d.setDate(today.getDate() - i);
+            const isoDate = d.toISOString().split('T')[0];
+            const displayDate = d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }); // Örn: "23 Oca"
+            
+            dataMap.set(isoDate, 0);
+            chartData.push({ date: isoDate, name: displayDate, total: 0 });
+        }
+
+        snapshot.forEach(doc => {
+            // Sadece "sales" klasörü altındakileri al (Alışları filtrele)
+            if (doc.ref.path.includes("sales")) {
+                const data = doc.data();
+                // İptal edilmemişleri topla
+                if (data.status !== 'İptal') {
+                    const date = data.date;
+                    if (dataMap.has(date)) {
+                        const current = dataMap.get(date) || 0;
+                        dataMap.set(date, current + Number(data.grandTotal || 0));
+                    }
+                }
+            }
+        });
+
+        // Grafik formatına çevir
+        return chartData.map(item => ({
+            name: item.name,
+            total: dataMap.get(item.date) || 0
+        }));
+
+    } catch (error) {
+        console.error("Grafik verisi çekilemedi:", error);
+        return [];
     }
 };

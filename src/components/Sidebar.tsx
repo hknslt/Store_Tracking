@@ -28,10 +28,11 @@ import cardIcon from "../assets/icons/credit-card.svg";
 import addIcon from "../assets/icons/user-add.svg";
 import logoutIcon from "../assets/icons/logout.svg";
 import reportsIcon from "../assets/icons/data-report.svg";
-import settingsIcon from "../assets/icons/settings.svg"; 
+import settingsIcon from "../assets/icons/settings.svg";
 import listIcon from "../assets/icons/square.svg";
 import targetIcon from "../assets/icons/target.svg";
 import commissionIcon from "../assets/icons/commission.svg";
+import invoiceIcon from "../assets/icons/invoice.svg";
 
 const Sidebar = () => {
   const { currentUser, userRole } = useAuth();
@@ -113,18 +114,6 @@ const Sidebar = () => {
           <span className="nav-text">Personel Primleri</span>
         </NavLink>
 
-        <div className="nav-section"><span>KATALOG & ÜRÜN</span></div>
-
-        <NavLink to="/products" className="nav-item">
-          <span className="nav-icon"><img src={productIcon} alt="" /></span>
-          <span className="nav-text">Ürün Listesi</span>
-        </NavLink>
-
-        <NavLink to="/prices/list" className="nav-item">
-          <span className="nav-icon"><img src={priceIcon} alt="" /></span>
-          <span className="nav-text">Fiyat Listesi</span>
-        </NavLink>
-
         <div className="nav-section"><span>MODÜLLER</span></div>
 
         <NavLink to="/sales" className="nav-item">
@@ -155,6 +144,23 @@ const Sidebar = () => {
         <NavLink to="/attendance" className="nav-item">
           <span className="nav-icon"><img src={timeIcon} alt="" /></span>
           <span className="nav-text">Puantaj</span>
+        </NavLink>
+
+        <NavLink to="/invoiceTracking" className="nav-item">
+          <span className="nav-icon"><img src={invoiceIcon} alt="" /></span>
+          <span className="nav-text">Fiş Takip</span>
+        </NavLink>
+
+        <div className="nav-section"><span>KATALOG & ÜRÜN</span></div>
+
+        <NavLink to="/products" className="nav-item">
+          <span className="nav-icon"><img src={productIcon} alt="" /></span>
+          <span className="nav-text">Ürün Listesi</span>
+        </NavLink>
+
+        <NavLink to="/prices/list" className="nav-item">
+          <span className="nav-icon"><img src={priceIcon} alt="" /></span>
+          <span className="nav-text">Fiyat Listesi</span>
         </NavLink>
 
         {/* 👇 GÜNCELLENEN TANIMLAMALAR BÖLÜMÜ (ACCORDION) */}

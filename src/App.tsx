@@ -48,6 +48,7 @@ import PersonnelReport from "./pages/reports/PersonnelReport";
 import ReportsDashboard from "./pages/Dashboard/ReportsDashboard";
 import StoreTargets from "./pages/targets/StoreTargets";
 import PersonnelCommissions from "./pages/personnel/PersonnelCommissions";
+import InvoiceTracking from "./pages/tracking/InvoiceTracking";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -265,6 +266,7 @@ function App() {
             <Route path="/attendance" element={<AttendanceManager />} />
             <Route path="/commissions" element={<PersonnelCommissions />} />
             <Route path="/register" element={<Register />} />
+            <Route path="/invoiceTracking" element={<InvoiceTracking />} />
 
             {/* Sales Module */}
             <Route path="/sales" element={<SaleList />} />

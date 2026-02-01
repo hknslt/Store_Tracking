@@ -24,9 +24,7 @@ const Home = () => {
 
     // 2. Rapor Kullanıcısı -> Rapor Dashboard'una
     if (userRole === 'report') {
-      navigate('/reports', { replace: true });
-      return;
-    }
+      navigate('/reports/dashboard', { replace: true });    }
 
     // 3. Admin ve Control kullanıcıları bu sayfada (Home) kalacak ve AdminDashboard'u görecek.
   }, [userRole, userData, loading, navigate]);
