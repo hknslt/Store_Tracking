@@ -10,7 +10,8 @@ import {
     updateDoc,
     orderBy,
     setDoc,
-    getDoc
+    getDoc,
+    deleteDoc
 } from "firebase/firestore";
 import type { Store, Personnel, SystemUser } from "../types";
 import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
@@ -129,4 +130,26 @@ export const getStoreById = async (storeId: string): Promise<Store | null> => {
         console.error("Mağaza detay hatası:", error);
         return null;
     }
+};
+
+export const updateStore = async (id: string, data: any) => {
+    const ref = doc(db, "stores", id);
+    await updateDoc(ref, data);
+};
+
+// Mağaza Sil
+export const deleteStore = async (id: string) => {
+    const ref = doc(db, "stores", id);
+    await deleteDoc(ref);
+};
+
+export const updatePersonnel = async (id: string, data: any) => {
+    const ref = doc(db, "personnel", id);
+    await updateDoc(ref, data);
+};
+
+// Personel Silme (Tamamen yok etme)
+export const deletePersonnel = async (id: string) => {
+    const ref = doc(db, "personnel", id);
+    await deleteDoc(ref);
 };

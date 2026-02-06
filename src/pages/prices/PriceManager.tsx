@@ -21,11 +21,20 @@ const PriceManager = () => {
     // Açık Perdeler (Accordion)
     const [openGroupIds, setOpenGroupIds] = useState<string[]>([]);
     const [openCategoryIds, setOpenCategoryIds] = useState<string[]>([]);
-    // Hangi ürünlerin ebat detayları açık?
     const [openProductDetails, setOpenProductDetails] = useState<string[]>([]);
 
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
+
+    // Mesaj State'i (Toast)
+    const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
 
     // Değişiklik var mı?
     const hasChanges = JSON.stringify(priceMap) !== JSON.stringify(originalPrices);
@@ -74,11 +83,9 @@ const PriceManager = () => {
     const handleSaveAll = async () => {
         setSaving(true);
         try {
-            // Sadece değişenleri bulup kaydedebiliriz (Performans için)
             const promises: Promise<void>[] = [];
 
             Object.keys(priceMap).forEach(key => {
-                // Eğer orijinalden farklıysa kaydet
                 if (priceMap[key] !== originalPrices[key]) {
                     const [productId, dimPart] = key.split('_');
                     const dimensionId = dimPart === 'std' ? null : dimPart;
@@ -88,10 +95,10 @@ const PriceManager = () => {
 
             await Promise.all(promises);
 
-            setOriginalPrices(priceMap); // Yeni orijinal bu oldu
-            alert("✅ Tüm değişiklikler kaydedildi!");
+            setOriginalPrices(priceMap);
+            setMessage({ type: 'success', text: "✅ Tüm değişiklikler başarıyla kaydedildi!" });
         } catch (error) {
-            alert("Kaydetme hatası!");
+            setMessage({ type: 'error', text: "Kaydetme sırasında bir hata oluştu!" });
         } finally {
             setSaving(false);
         }
@@ -101,6 +108,19 @@ const PriceManager = () => {
 
     return (
         <div className="page-container">
+            {/* TOAST MESAJI */}
+            {message && (
+                <div style={{
+                    position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+                    padding: '15px 25px', borderRadius: '8px', color: 'white',
+                    fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444',
+                    animation: 'fadeIn 0.3s ease-in-out'
+                }}>
+                    {message.type === 'success' ? '✅' : '⚠️'} {message.text}
+                </div>
+            )}
+
             <div className="page-header">
                 <div className="page-title">
                     <h2>Fiyat Listesi Oluştur</h2>
@@ -142,7 +162,12 @@ const PriceManager = () => {
                                 <div style={{ padding: '10px 20px 20px 20px', backgroundColor: '#fff' }}>
                                     {groupCats.map(cat => {
                                         const isCatOpen = openCategoryIds.includes(cat.id!);
-                                        const catProducts = products.filter(p => p.categoryId === cat.id);
+
+                                        // 🔥 ÜRÜNLERİ FİLTRELE VE A'DAN Z'YE SIRALA
+                                        const catProducts = products
+                                            .filter(p => p.categoryId === cat.id)
+                                            .sort((a, b) => a.productName.localeCompare(b.productName)); // A-Z Sıralama
+
                                         if (catProducts.length === 0) return null;
 
                                         return (

@@ -33,6 +33,7 @@ import listIcon from "../assets/icons/square.svg";
 import targetIcon from "../assets/icons/target.svg";
 import commissionIcon from "../assets/icons/commission.svg";
 import invoiceIcon from "../assets/icons/invoice.svg";
+import financeIcon from "../assets/icons/finance.svg";
 
 const Sidebar = () => {
   const { currentUser, userRole } = useAuth();
@@ -123,12 +124,17 @@ const Sidebar = () => {
 
         <NavLink to="/purchases" className="nav-item">
           <span className="nav-icon"><img src={cartIcon} alt="" /></span>
-          <span className="nav-text">Alışlar</span>
+          <span className="nav-text">Alış Listesi</span>
         </NavLink>
 
         <NavLink to="/payments/list" className="nav-item">
-          <span className="nav-icon"><img src={walletIcon} alt="" /></span>
+          <span className="nav-icon"><img src={financeIcon} alt="" /></span>
           <span className="nav-text">Kasa & Finans</span>
+        </NavLink>
+
+        <NavLink to="/debts" className="nav-item">
+          <span className="nav-icon"><img src={walletIcon} alt="" /></span>
+          <span className="nav-text">Müşteri Borçları</span>
         </NavLink>
 
         <NavLink to="/reports" className="nav-item">

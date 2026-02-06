@@ -1,6 +1,7 @@
 // src/pages/payments/PaymentAdd.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
+import { useLocation } from "react-router-dom"; // 🔥 Eklendi
 import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
@@ -12,6 +13,7 @@ import "../../App.css";
 
 const PaymentAdd = () => {
     const { currentUser } = useAuth();
+    const location = useLocation(); // 🔥 Gelen veriyi yakalamak için
 
     // --- STATE'LER ---
     const [stores, setStores] = useState<Store[]>([]);
@@ -22,7 +24,7 @@ const PaymentAdd = () => {
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Mesaj Durumu (Hata / Başarı)
+    // Mesaj Durumu
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     // Başlık Bilgileri
@@ -34,7 +36,6 @@ const PaymentAdd = () => {
         personnelName: ""
     });
 
-    // SEÇİLEN İŞLEM TÜRÜ
     const [selectedType, setSelectedType] = useState<TransactionType>('Tahsilat');
 
     // Satırlar
@@ -50,7 +51,7 @@ const PaymentAdd = () => {
         }
     ]);
 
-    // --- VERİ ÇEKME ---
+    // --- VERİ ÇEKME VE BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
             const methods = await getPaymentMethods();
@@ -68,7 +69,7 @@ const PaymentAdd = () => {
                         personnelName: u.fullName
                     }));
 
-                    if (u.role === 'admin' || u.role === 'control') {
+                    if (['admin', 'control'].includes(u.role)) {
                         setIsAdmin(true);
                         getStores().then(setStores);
                     } else {
@@ -83,7 +84,45 @@ const PaymentAdd = () => {
         init();
     }, [currentUser]);
 
-    // Mağaza değişince verileri çek
+    // 🔥 OTOMATİK DOLDURMA (DebtList'ten gelindiyse)
+    useEffect(() => {
+        // Eğer location.state içinde veri varsa ve mağazalar/borçlar yüklendiyse
+        if (location.state?.preSelectedDebt && headerData.storeId) {
+            const preData = location.state.preSelectedDebt;
+
+            // Eğer admin değilse veya admin ise ve mağaza seçimi eşleşiyorsa
+            // (Admin farklı mağazadan gelmiş olabilir, kontrol etmekte fayda var)
+            if (headerData.storeId === preData.storeId) {
+
+                // İlk satırı güncelle
+                const newItem = {
+                    type: 'Tahsilat' as TransactionType,
+                    paymentMethodId: "", // Kullanıcı seçsin
+                    currency: 'TL' as const, // 'TL' literal type olarak cast edildi
+                    originalAmount: preData.remainingAmount, // Kalan tutarı öner
+                    exchangeRate: 1,
+                    amount: preData.remainingAmount,
+                    description: "Borç Tahsilatı",
+                    saleId: preData.saleId,
+                    saleReceiptNo: preData.receiptNo,
+                    customerName: preData.customerName
+                };
+                setItems([newItem]);
+            } else {
+                // Eğer admin başka mağazadan geldiyse, önce o mağazayı seçtir
+                if (isAdmin) {
+                    setHeaderData(prev => ({ ...prev, storeId: preData.storeId }));
+                    // Mağaza değişimi useEffect'i tetikleyecek ve borçları çekecek, 
+                    // ancak items'ı burada set etmek için bir sonraki render'ı beklemeliyiz veya
+                    // mağaza değişim effect'ine bir flag koymalıyız.
+                    // Şimdilik basitçe mağazayı seçtiriyoruz, items'ı manuel seçmesi gerekebilir 
+                    // veya debts yüklendikten sonra tekrar kontrol edilebilir.
+                }
+            }
+        }
+    }, [location.state, headerData.storeId, isAdmin]); // Bağımlılıklar
+
+    // Mağaza değişince
     useEffect(() => {
         if (headerData.storeId) {
             getDebtsByStore(headerData.storeId).then(setDebts);
@@ -106,8 +145,8 @@ const PaymentAdd = () => {
         }
     }, [headerData.storeId]);
 
-    // --- İŞLEMLER ---
 
+    // --- İŞLEMLER ---
     const handleTypeChange = (type: TransactionType) => {
         setSelectedType(type);
         setItems([{
@@ -140,25 +179,21 @@ const PaymentAdd = () => {
         setItems(newItems);
     };
 
-    // MANUEL GİRİŞ GÜNCELLEME
     const updateItem = (index: number, field: keyof PaymentItem, value: any) => {
         const newItems = [...items];
         const item = { ...newItems[index], [field]: value };
 
-        // 1. Eğer Para Birimi TL seçilirse:
         if (field === 'currency' && value === 'TL') {
             item.exchangeRate = 1;
             item.amount = Number(item.originalAmount);
         }
 
-        // 2. Eğer "Miktar" (Orjinal) değişirse:
         if (field === 'originalAmount') {
             if (item.currency === 'TL') {
                 item.amount = Number(value);
             }
         }
 
-        // Tahsilat Fiş Seçimi
         if (field === 'saleId') {
             const selectedDebt = debts.find(d => d.saleId === value);
             item.saleId = value;
@@ -171,14 +206,14 @@ const PaymentAdd = () => {
     };
 
     const handleSave = async () => {
-        setMessage(null); // Önceki mesajı temizle
+        setMessage(null);
 
         if (!headerData.receiptNo) { setMessage({ type: 'error', text: "Lütfen Makbuz No giriniz." }); return; }
         if (!headerData.storeId) { setMessage({ type: 'error', text: "Lütfen Mağaza seçiniz." }); return; }
         if (!headerData.personnelId) { setMessage({ type: 'error', text: "Lütfen Personel seçiniz." }); return; }
 
         const validItems = items.filter(i => i.amount > 0 && i.paymentMethodId);
-        if (validItems.length === 0) { setMessage({ type: 'error', text: "Geçerli bir işlem giriniz (TL Tutarı 0'dan büyük olmalı ve Ödeme Yöntemi seçilmeli)." }); return; }
+        if (validItems.length === 0) { setMessage({ type: 'error', text: "Geçerli bir işlem giriniz." }); return; }
 
         if (selectedType === 'Tahsilat') {
             const missingSale = validItems.find(i => !i.saleId);
@@ -199,12 +234,13 @@ const PaymentAdd = () => {
 
             setMessage({ type: 'success', text: "✅ İşlem Başarıyla Kaydedildi!" });
 
-            // Başarılı kayıttan sonra formu temizle
+            // Temizlik
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
             handleTypeChange('Tahsilat');
-            if (headerData.storeId) getDebtsByStore(headerData.storeId).then(setDebts);
-
-            // 3 saniye sonra mesajı kaldır
+            if (headerData.storeId) {
+                getDebtsByStore(headerData.storeId).then(setDebts);
+                getNextPaymentReceiptNo(headerData.storeId).then(nextNo => setHeaderData(prev => ({ ...prev, receiptNo: nextNo })));
+            }
             setTimeout(() => setMessage(null), 3000);
 
         } catch (error: any) {
@@ -228,42 +264,24 @@ const PaymentAdd = () => {
                 <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 30px', fontSize: '16px' }}>KAYDET</button>
             </div>
 
-            {/* MESAJ KUTUSU (Alert yerine) */}
             {message && (
                 <div style={{
-                    padding: '15px',
-                    marginBottom: '20px',
-                    borderRadius: '8px',
+                    padding: '15px', marginBottom: '20px', borderRadius: '8px',
                     backgroundColor: message.type === 'success' ? '#dcfce7' : '#fee2e2',
                     color: message.type === 'success' ? '#166534' : '#991b1b',
                     border: `1px solid ${message.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '10px',
-                    fontWeight: '500'
+                    display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500'
                 }}>
                     <span>{message.type === 'success' ? '✓' : '⚠️'}</span>
                     {message.text}
                 </div>
             )}
 
-            {/* HEADER */}
             <div className="card" style={{ marginBottom: '20px', padding: '20px' }}>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '20px' }}>
                     <div>
-                        <label style={labelStyle}>
-                            Tarih {isAdmin && <span style={{ fontSize: '10px', color: 'green' }}>(Admin)</span>}
-                        </label>
-                        <input
-                            type="date"
-                            style={{
-                                ...inputStyle,
-                                backgroundColor: !isAdmin ? '#f1f5f9' : 'white'
-                            }}
-                            value={headerData.date}
-                            onChange={e => setHeaderData({ ...headerData, date: e.target.value })}
-                            disabled={!isAdmin}
-                        />
+                        <label style={labelStyle}>Tarih {isAdmin && <span style={{ fontSize: '10px', color: 'green' }}>(Admin)</span>}</label>
+                        <input type="date" style={{ ...inputStyle, backgroundColor: !isAdmin ? '#f1f5f9' : 'white' }} value={headerData.date} onChange={e => setHeaderData({ ...headerData, date: e.target.value })} disabled={!isAdmin} />
                     </div>
                     <div>
                         <label style={labelStyle}>Mağaza</label>
@@ -277,64 +295,38 @@ const PaymentAdd = () => {
                         )}
                     </div>
                     <div>
-                        <label style={labelStyle}>Makbuz / Evrak No <span style={{color:'red'}}>*</span></label>
-                        <input 
-                            style={inputStyle} 
-                            value={headerData.receiptNo} 
-                            onChange={e => setHeaderData({ ...headerData, receiptNo: e.target.value })} 
-                            placeholder="Otomatik..." 
-                        />
-                    </div> 
+                        <label style={labelStyle}>Makbuz / Evrak No <span style={{ color: 'red' }}>*</span></label>
+                        <input style={inputStyle} value={headerData.receiptNo} onChange={e => setHeaderData({ ...headerData, receiptNo: e.target.value })} placeholder="Otomatik..." />
+                    </div>
                     <div>
                         <label style={labelStyle}>İşlemi Yapan Personel</label>
-                        <select
-                            style={inputStyle}
-                            value={headerData.personnelId}
-                            onChange={e => {
-                                const p = personnelList.find(x => x.id === e.target.value);
-                                setHeaderData({ ...headerData, personnelId: e.target.value, personnelName: p?.fullName || "" });
-                            }}
-                        >
+                        <select style={inputStyle} value={headerData.personnelId} onChange={e => { const p = personnelList.find(x => x.id === e.target.value); setHeaderData({ ...headerData, personnelId: e.target.value, personnelName: p?.fullName || "" }); }}>
                             <option value="">Seçiniz...</option>
-                            {!personnelList.find(p => p.id === currentUser?.uid) && currentUserData && (
-                                <option value={currentUser?.uid}>{currentUserData.fullName}</option>
-                            )}
-                            {personnelList.map(p => (
-                                <option key={p.id} value={p.id}>{p.fullName}</option>
-                            ))}
+                            {!personnelList.find(p => p.id === currentUser?.uid) && currentUserData && <option value={currentUser?.uid}>{currentUserData.fullName}</option>}
+                            {personnelList.map(p => <option key={p.id} value={p.id}>{p.fullName}</option>)}
                         </select>
                     </div>
                 </div>
             </div>
 
-            {/* İŞLEM TÜRÜ SEÇİMİ */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
                 {['Tahsilat', 'Masraf', 'Merkez', 'E/F'].map((type) => (
                     <button
                         key={type}
                         onClick={() => handleTypeChange(type as TransactionType)}
                         style={{
-                            flex: 1,
-                            padding: '15px',
-                            border: 'none',
-                            borderRadius: '10px',
+                            flex: 1, padding: '15px', border: 'none', borderRadius: '10px',
                             backgroundColor: selectedType === type ? '#145a32' : 'white',
                             color: selectedType === type ? 'white' : '#7f8c8d',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '15px',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)',
-                            transition: 'all 0.2s'
+                            cursor: 'pointer', fontWeight: 'bold', fontSize: '15px',
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
                         }}
                     >
-                        {type === 'Tahsilat' ? '💰 Tahsilat (Giriş)' :
-                            type === 'Masraf' ? '🧾 Masraf (Çıkış)' :
-                                type === 'Merkez' ? '🏦 Merkeze Transfer' : '⚖️ Eksik / Fazla'}
+                        {type === 'Tahsilat' ? '💰 Tahsilat (Giriş)' : type === 'Masraf' ? '🧾 Masraf (Çıkış)' : type === 'Merkez' ? '🏦 Merkeze Transfer' : '⚖️ Eksik / Fazla'}
                     </button>
                 ))}
             </div>
 
-            {/* TABLO */}
             <div className="card">
                 <div className="card-body" style={{ padding: 0 }}>
                     <table className="data-table dense">
@@ -352,90 +344,34 @@ const PaymentAdd = () => {
                         <tbody>
                             {items.map((item, index) => (
                                 <tr key={index}>
-
-                                    {/* 1. Müşteri Seçimi */}
                                     {selectedType === 'Tahsilat' && (
                                         <td style={cellStyle}>
-                                            <select
-                                                style={inputStyle}
-                                                value={item.saleId || ""}
-                                                onChange={e => updateItem(index, 'saleId', e.target.value)}
-                                                disabled={!headerData.storeId}
-                                            >
+                                            <select style={inputStyle} value={item.saleId || ""} onChange={e => updateItem(index, 'saleId', e.target.value)} disabled={!headerData.storeId}>
                                                 <option value="">Seçiniz...</option>
-                                                {debts.map(d => (
-                                                    <option key={d.saleId} value={d.saleId} disabled={d.remainingAmount <= 0}>
-                                                        {d.receiptNo} - {d.customerName} (Kalan: {d.remainingAmount} ₺)
-                                                    </option>
-                                                ))}
+                                                {debts.map(d => <option key={d.saleId} value={d.saleId} disabled={d.remainingAmount <= 0}>{d.receiptNo} - {d.customerName} (Kalan: {d.remainingAmount} ₺)</option>)}
                                             </select>
                                         </td>
                                     )}
-
-                                    {/* 2. Ödeme Yöntemi */}
                                     <td style={cellStyle}>
                                         <select style={inputStyle} value={item.paymentMethodId} onChange={e => updateItem(index, 'paymentMethodId', e.target.value)}>
                                             <option value="">Seçiniz...</option>
                                             {paymentMethods.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
                                         </select>
                                     </td>
-
-                                    {/* 3. Para Birimi */}
                                     <td style={cellStyle}>
-                                        <select
-                                            style={{ ...inputStyle, fontWeight: 'bold' }}
-                                            value={item.currency}
-                                            onChange={e => updateItem(index, 'currency', e.target.value)}
-                                        >
-                                            <option value="TL">TL ₺</option>
-                                            <option value="USD">USD $</option>
-                                            <option value="EUR">EUR €</option>
-                                            <option value="GBP">GBP £</option>
+                                        <select style={{ ...inputStyle, fontWeight: 'bold' }} value={item.currency} onChange={e => updateItem(index, 'currency', e.target.value)}>
+                                            <option value="TL">TL ₺</option><option value="USD">USD $</option><option value="EUR">EUR €</option><option value="GBP">GBP £</option>
                                         </select>
                                     </td>
-
-                                    {/* 4. Döviz Miktarı (Original) */}
                                     <td style={cellStyle}>
-                                        <input
-                                            type="number"
-                                            placeholder="0"
-                                            style={{ ...inputStyle, textAlign: 'right' }}
-                                            value={item.originalAmount || ""}
-                                            onChange={e => updateItem(index, 'originalAmount', e.target.value)}
-                                        />
+                                        <input type="number" placeholder="0" style={{ ...inputStyle, textAlign: 'right' }} value={item.originalAmount || ""} onChange={e => updateItem(index, 'originalAmount', e.target.value)} />
                                     </td>
-
-                                    {/* 5. TL Karşılığı (Manuel Giriş) */}
                                     <td style={cellStyle}>
-                                        <input
-                                            type="number"
-                                            placeholder="TL Tutarı"
-                                            disabled={item.currency === 'TL'}
-                                            style={{
-                                                ...inputStyle,
-                                                textAlign: 'right',
-                                                backgroundColor: item.currency === 'TL' ? '#e9ecef' : '#fff',
-                                                fontWeight: 'bold',
-                                                color: '#2c3e50',
-                                                border: item.currency !== 'TL' ? '2px solid #3498db' : '1px solid #ddd'
-                                            }}
-                                            value={item.amount || ""}
-                                            onChange={e => updateItem(index, 'amount', e.target.value)}
-                                        />
+                                        <input type="number" placeholder="TL Tutarı" disabled={item.currency === 'TL'} style={{ ...inputStyle, textAlign: 'right', backgroundColor: item.currency === 'TL' ? '#e9ecef' : '#fff', fontWeight: 'bold', color: '#2c3e50', border: item.currency !== 'TL' ? '2px solid #3498db' : '1px solid #ddd' }} value={item.amount || ""} onChange={e => updateItem(index, 'amount', e.target.value)} />
                                     </td>
-
-                                    {/* 6. Açıklama */}
                                     <td style={cellStyle}>
-                                        <input
-                                            type="text"
-                                            style={inputStyle}
-                                            value={item.description}
-                                            onChange={e => updateItem(index, 'description', e.target.value)}
-                                            onKeyDown={e => { if (e.key === 'Enter') addRow(); }}
-                                        />
+                                        <input type="text" style={inputStyle} value={item.description} onChange={e => updateItem(index, 'description', e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addRow(); }} />
                                     </td>
-
-                                    {/* 7. Sil */}
                                     <td style={{ ...cellStyle, textAlign: 'center' }}>
                                         <button onClick={() => removeRow(index)} style={{ color: '#e74c3c', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px' }}>×</button>
                                     </td>
@@ -443,16 +379,10 @@ const PaymentAdd = () => {
                             ))}
                         </tbody>
                         <tfoot>
-                            <tr>
-                                <td colSpan={selectedType === 'Tahsilat' ? 7 : 6} style={{ padding: '10px' }}>
-                                    <button onClick={addRow} className="btn btn-primary" style={{ width: '100%', padding: '8px' }}>+ Yeni Satır Ekle</button>
-                                </td>
-                            </tr>
+                            <tr><td colSpan={selectedType === 'Tahsilat' ? 7 : 6} style={{ padding: '10px' }}><button onClick={addRow} className="btn btn-primary" style={{ width: '100%', padding: '8px' }}>+ Yeni Satır Ekle</button></td></tr>
                             <tr style={{ backgroundColor: '#e8f8f5', fontWeight: 'bold' }}>
                                 <td colSpan={selectedType === 'Tahsilat' ? 4 : 3} style={{ textAlign: 'right', padding: '15px' }}>GENEL TOPLAM (TL):</td>
-                                <td style={{ textAlign: 'right', padding: '15px', fontSize: '18px', color: '#27ae60' }}>
-                                    {items.reduce((acc, item) => acc + Number(item.amount), 0).toFixed(2)} ₺
-                                </td>
+                                <td style={{ textAlign: 'right', padding: '15px', fontSize: '18px', color: '#27ae60' }}>{items.reduce((acc, item) => acc + Number(item.amount), 0).toFixed(2)} ₺</td>
                                 <td colSpan={2}></td>
                             </tr>
                         </tfoot>

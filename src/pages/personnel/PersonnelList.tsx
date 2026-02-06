@@ -45,11 +45,14 @@ const PersonnelList = () => {
         loadData();
     }, [currentUser]);
 
-    const filteredPersonnel = personnel.filter(p => {
-        const matchesStore = selectedStoreId ? (p as any).storeId === selectedStoreId : true;
-        const matchesSearch = p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || (p.phone && p.phone.includes(searchTerm));
-        return matchesStore && matchesSearch;
-    });
+    // 🔥 FİLTRELEME VE SIRALAMA (A-Z)
+    const filteredPersonnel = personnel
+        .filter(p => {
+            const matchesStore = selectedStoreId ? (p as any).storeId === selectedStoreId : true;
+            const matchesSearch = p.fullName.toLowerCase().includes(searchTerm.toLowerCase()) || (p.phone && p.phone.includes(searchTerm));
+            return matchesStore && matchesSearch;
+        })
+        .sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr')); // Türkçe Karakter Uyumlu A-Z Sıralama
 
     const getStoreName = (id?: string) => stores.find(x => x.id === id)?.storeName || "-";
     const getRoleName = (role: string) => {
@@ -73,7 +76,7 @@ const PersonnelList = () => {
                 </Link>
             </div>
 
-            {/* 2. FİLTRE BARI (CSS'deki .filter-bar burayı etkiler) */}
+            {/* 2. FİLTRE BARI */}
             <div className="filter-bar">
                 {isAdmin ? (
                     <select

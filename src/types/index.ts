@@ -45,6 +45,8 @@ export interface Store {
     phone?: string;
     currentBalance?: StoreBalance;
     commissionModel?: 'target_based' | 'flat_rate';
+    city?: string;
+    district?: string;
 }
 
 

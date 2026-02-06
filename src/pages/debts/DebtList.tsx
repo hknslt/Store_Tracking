@@ -232,7 +232,17 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
 
                 {debt.remainingAmount > 0.5 && (
                     <button
-                        onClick={() => navigate('/payments/add')}
+                        onClick={() => navigate('/payments/add', {
+                            state: {
+                                preSelectedDebt: {
+                                    saleId: debt.saleId,
+                                    storeId: debt.storeId,
+                                    customerName: debt.customerName,
+                                    receiptNo: debt.receiptNo,
+                                    remainingAmount: debt.remainingAmount
+                                }
+                            }
+                        })}
                         style={{
                             backgroundColor: '#3498db',
                             color: 'white',

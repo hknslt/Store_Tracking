@@ -49,6 +49,10 @@ import ReportsDashboard from "./pages/Dashboard/ReportsDashboard";
 import StoreTargets from "./pages/targets/StoreTargets";
 import PersonnelCommissions from "./pages/personnel/PersonnelCommissions";
 import InvoiceTracking from "./pages/tracking/InvoiceTracking";
+import PersonnelEdit from "./pages/personnel/PersonnelEdit";
+import StoreEdit from "./pages/stores/StoreEdit";
+import StoreComparison from "./pages/reports/StoreComparison";
+import SSHDetail from "./pages/ssh/SSHDetail";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -246,6 +250,7 @@ function App() {
             <Route path="/definitions/dimensions" element={<DimensionsPage />} />
             <Route path="/definitions/colors" element={<ColorsPage />} />
             <Route path="/definitions/cushions" element={<CushionsPage />} />
+             <Route path="/definitions/payment-methods" element={<PaymentMethods />} />
 
             {/* Price, Stock & Purchase */}
             <Route path="/prices/list" element={<PriceList />} />
@@ -258,11 +263,13 @@ function App() {
             {/* Management */}
             <Route path="/stores" element={<StoreList />} />
             <Route path="/stores/add" element={<StoreAdd />} />
+            <Route path="/stores/edit/:id" element={<StoreEdit />} />
             <Route path="/finance/cash-registers" element={<StoreCashRegisters />} />
 
             <Route path="/personnel" element={<PersonnelList />} />
             <Route path="/personnel/add" element={<PersonnelAdd />} />
             <Route path="/personnel/:id" element={<PersonnelDetail />} />
+            <Route path="/personnel/edit/:id" element={<PersonnelEdit />} />
             <Route path="/attendance" element={<AttendanceManager />} />
             <Route path="/commissions" element={<PersonnelCommissions />} />
             <Route path="/register" element={<Register />} />
@@ -274,13 +281,13 @@ function App() {
             <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
 
             {/* Payment Methods & Transactions */}
-            <Route path="/definitions/payment-methods" element={<PaymentMethods />} />
             <Route path="/payments/add" element={<PaymentAdd />} />
             <Route path="/payments/list" element={<PaymentList />} />
 
             {/* SSH Records */}
             <Route path="/ssh/list" element={<SSHList />} />
             <Route path="/ssh/add" element={<SSHAdd />} />
+            <Route path="/ssh/:id" element={<SSHDetail />} />
 
             {/* Borç / Cari Takip */}
             <Route path="/debts" element={<DebtList />} />
@@ -291,12 +298,13 @@ function App() {
             <Route path="/reports/finance" element={<FinanceReport />} />
             <Route path="/reports/stocks" element={<StockReport />} />
             <Route path="/reports/personnel" element={<PersonnelReport />} />
+            <Route path="/reports/compare" element={<StoreComparison />} /> {/* Rota */}
 
             {/* Ayarlar */}
             <Route path="/settings" element={<Settings />} />
 
             {/* Dashboard Routes */}
-            <Route path="/reports/dashboard" element={<ReportsDashboard/>} />
+            <Route path="/reports/dashboard" element={<ReportsDashboard />} />
             <Route path="/stores/:id" element={<StoreDashboard />} />
 
             {/* Mağaza Hedefleri (KPI) */}

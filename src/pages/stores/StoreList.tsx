@@ -1,21 +1,16 @@
 // src/pages/stores/StoreList.tsx
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom"; // useNavigate eklendi
+import { Link, useNavigate } from "react-router-dom";
 import { getStores } from "../../services/storeService";
 import type { Store } from "../../types";
 
 const StoreList = () => {
     const [stores, setStores] = useState<Store[]>([]);
-    const navigate = useNavigate(); // Hook
+    const navigate = useNavigate();
 
     useEffect(() => {
         getStores().then(setStores);
     }, []);
-
-    // Dashboard'a git
-    const goToDashboard = (id: string) => {
-        navigate(`/stores/${id}`);
-    };
 
     return (
         <div className="page-container">
@@ -32,7 +27,7 @@ const StoreList = () => {
                             <th style={{ padding: '12px' }}>Mağaza Adı</th>
                             <th style={{ padding: '12px' }}>Telefon</th>
                             <th style={{ padding: '12px' }}>Adres</th>
-                            <th style={{ width: '100px' }}>İşlem</th>
+                            <th style={{ width: '180px', textAlign: 'center' }}>İşlemler</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -43,12 +38,16 @@ const StoreList = () => {
                                 <td style={{ padding: '12px' }}>{s.phone}</td>
                                 <td style={{ padding: '12px', fontSize: '13px', color: '#666' }}>{s.address}</td>
                                 <td style={{ padding: '12px', textAlign: 'center' }}>
-                                    <button
-                                        onClick={() => goToDashboard(s.id!)}
-                                        className="btn btn-sm btn-info"
-                                    >
-                                        Yönet ➜
-                                    </button>
+                                    <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
+                                        {/* YÖNET (Dashboard) */}
+                                        <button onClick={() => navigate(`/stores/${s.id}`)} className="btn btn-sm btn-info" style={{ padding: '6px 12px' }}>
+                                            Yönet
+                                        </button>
+                                        {/* DÜZENLE */}
+                                        <button onClick={() => navigate(`/stores/edit/${s.id}`)} className="btn btn-sm btn-warning" style={{ backgroundColor: '#f59e0b', color: 'white', padding: '6px 12px' }}>
+                                            Düzenle
+                                        </button>
+                                    </div>
                                 </td>
                             </tr>
                         ))}
