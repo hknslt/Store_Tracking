@@ -5,6 +5,8 @@ import { getStoreStocks, manualAddOrUpdateStock } from "../../services/storeStoc
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
 
 // Tanımlar ve Servisler
 import { getProducts } from "../../services/productService";
@@ -22,7 +24,8 @@ import PlusIcon from "../../assets/icons/plus.svg";
 const Icons = {
     search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
     filter: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>,
-    sort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>
+    sort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
+    pdf: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
 };
 
 const StoreStockManager = () => {
@@ -120,6 +123,27 @@ const StoreStockManager = () => {
 
     useEffect(() => { refreshStocks(); }, [selectedStoreId]);
 
+    // --- YARDIMCILAR ---
+    const getCatName = (prodId: string) => {
+        const p = products.find(x => x.id === prodId);
+        return p ? categories.find(c => c.id === p.categoryId)?.categoryName : "-";
+    };
+    const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
+    const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
+
+    const getProductPrice = (prodId: string, dimId?: string | null) => {
+        const key = dimId ? `${prodId}_${dimId}` : `${prodId}_std`;
+        const price = priceMap[key];
+
+        if (!price && dimId) {
+            const stdPrice = priceMap[`${prodId}_std`];
+            return stdPrice ? `${stdPrice.toLocaleString('tr-TR')} ₺` : "-";
+        }
+        return price ? `${price.toLocaleString('tr-TR')} ₺` : "-";
+    };
+
+    const renderVal = (val: number) => val === 0 ? "" : val;
+
     // --- FİLTRELEME VE SIRALAMA MANTIĞI ---
     const getFilteredStocks = () => {
         let filtered = stocks;
@@ -153,10 +177,76 @@ const StoreStockManager = () => {
 
     const displayStocks = getFilteredStocks();
 
+    // --- TÜRKÇE KARAKTER DÜZELTME ---
+    const replaceTr = (text: string | number | undefined | null) => {
+        if (!text) return "";
+        const str = String(text);
+        const map: Record<string, string> = {
+            'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
+            'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C'
+        };
+        return str.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (char) => map[char] || char);
+    };
+
+    // --- PDF ÇIKTISI ALMA ---
+    const handleExportPDF = () => {
+        if (!displayStocks || displayStocks.length === 0) {
+            setMessage({ type: 'error', text: "Çıktı alınacak stok bulunamadı." });
+            return;
+        }
+
+        const doc = new jsPDF();
+        const storeName = stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza";
+        const dateStr = new Date().toLocaleDateString('tr-TR');
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(14);
+
+        // Başlıkta Türkçe karakter düzeltmesi
+        doc.text(replaceTr(`${storeName} - Stok Listesi`), 14, 15);
+
+        doc.setFontSize(10);
+        doc.text(`Tarih: ${dateStr}`, 14, 22);
+
+        // Tablo verilerini hazırla (Her hücrede replaceTr kullanıyoruz)
+        const tableBody = displayStocks.map(stock => {
+            const dimName = getDimName(stock.dimensionId);
+            const fullProductName = dimName ? `${stock.productName} (${dimName})` : stock.productName;
+
+            return [
+                replaceTr(fullProductName),
+                replaceTr(getColorName(stock.colorId)),
+                renderVal(stock.freeStock),
+                renderVal(stock.reservedStock),
+                renderVal(stock.incomingStock),
+                renderVal(stock.incomingReservedStock)
+            ];
+        });
+
+        autoTable(doc, {
+            startY: 25,
+            head: [['Urun', 'Renk', 'Serbest', 'Rezerve', 'Gel(Depo)', 'Gel(Mus)']],
+            body: tableBody,
+            theme: 'striped',
+            headStyles: { fillColor: [44, 62, 80], textColor: 255 },
+            styles: { fontSize: 9, cellPadding: 2 },
+            columnStyles: {
+                0: { cellWidth: 60 }, // Ürün
+                1: { cellWidth: 30 }, // Renk
+                2: { halign: 'center' }, // Serbest
+                3: { halign: 'center' }, // Rezerve
+                4: { halign: 'center' }, // Gel(Depo)
+                5: { halign: 'center' }, // Gel(Müş)
+            }
+        });
+
+        doc.save(`Stok_Listesi_${replaceTr(storeName)}_${dateStr}.pdf`);
+    };
+
     // --- MODAL İŞLEMLERİ ---
     const handleAddNewClick = () => {
         setModalMode('add');
-        setSelectedGroupId(""); // Filtreleri modal için sıfırla
+        setSelectedGroupId("");
         setSelectedCategoryId("");
         setFormData({
             productId: "", colorId: "", dimensionId: "",
@@ -211,27 +301,6 @@ const StoreStockManager = () => {
             setMessage({ type: 'error', text: "Kaydedilirken bir hata oluştu." });
         }
     };
-
-    // --- YARDIMCILAR ---
-    const getCatName = (prodId: string) => {
-        const p = products.find(x => x.id === prodId);
-        return p ? categories.find(c => c.id === p.categoryId)?.categoryName : "-";
-    };
-    const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
-    const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
-
-    const getProductPrice = (prodId: string, dimId?: string | null) => {
-        const key = dimId ? `${prodId}_${dimId}` : `${prodId}_std`;
-        const price = priceMap[key];
-
-        if (!price && dimId) {
-            const stdPrice = priceMap[`${prodId}_std`];
-            return stdPrice ? `${stdPrice.toLocaleString('tr-TR')} ₺` : "-";
-        }
-        return price ? `${price.toLocaleString('tr-TR')} ₺` : "-";
-    };
-
-    const renderVal = (val: number) => val === 0 ? "" : val;
 
     // Modal içi dinamik filtreli ürün listesi
     const filteredModalProducts = selectedCategoryId
@@ -321,14 +390,20 @@ const StoreStockManager = () => {
                         </div>
                     </div>
 
-                    {/* YENİ EKLE BUTONU */}
-                    {isAdmin && selectedStoreId && (
-                        <div>
-                            <button onClick={handleAddNewClick} className="btn btn-primary" style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px' }}>
+                    {/* PDF VE YENİ EKLE BUTONLARI */}
+                    <div style={{ display: 'flex', gap: '5px' }}>
+                        {selectedStoreId && (
+                            <button onClick={handleExportPDF} className="btn btn-secondary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px', padding: '0 10px' }}>
+                                {Icons.pdf} PDF
+                            </button>
+                        )}
+
+                        {isAdmin && selectedStoreId && (
+                            <button onClick={handleAddNewClick} className="btn btn-primary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px', padding: '0 10px' }}>
                                 <img src={PlusIcon} style={{ width: 16, filter: 'invert(1)' }} /> Yeni Ekle
                             </button>
-                        </div>
-                    )}
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -340,7 +415,6 @@ const StoreStockManager = () => {
                                 <tr style={{ backgroundColor: '#f1f2f6' }}>
                                     <th style={{ width: '25%' }}>Ürün Bilgisi</th>
                                     <th style={{ width: '15%' }}>Renk</th>
-                                    {/* 🔥 DÜZELTME: Sağdan boşluk eklendi */}
                                     <th style={{ width: '10%', textAlign: 'right', paddingRight: '20px' }}>Fiyat</th>
                                     <th style={{ textAlign: 'center', backgroundColor: '#d4edda', color: '#155724' }}>Serbest</th>
                                     <th style={{ textAlign: 'center', backgroundColor: '#fff3cd', color: '#856404' }}>Rezerve</th>
@@ -370,7 +444,6 @@ const StoreStockManager = () => {
                                             </td>
                                             <td style={{ color: '#555', padding: '8px 12px', fontSize: '13px' }}>{getColorName(stock.colorId)}</td>
 
-                                            {/* 🔥 DÜZELTME: Sağdan boşluk eklendi */}
                                             <td style={{ textAlign: 'right', fontWeight: '600', color: '#1e293b', fontSize: '13px', paddingRight: '20px' }}>
                                                 {getProductPrice(stock.productId, stock.dimensionId)}
                                             </td>

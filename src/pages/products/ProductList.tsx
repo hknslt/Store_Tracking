@@ -192,7 +192,10 @@ const ProductList = () => {
                 <div style={{ backgroundColor: '#f8f9fa', padding: '15px' }}>
                   <div className="dashboard-grid">
                     {groupCategories.map(category => {
-                      const categoryProducts = products.filter(p => p.categoryId === category.id);
+                      // 🔥 DEĞİŞİKLİK BURADA: Ürünleri filtreleyip A'dan Z'ye sıralıyoruz
+                      const categoryProducts = products
+                        .filter(p => p.categoryId === category.id)
+                        .sort((a, b) => a.productName.localeCompare(b.productName, 'tr'));
 
                       return (
                         <div key={category.id} className="card" style={{ marginBottom: 0, boxShadow: '0 2px 5px rgba(0,0,0,0.05)' }}>
