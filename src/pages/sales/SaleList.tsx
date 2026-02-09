@@ -405,6 +405,7 @@ const SaleList = () => {
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
                                 getDimensionName={getDimensionName}
+                                onEdit={(sale) => navigate(`/sales/${sale.storeId}/edit/${sale.id}`, { state: { sale } })}
                             />
                         ) : (
                             <SalesGridView

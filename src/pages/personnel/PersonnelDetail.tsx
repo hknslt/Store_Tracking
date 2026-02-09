@@ -232,7 +232,7 @@ const PersonnelDetail = () => {
                                 border: `1px solid ${person.isActive ? '#fecdd3' : '#bbf7d0'}`
                             }}
                         >
-                            {person.isActive ? <>{Icons.userX} İşten Çıkar</> : <>{Icons.userCheck} Tekrar Aktif Yap</>}
+                            {person.isActive ? <>{Icons.userX} BURAYI TERKET</> : <>{Icons.userCheck} Tekrar Aktif Yap</>}
                         </button>
 
                         <button
