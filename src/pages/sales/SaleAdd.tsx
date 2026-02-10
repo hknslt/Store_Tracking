@@ -92,7 +92,16 @@ const SaleAdd = () => {
 
     const formatPhone = (value: string) => value.replace(/\D/g, '');
 
-    const capitalizeWords = (str: string) => str.replace(/\b\w/g, char => char.toUpperCase());
+    // 🔥 GÜNCELLENEN FONKSİYON: Türkçe Karakter Duyarlı Baş Harf Büyütme
+    const capitalizeWords = (str: string) => {
+        if (!str) return "";
+        return str.split(" ").map(word => {
+            if (word.length === 0) return "";
+            // İlk harfi Türkçe locale göre büyüt, kalanı olduğu gibi bırak veya küçült
+            // (Burada sadece ilk harfi büyütüyoruz, kalanı kullanıcının yazdığı gibi kalıyor)
+            return word.charAt(0).toLocaleUpperCase('tr-TR') + word.slice(1);
+        }).join(" ");
+    };
 
     // Stok Kontrolü
     const getCurrentStockQuantity = () => {
@@ -111,7 +120,7 @@ const SaleAdd = () => {
         return '#f0fff4';
     };
 
-    // --- 1. VERİLERİ YÜKLE (Tüm Kategorileri ve Ürünleri de çekiyoruz) ---
+    // --- 1. VERİLERİ YÜKLE ---
     useEffect(() => {
         const initData = async () => {
             const [g, c, col, dim, cats, prods] = await Promise.all([
@@ -121,8 +130,8 @@ const SaleAdd = () => {
             setCushions(c);
             setAllColors(col);
             setAllDimensions(dim);
-            setAllCategories(cats); // Hepsini hafızaya al
-            setAllProducts(prods);  // Hepsini hafızaya al
+            setAllCategories(cats);
+            setAllProducts(prods);
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -193,27 +202,22 @@ const SaleAdd = () => {
 
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    // --- SEÇİM ZİNCİRİ (CLIENT SIDE FILTERING) ---
-
-    // Grup Seçilince -> Kategorileri Filtrele
+    // --- SEÇİM ZİNCİRİ ---
     const handleGroupChange = (groupId: string) => {
         setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
         setSelectedProductId("");
-
         if (groupId) {
             const filtered = allCategories.filter(c => c.groupId === groupId);
             setFilteredCategories(filtered);
         } else {
             setFilteredCategories([]);
         }
-        setFilteredProducts([]); // Grup değişince ürünleri de sıfırla
+        setFilteredProducts([]);
     };
 
-    // Kategori Seçilince -> Ürünleri Filtrele
     const handleCategoryChange = (categoryId: string) => {
         setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
         setSelectedProductId("");
-
         if (categoryId) {
             const filtered = allProducts.filter(p => p.categoryId === categoryId);
             setFilteredProducts(filtered);
@@ -223,7 +227,7 @@ const SaleAdd = () => {
     };
 
     const updateLineItem = (prodId: string, colId: string, dimId: string) => {
-        const prod = filteredProducts.find(p => p.id === prodId); // filteredProducts'dan bul
+        const prod = filteredProducts.find(p => p.id === prodId);
         if (prod) {
             let name = prod.productName;
             setLineItem(prev => ({ ...prev, productId: prodId, colorId: colId, dimensionId: dimId || null, productName: name }));
@@ -280,6 +284,9 @@ const SaleAdd = () => {
         }
     };
 
+    // --- 🔥 CANLI ÜRÜN TOPLAMI ---
+    const itemsTotal = addedItems.reduce((acc, item) => acc + item.total, 0);
+
     // Stiller
     const cellStyle = { padding: '6px', verticalAlign: 'middle' };
     const smallInput = { width: '60px', padding: '6px', fontSize: '13px', textAlign: 'center' as const };
@@ -298,7 +305,7 @@ const SaleAdd = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => navigate('/sales')} className="modern-btn btn-secondary">İptal</button>
-                    {addedItems.length > 0 && (<button onClick={saveSale} className="modern-btn btn-success">SİPARİŞİ TAMAMLA ({addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost)} ₺)</button>)}
+                    {addedItems.length > 0 && (<button onClick={saveSale} className="modern-btn btn-success">SİPARİŞİ TAMAMLA ({itemsTotal + Number(headerData.shippingCost)} ₺)</button>)}
                 </div>
             </div>
 
@@ -353,7 +360,7 @@ const SaleAdd = () => {
                             name="tc"
                             value={headerData.tc}
                             onChange={(e) => {
-                                const val = e.target.value.replace(/\D/g, '').slice(0, 11); 
+                                const val = e.target.value.replace(/\D/g, '').slice(0, 11);
                                 handleHeaderChange({ target: { name: 'tc', value: val } });
                             }}
                             className="form-input"
@@ -361,7 +368,7 @@ const SaleAdd = () => {
                         />
                     </div>
 
-                    {/*  E-Posta */}
+                    {/* E-Posta */}
                     <div>
                         <label className="form-label">E-Posta <span style={{ fontSize: '11px', color: '#999' }}></span></label>
                         <input name="email" type="email" value={headerData.email} onChange={handleHeaderChange} className="form-input" placeholder="ornek@mail.com" />
@@ -376,15 +383,15 @@ const SaleAdd = () => {
                                 className="form-input"
                                 style={{ width: '70px', padding: '0 5px' }}
                             >
-                                <option value="+90">+90</option> // Türkiye
-                                <option value="+49">+49</option> // Almanya
-                                <option value="+44">+44</option> // İngiltere
-                                <option value="+1">+1</option> // ABD
-                                <option value="+30">+30</option> // Yunanistan
-                                <option value="+33">+33</option> // Fransa
-                                <option value="+39">+39</option> // İtalya
-                                <option value="+7">+7</option> // Rusya
-                                <option value="+972">+972</option> // İsrail
+                                <option value="+90">+90</option>
+                                <option value="+49">+49</option>
+                                <option value="+44">+44</option>
+                                <option value="+1">+1</option>
+                                <option value="+30">+30</option>
+                                <option value="+33">+33</option>
+                                <option value="+39">+39</option>
+                                <option value="+7">+7</option>
+                                <option value="+972">+972</option>
                             </select>
                             <input
                                 name="phone"
@@ -438,9 +445,14 @@ const SaleAdd = () => {
 
             {/* ÜRÜN GİRİŞİ */}
             <div className="card">
-                <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid #eee' }}>
+                {/* 🔥 GÜNCEL KART BAŞLIĞI: Toplam Tutar Eklendi */}
+                <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0, fontSize: '16px', color: '#2c3e50' }}>Ürün Girişi</h3>
+                    <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>
+                        Ürünler Toplamı: {itemsTotal.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                    </span>
                 </div>
+
                 <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
                     <table className="modern-table dense">
                         <thead style={{ backgroundColor: '#f8fafc' }}>

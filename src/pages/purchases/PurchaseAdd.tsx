@@ -1,3 +1,4 @@
+// src/pages/purchases/PurchaseAdd.tsx
 import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -23,8 +24,8 @@ const PurchaseAdd = () => {
     // --- LİSTELER ---
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<Category[]>([]); // Filtrelenmiş kategoriler
+    const [allCategories, setAllCategories] = useState<Category[]>([]); // 🔥 TÜM KATEGORİLER (İsimlendirme için)
     const [productsInCat, setProductsInCat] = useState<Product[]>([]);
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
@@ -48,9 +49,11 @@ const PurchaseAdd = () => {
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
 
+    // 🔥 DÜZENLEME: Burada 'unitPrice' tutacağız, 'amount' (toplam) hesaplanacak.
+    const [unitPrice, setUnitPrice] = useState<number | string>("");
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "", colorId: "", cushionId: "", dimensionId: null,
-        quantity: 1, amount: 0, explanation: "", status: 'Beklemede'
+        quantity: 1, explanation: "", status: 'Beklemede'
     });
 
     const [addedItems, setAddedItems] = useState<(PurchaseItem & { requestId?: string })[]>([]);
@@ -59,9 +62,7 @@ const PurchaseAdd = () => {
 
     // --- MODAL STATE (Talep Fiyatı İçin) ---
     const [requestModal, setRequestModal] = useState<{ show: boolean, req: PendingRequest | null, price: number }>({
-        show: false,
-        req: null,
-        price: 0
+        show: false, req: null, price: 0
     });
 
     // Toast Mesaj
@@ -82,8 +83,12 @@ const PurchaseAdd = () => {
     // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
-            const [g, c, col, dim, cats] = await Promise.all([getGroups(), getCushions(), getColors(), getDimensions(), getCategories()]);
-            setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim); setAllCategories(cats);
+            // 🔥 'getCategories' ile tüm kategorileri çekiyoruz
+            const [g, c, col, dim, cats] = await Promise.all([
+                getGroups(), getCushions(), getColors(), getDimensions(), getCategories()
+            ]);
+            setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim);
+            setAllCategories(cats); // 🔥 State'e atıyoruz
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -141,30 +146,42 @@ const PurchaseAdd = () => {
 
     // --- MANUEL EKLEME ---
     const addLineItem = () => {
-        if (!lineItem.productId || !selectedColorId || !lineItem.quantity) { showToast('error', "Ürün ve Renk seçimi zorunludur."); return; }
+        if (!lineItem.productId || !selectedColorId || !lineItem.quantity) {
+            showToast('error', "Ürün ve Renk seçimi zorunludur."); return;
+        }
+
+        const qty = Number(lineItem.quantity);
+        const uPrice = Number(unitPrice);
+
+        // 🔥 HESAPLAMA: Toplam Tutar = Birim Fiyat * Adet
+        const totalAmount = uPrice * qty;
 
         const newItem: PurchaseItem = {
             ...(lineItem as PurchaseItem),
+            amount: totalAmount, // Veritabanına toplam tutar kaydedilir
             itemType: 'Stok',
             status: 'Beklemede'
         };
 
         setAddedItems([...addedItems, newItem]);
-        setLineItem(prev => ({ ...prev, cushionId: "", quantity: 1, amount: 0, explanation: "", productId: "", productName: "", colorId: "", dimensionId: null }));
+
+        // Formu temizle
+        setLineItem(prev => ({ ...prev, cushionId: "", quantity: 1, explanation: "", productId: "", productName: "", colorId: "", dimensionId: null }));
+        setUnitPrice(""); // Fiyatı temizle
         setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
     };
 
     // --- TALEP EKLEME SÜRECİ ---
-
-    // 1. "Ekle" butonuna basınca Modalı Aç
     const openRequestModal = (req: PendingRequest) => {
-        setRequestModal({ show: true, req, price: 0 });
+        setRequestModal({ show: true, req, price: 0 }); // Modal açılırken fiyat 0 (Buradaki price: Birim Fiyat olacak)
     };
 
-    // 2. Modalda "Onayla" deyince listeye ekle
     const confirmRequestAdd = () => {
         const { req, price } = requestModal;
         if (!req) return;
+
+        // 🔥 HESAPLAMA: Modalda girilen "Birim Fiyat" * Adet
+        const totalAmount = Number(price) * req.quantity;
 
         const newItem: PurchaseItem & { requestId?: string } = {
             groupId: req.groupId,
@@ -175,7 +192,7 @@ const PurchaseAdd = () => {
             cushionId: req.cushionId,
             dimensionId: req.dimensionId,
             quantity: req.quantity,
-            amount: Number(price), // Girilen toplam tutar
+            amount: totalAmount, // Toplam Tutar
             explanation: req.productNote || "",
             status: 'Beklemede',
             itemType: 'Sipariş',
@@ -184,8 +201,6 @@ const PurchaseAdd = () => {
 
         setAddedItems([...addedItems, newItem]);
         setPendingRequests(prev => prev.filter(p => p.id !== req.id));
-
-        // Modalı Kapat
         setRequestModal({ show: false, req: null, price: 0 });
     };
 
@@ -245,7 +260,7 @@ const PurchaseAdd = () => {
         <div className="page-container">
             {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
 
-            {/* --- FİYAT GİRİŞ MODALI --- */}
+            {/* --- FİYAT GİRİŞ MODALI (TALEPLER İÇİN) --- */}
             {requestModal.show && requestModal.req && (
                 <div className="modal-overlay">
                     <div className="modal-content" style={{ width: '350px' }}>
@@ -260,7 +275,7 @@ const PurchaseAdd = () => {
                                 <strong>Adet:</strong> {requestModal.req.quantity}
                             </div>
 
-                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Toplam Tutar (TL)</label>
+                            <label style={{ display: 'block', fontSize: '13px', fontWeight: 'bold', marginBottom: '5px' }}>Birim Fiyat (TL)</label>
                             <input
                                 type="number"
                                 autoFocus
@@ -269,6 +284,9 @@ const PurchaseAdd = () => {
                                 onChange={e => setRequestModal({ ...requestModal, price: Number(e.target.value) })}
                                 onKeyDown={e => e.key === 'Enter' && confirmRequestAdd()}
                             />
+                            <div style={{ marginTop: '5px', fontSize: '12px', color: '#16a34a' }}>
+                                Toplam: {(requestModal.req.quantity * requestModal.price).toFixed(2)} ₺
+                            </div>
                         </div>
                         <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
                             <button onClick={() => setRequestModal({ show: false, req: null, price: 0 })} className="btn btn-secondary">İptal</button>
@@ -281,7 +299,7 @@ const PurchaseAdd = () => {
             <div className="modern-header">
                 <div>
                     <h2>Alış / Stok Giriş</h2>
-                    <p>Depoya yeni ürün girişi veya sipariş karşılama</p>
+                    <p>Depo Stok Girişleri ve Sipariş Tedarikleri</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <Link to="/purchases" className="modern-btn btn-secondary">İptal</Link>
@@ -345,7 +363,7 @@ const PurchaseAdd = () => {
                                 <th style={{ width: '12%' }}>Ebat</th>
                                 <th style={{ width: '12%' }}>Minder</th>
                                 <th style={{ width: '6%', textAlign: 'center' }}>Adet</th>
-                                <th style={{ width: '10%' }}>Tutar</th>
+                                <th style={{ width: '10%' }}>Birim Fiyat</th>
                                 <th style={{ width: '13%' }}>Açıklama</th>
                                 <th style={{ width: '5%' }}>+</th>
                             </tr>
@@ -385,7 +403,14 @@ const PurchaseAdd = () => {
                                     <input type="number" ref={quantityInputRef} name="quantity" value={lineItem.quantity} onChange={handleLineChange} className="soft-input" style={{ ...smallInput, fontWeight: 'bold' }} />
                                 </td>
                                 <td style={cellStyle}>
-                                    <input type="number" name="amount" value={lineItem.amount} onChange={handleLineChange} className="soft-input" style={mediumInput} />
+                                    <input
+                                        type="number"
+                                        value={unitPrice}
+                                        onChange={e => setUnitPrice(e.target.value)}
+                                        className="soft-input"
+                                        style={mediumInput}
+                                        placeholder="Birim ₺"
+                                    />
                                 </td>
                                 <td style={cellStyle}>
                                     <input type="text" name="explanation" value={lineItem.explanation} onChange={handleLineChange} className="soft-input" style={{ width: '100%', padding: '6px', fontSize: '12px' }} onKeyDown={e => e.key === 'Enter' && addLineItem()} />
@@ -413,7 +438,8 @@ const PurchaseAdd = () => {
                                     <th style={{ width: '12%' }}>Renk</th>
                                     <th style={{ width: '12%' }}>Minder</th>
                                     <th style={{ textAlign: 'center', width: '8%' }}>Miktar</th>
-                                    <th style={{ textAlign: 'right', width: '10%' }}>Tutar</th>
+                                    <th style={{ textAlign: 'right', width: '10%' }}>Birim Fiyat</th>
+                                    <th style={{ textAlign: 'right', width: '10%' }}>Toplam</th>
                                     <th style={{ width: '20%' }}>Açıklama</th>
                                     <th style={{ width: '5%' }}>Sil</th>
                                 </tr>
@@ -439,7 +465,17 @@ const PurchaseAdd = () => {
                                         <td style={{ padding: '10px 15px', color: '#475569' }}>{getName(allColors, item.colorId, 'colorName')}</td>
                                         <td style={{ padding: '10px 15px', color: '#475569' }}>{item.cushionId ? getName(cushions, item.cushionId, 'cushionName') : '-'}</td>
                                         <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', padding: '10px 15px' }}>{item.quantity}</td>
-                                        <td style={{ textAlign: 'right', fontWeight: '600', color: '#166534', padding: '10px 15px' }}>{Number(item.amount).toFixed(2)} ₺</td>
+
+                                        {/* Birim Fiyat Gösterimi */}
+                                        <td style={{ textAlign: 'right', color: '#1e293b', padding: '10px 15px' }}>
+                                            {Number(item.amount / item.quantity).toFixed(2)} ₺
+                                        </td>
+
+                                        {/* Toplam Tutar */}
+                                        <td style={{ textAlign: 'right', fontWeight: '600', color: '#166534', padding: '10px 15px' }}>
+                                            {Number(item.amount).toFixed(2)} ₺
+                                        </td>
+
                                         <td style={{ padding: '10px 15px', color: '#64748b', fontSize: '12px', fontStyle: 'italic' }}>{item.explanation}</td>
                                         <td style={{ textAlign: 'center', padding: '10px 15px' }}>
                                             <button onClick={() => removeAddedItem(idx)} style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px', fontWeight: 'bold' }}>×</button>
@@ -488,7 +524,6 @@ const PurchaseAdd = () => {
                                         <td style={{ textAlign: 'center', fontWeight: 'bold', padding: '10px 15px' }}>{req.quantity}</td>
                                         <td style={{ padding: '10px 15px', fontSize: '11px', fontStyle: 'italic', color: '#666' }}>{req.productNote || "-"}</td>
                                         <td style={{ padding: '10px 15px' }}>
-                                            {/* 🔥 BUTONA BASINCA MODAL AÇILACAK */}
                                             <button onClick={() => openRequestModal(req)} className="modern-btn btn-secondary" style={{ width: '100%', fontSize: '11px', padding: '6px' }}>
                                                 ⬇️ Ekle
                                             </button>

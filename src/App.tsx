@@ -54,6 +54,7 @@ import StoreEdit from "./pages/stores/StoreEdit";
 import StoreComparison from "./pages/reports/StoreComparison";
 import SSHDetail from "./pages/ssh/SSHDetail";
 import SaleEdit from "./pages/sales/SaleEdit";
+import PurchaseEdit from "./pages/purchases/PurchaseEdit";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -251,7 +252,7 @@ function App() {
             <Route path="/definitions/dimensions" element={<DimensionsPage />} />
             <Route path="/definitions/colors" element={<ColorsPage />} />
             <Route path="/definitions/cushions" element={<CushionsPage />} />
-             <Route path="/definitions/payment-methods" element={<PaymentMethods />} />
+            <Route path="/definitions/payment-methods" element={<PaymentMethods />} />
 
             {/* Price, Stock & Purchase */}
             <Route path="/prices/list" element={<PriceList />} />
@@ -260,6 +261,7 @@ function App() {
             <Route path="/purchases" element={<PurchaseList />} />
             <Route path="/purchases/add" element={<PurchaseAdd />} />
             <Route path="/purchases/:storeId/:id" element={<PurchaseDetail />} />
+            <Route path="/purchases/:storeId/edit/:id" element={<PurchaseEdit />} />
 
             {/* Management */}
             <Route path="/stores" element={<StoreList />} />

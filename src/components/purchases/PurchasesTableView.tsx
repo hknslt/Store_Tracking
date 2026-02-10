@@ -2,6 +2,14 @@
 import React from 'react';
 import type { Purchase, PurchaseStatus } from '../../types';
 
+const Icons = {
+    check: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>,
+    cross: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>,
+    search: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
+    clock: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>,
+    edit: <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+};
+
 interface Props {
     purchases: Purchase[];
     toggleRow: (id: string) => void;
@@ -13,6 +21,7 @@ interface Props {
     isAdmin: boolean;
     setCancelModal: (val: { show: boolean, id: string | null }) => void;
     goToDetail: (purchase: Purchase) => void;
+    onEdit: (purchase: Purchase) => void;
     getCatName: (id?: string) => string;
     getCushionName: (id?: string) => string;
     getColorName: (id?: string) => string;
@@ -21,7 +30,7 @@ interface Props {
 
 const PurchasesTableView: React.FC<Props> = ({
     purchases, toggleRow, expandedRowId, formatDate,
-    handleStatusClick, getButtonText, getButtonColor, isAdmin, setCancelModal, goToDetail,
+    handleStatusClick, getButtonText, getButtonColor, isAdmin, setCancelModal, goToDetail, onEdit,
     getCatName, getCushionName, getColorName, getDimensionName
 }) => {
     return (
@@ -41,9 +50,14 @@ const PurchasesTableView: React.FC<Props> = ({
                     const isAllCompleted = p.items.every(item => item.status === 'Tamamlandı');
                     const isCanceled = p.items.every(item => item.status === 'İptal');
 
+                    // 🔥 YENİ KONTROL: Fişin içinde 'Beklemede' olmayan aktif bir ürün var mı?
+                    // Eğer hepsi 'Beklemede' ise düzenlenebilir. Değilse kilitli.
+                    const isEditable = !isCanceled && !isAllCompleted && p.items.every(i => i.status === 'Beklemede' || i.status === 'İptal');
+
                     return (
                         <React.Fragment key={p.id}>
                             <tr className="hover-row" onClick={() => p.id && toggleRow(p.id)} style={{ cursor: 'pointer', borderBottom: expandedRowId === p.id ? 'none' : '1px solid #eee', opacity: isCanceled ? 0.6 : 1, backgroundColor: expandedRowId === p.id ? '#f0fdf4' : 'white' }}>
+
                                 <td style={{ textAlign: 'center', fontSize: '18px' }}>
                                     {isCanceled ? <span className="badge" style={{ backgroundColor: '#e11d48', color: 'white', fontSize: '10px' }}>İPTAL</span> : (isAllCompleted ? <span style={{ color: '#27ae60' }}>●</span> : <span style={{ color: '#e74c3c' }}>●</span>)}
                                 </td>
@@ -58,9 +72,22 @@ const PurchasesTableView: React.FC<Props> = ({
                                 <tr style={{ backgroundColor: '#fbfbfb', borderBottom: '2px solid #ddd' }}>
                                     <td colSpan={6} style={{ padding: '20px' }}>
                                         <div style={{ textAlign: 'right', marginBottom: '10px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
+
+                                            {/* 🔥 DÜZENLEME BUTONU: Sadece "Beklemede" durumundaysa görünür */}
+                                            {isAdmin && isEditable && (
+                                                <button
+                                                    onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                                                    className="btn btn-sm"
+                                                    style={{ backgroundColor: '#e0f2fe', color: '#0284c7', border: '1px solid #bae6fd', display: 'flex', alignItems: 'center', gap: '5px' }}
+                                                >
+                                                    {Icons.edit} Düzenle
+                                                </button>
+                                            )}
+
                                             {isAdmin && !isCanceled && !isAllCompleted && (
                                                 <button onClick={(e) => { e.stopPropagation(); setCancelModal({ show: true, id: p.id! }); }} className="btn btn-sm btn-warning" style={{ backgroundColor: '#f39c12' }}>İptal Et</button>
                                             )}
+
                                             <button onClick={(e) => { e.stopPropagation(); goToDetail(p); }} className="btn btn-sm btn-info">🔍 Detay</button>
                                         </div>
 

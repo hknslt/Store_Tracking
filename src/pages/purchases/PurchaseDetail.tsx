@@ -3,7 +3,8 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { cancelPurchaseComplete, deletePurchaseComplete } from "../../services/purchaseService";
+// 🔥 EKLENDİ: resetPurchaseToPending import edildi
+import { cancelPurchaseComplete, deletePurchaseComplete, resetPurchaseToPending } from "../../services/purchaseService";
 import { getCategories, getColors, getDimensions, getCushions } from "../../services/definitionService";
 import { useAuth } from "../../context/AuthContext";
 import type { Purchase, Category, Color, Dimension, Cushion } from "../../types";
@@ -16,6 +17,7 @@ const PurchaseDetail = () => {
     const navigate = useNavigate();
     const location = useLocation();
     const { userRole } = useAuth();
+    const isAdmin = userRole === 'admin';
 
     const [purchase, setPurchase] = useState<Purchase | null>(location.state?.purchase || null);
     const [loading, setLoading] = useState(!location.state?.purchase);
@@ -29,7 +31,7 @@ const PurchaseDetail = () => {
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
 
-    const [modal, setModal] = useState<{ show: boolean, action: 'cancel' | 'delete' } | null>(null);
+    const [modal, setModal] = useState<{ show: boolean, action: 'cancel' | 'delete' | 'reset' } | null>(null);
 
     useEffect(() => {
         if (message) {
@@ -71,18 +73,25 @@ const PurchaseDetail = () => {
         try {
             if (modal.action === 'cancel') {
                 await cancelPurchaseComplete(storeId, id);
-                // Veriyi yenile
-                const docRef = doc(db, "purchases", storeId, "receipts", id);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    setPurchase({ id: docSnap.id, ...docSnap.data() } as Purchase);
-                }
                 setMessage({ type: 'success', text: "Sipariş başarıyla iptal edildi." });
-            } else {
+            } else if (modal.action === 'delete') {
                 await deletePurchaseComplete(storeId, id);
                 setMessage({ type: 'success', text: "Kayıt başarıyla silindi." });
                 setTimeout(() => navigate("/purchases"), 1500);
+                return;
+            } else if (modal.action === 'reset') {
+                // 🔥 SIFIRLAMA İŞLEMİ
+                await resetPurchaseToPending(storeId, id);
+                setMessage({ type: 'success', text: "Fiş 'Beklemede' durumuna geri alındı." });
             }
+
+            // Veriyi yenile
+            const docRef = doc(db, "purchases", storeId, "receipts", id);
+            const docSnap = await getDoc(docRef);
+            if (docSnap.exists()) {
+                setPurchase({ id: docSnap.id, ...docSnap.data() } as Purchase);
+            }
+
         } catch (error: any) {
             console.error(error);
             setMessage({ type: 'error', text: error.message || "İşlem başarısız oldu." });
@@ -97,6 +106,8 @@ const PurchaseDetail = () => {
 
     const isCancelled = purchase.items.every(i => i.status === 'İptal');
     const isCompleted = purchase.items.every(i => i.status === 'Tamamlandı');
+    // Eğer en az bir ürün "Beklemede" veya "İptal" DEĞİLSE, süreç başlamış demektir.
+    const isProcessStarted = purchase.items.some(i => i.status !== 'Beklemede' && i.status !== 'İptal');
 
     return (
         <div className="page-container">
@@ -110,7 +121,9 @@ const PurchaseDetail = () => {
                         <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
                             {modal.action === 'cancel'
                                 ? "Alış iptal edilecek, stoklar geri düşülecek."
-                                : "Kayıt tamamen silinecek ve stoklar geri alınacak."}
+                                : modal.action === 'delete'
+                                    ? "Kayıt tamamen silinecek ve stoklar geri alınacak."
+                                    : "Tüm ürünlerin durumu 'Beklemede' olarak değiştirilecek. Düzenleme yapabilirsiniz."}
                         </p>
                         <div style={{ display: 'flex', justifyContent: 'center', gap: '10px' }}>
                             <button onClick={() => setModal(null)} className="btn btn-secondary">Vazgeç</button>
@@ -120,15 +133,24 @@ const PurchaseDetail = () => {
                 </div>
             )}
 
-            {/* ... (Geri kalan render kodları aynı) ... */}
             {/* ÜST BUTONLAR */}
             <div className="no-print" style={{ marginBottom: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <button onClick={() => navigate(-1)} className="btn btn-secondary">← Listeye Dön</button>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {/* SADECE ADMIN */}
-                    {userRole === 'admin' && (
+                    {isAdmin && (
                         <>
+                            {/* 🔥 SIFIRLAMA BUTONU: Süreç başlamışsa (Onaylandı/Üretim vs) ve tamamlanmamışsa görünür */}
+                            {!isCancelled && !isCompleted && isProcessStarted && (
+                                <button
+                                    onClick={() => setModal({ show: true, action: 'reset' })}
+                                    className="btn"
+                                    style={{ backgroundColor: '#64748b', color: 'white' }}
+                                >
+                                    ↺ Beklemeye Al
+                                </button>
+                            )}
+
                             {!isCancelled && !isCompleted && (
                                 <button onClick={() => setModal({ show: true, action: 'cancel' })} className="btn btn-warning" style={{ backgroundColor: '#f39c12' }}>
                                     İptal Et

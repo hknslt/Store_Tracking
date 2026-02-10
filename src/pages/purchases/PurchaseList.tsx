@@ -300,6 +300,7 @@ const PurchaseList = () => {
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
                                 getDimensionName={getDimensionName}
+                                onEdit={(p) => navigate(`/purchases/${p.storeId}/edit/${p.id}`, { state: { purchase: p } })}
                             />
                         ) : (
                             <PurchasesGridView
