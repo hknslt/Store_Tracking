@@ -4,13 +4,11 @@ import { useNavigate, useParams } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getStores, updatePersonnel } from "../../services/storeService"; // Servisi import et
-import { useAuth } from "../../context/AuthContext";
 import { motion } from "framer-motion";
 import type { Store } from "../../types";
 
 const PersonnelEdit = () => {
     const { id } = useParams();
-    const { currentUser } = useAuth();
     const navigate = useNavigate();
 
     const [stores, setStores] = useState<Store[]>([]);

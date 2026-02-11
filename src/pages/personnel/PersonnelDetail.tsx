@@ -4,8 +4,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getStores, deletePersonnel, updatePersonnel } from "../../services/storeService";
-import { getMonthlySalesByPersonnel } from "../../services/commissionService"; // 🔥 Yeni Eklenen
-import { getMonthlyAttendance } from "../../services/attendanceService"; // 🔥 Yeni Eklenen
+import { getMonthlySalesByPersonnel } from "../../services/commissionService"; 
+import { getMonthlyAttendance } from "../../services/attendanceService"; 
 import type { Personnel, SystemUser } from "../../types";
 import "../../App.css";
 

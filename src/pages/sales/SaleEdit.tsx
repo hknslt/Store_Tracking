@@ -1,20 +1,18 @@
 // src/pages/sales/SaleEdit.tsx
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { updateSale } from "../../services/saleService"; // Yeni servis
+import { updateSale } from "../../services/saleService"; 
 import { getPersonnelByStore } from "../../services/storeService";
 import { getStoreStocks } from "../../services/storeStockService";
 import { getGroups, getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
 import { getProducts } from "../../services/productService";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
 import { iller } from "../../constants/cities";
-import type { Sale, SaleItem, StoreStock, Personnel, Category, Product, Cushion, Color, Dimension, SystemUser } from "../../types";
+import type { Sale, SaleItem, StoreStock, Personnel, Category, Product, Cushion, Color, Dimension } from "../../types";
 import "../../App.css";
 
 const SaleEdit = () => {
-    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { id, storeId } = useParams(); // URL'den parametreleri al (Router ayarına göre değişir)
     const location = useLocation(); // State'den veriyi al (varsa)
@@ -31,7 +29,7 @@ const SaleEdit = () => {
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
     const [cushions, setCushions] = useState<Cushion[]>([]);
     const [storeStocks, setStoreStocks] = useState<StoreStock[]>([]);
-    const [storePersonnel, setStorePersonnel] = useState<Personnel[]>([]);
+    const [ setStorePersonnel] = useState<Personnel[]>([]);
     const [districts, setDistricts] = useState<string[]>([]);
 
     // Header State

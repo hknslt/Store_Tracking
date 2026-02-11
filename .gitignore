@@ -5,6 +5,7 @@ build/
 release/
 *.exe
 *.asar
+src/constants/hiddenUsers.ts
 
 
 *.exe

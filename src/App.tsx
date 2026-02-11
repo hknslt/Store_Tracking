@@ -55,6 +55,8 @@ import StoreComparison from "./pages/reports/StoreComparison";
 import SSHDetail from "./pages/ssh/SSHDetail";
 import SaleEdit from "./pages/sales/SaleEdit";
 import PurchaseEdit from "./pages/purchases/PurchaseEdit";
+import UserEdit from "./pages/admin/UserEdit";
+import UserList from "./pages/admin/UserList";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -242,6 +244,9 @@ function App() {
           {/* B) PROTECTED AREA */}
           <Route element={<ProtectedLayout />}>
             <Route path="/" element={<Home />} />
+
+            <Route path="/admin/users" element={<UserList />} />
+            <Route path="/admin/users/edit/:id" element={<UserEdit />} />
 
             {/* Products */}
             <Route path="/products" element={<ProductList />} />

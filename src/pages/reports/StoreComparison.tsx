@@ -1,6 +1,6 @@
 // src/pages/reports/StoreComparison.tsx
 import { useEffect, useState, useRef } from "react";
-import { collection, collectionGroup, getDocs, query, where } from "firebase/firestore";
+import {collectionGroup, getDocs, query } from "firebase/firestore";
 import { db } from "../../firebase";
 import { getStores } from "../../services/storeService";
 import type { Store } from "../../types";

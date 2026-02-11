@@ -215,6 +215,10 @@ const Sidebar = () => {
             </NavLink>
           </div>
         )}
+        <NavLink to="/admin/users" className="nav-item">
+          <span className="nav-icon"><img src={userIcon} alt="" /></span>
+          <span className="nav-text">Kullanıcılar</span>
+        </NavLink>
 
         {/* 👇 YENİ AYARLAR SAYFASI */}
         <NavLink to="/settings" className="nav-item">

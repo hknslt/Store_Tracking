@@ -1,6 +1,5 @@
 // src/pages/purchases/PurchaseEdit.tsx
 import { useState, useEffect } from "react";
-import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { updatePurchase } from "../../services/purchaseService"; 
@@ -11,7 +10,6 @@ import type { Purchase, PurchaseItem, Category, Product, Cushion, Color, Dimensi
 import "../../App.css";
 
 const PurchaseEdit = () => {
-    const { currentUser } = useAuth();
     const navigate = useNavigate();
     const { id, storeId } = useParams();
     const location = useLocation();

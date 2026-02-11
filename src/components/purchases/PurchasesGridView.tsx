@@ -27,7 +27,7 @@ interface Props {
 
 const PurchasesGridView: React.FC<Props> = ({
     purchases, formatDate, goToDetail, handleStatusClick, getButtonText, getButtonColor,
-    getCatName, getCushionName, getColorName, getDimensionName
+    getCatName, getCushionName, getColorName
 }) => {
 
     const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});

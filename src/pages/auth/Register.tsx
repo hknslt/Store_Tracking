@@ -1,10 +1,12 @@
+// src/pages/Register.tsx (veya Auth/Register.tsx)
 import { useState, useEffect } from "react";
-import { createUserWithEmailAndPassword } from "firebase/auth";
-import { auth, db } from "../../firebase";
+import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
+import { initializeApp, getApp, deleteApp } from "firebase/app"; // 🔥 Yeni importlar
+import { db } from "../../firebase"; // Mevcut db bağlantısı (Admin yetkisi için)
 import { doc, setDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import type { Store } from "../../types";
-import "./Auth.css"; // CSS dosyasını import et
+import "./Auth.css";
 
 const Register = () => {
     const [stores, setStores] = useState<Store[]>([]);
@@ -36,11 +38,23 @@ const Register = () => {
         }
 
         setLoading(true);
+        let secondaryApp;
 
         try {
-            const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+            // 1. Mevcut Firebase konfigürasyonunu al
+            const app = getApp();
+            const config = app.options;
+
+            // 2. Geçici bir "İkincil" Firebase uygulaması başlat
+            // Bu sayede yeni kullanıcı oluşsa bile ana 'auth' oturumu değişmez.
+            secondaryApp = initializeApp(config, "SecondaryApp");
+            const secondaryAuth = getAuth(secondaryApp);
+
+            // 3. Yeni kullanıcıyı bu ikincil auth üzerinden oluştur
+            const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
             const user = userCredential.user;
 
+            // 4. Firestore'a kaydet (Ana 'db' bağlantısını kullanıyoruz ki Admin yetkisiyle yazabilelim)
             const userData = {
                 fullName,
                 email,
@@ -52,15 +66,16 @@ const Register = () => {
                 createdAt: new Date().toISOString()
             };
 
+            // ÖNEMLİ: Auth ID ile Firestore ID'yi eşliyoruz
             await setDoc(doc(db, "personnel", user.uid), userData);
 
-            setMessage("✅ Kullanıcı başarıyla oluşturuldu!");
+            // 5. Oluşturulan kullanıcının oturumunu ikincil app'ten kapat (Garanti olsun)
+            await signOut(secondaryAuth);
+
+            setMessage("✅ Kullanıcı başarıyla oluşturuldu! (Mevcut oturumunuz devam ediyor)");
 
             // Formu temizle
             setEmail(""); setPassword(""); setFullName(""); setPhone(""); setAddress("");
-
-            // İsterseniz yönlendirme yapabilir veya aynı sayfada yeni kayıt için kalabilirsiniz
-            // setTimeout(() => navigate("/personnel"), 2000); 
 
         } catch (err: any) {
             console.error(err);
@@ -68,12 +83,15 @@ const Register = () => {
             else if (err.code === 'auth/weak-password') setError("Şifre en az 6 karakter olmalıdır.");
             else setError("Bir hata oluştu: " + err.message);
         } finally {
+            // 6. İkincil uygulamayı bellekten sil
+            if (secondaryApp) {
+                await deleteApp(secondaryApp);
+            }
             setLoading(false);
         }
     };
 
     return (
-        // Bu div 'page-container' içinde render edilecek şekilde tasarlandı
         <div className="register-container">
             <h2 className="register-title">Yeni Personel / Kullanıcı Ekle</h2>
 
