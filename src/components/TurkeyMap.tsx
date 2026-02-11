@@ -1,7 +1,7 @@
 // src/components/TurkeyMap.tsx
 import React, { useState, useEffect } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
-import { geoCentroid } from "d3-geo"; // Şehir merkezlerini bulmak için
+import { geoCentroid } from "d3-geo";
 
 // Harita Verileri
 const TURKEY_TOPO_URL = "https://code.highcharts.com/mapdata/countries/tr/tr-all.topo.json";
@@ -17,11 +17,9 @@ interface TurkeyMapProps {
 }
 
 const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
-    // Tooltip state artık ekran boyutlarını da dikkate alacak
     const [tooltip, setTooltip] = useState<{ name: string, data: CityData | null, x: number, y: number } | null>(null);
     const [windowSize, setWindowSize] = useState({ w: window.innerWidth, h: window.innerHeight });
 
-    // Ekran boyutu değişirse güncelle (Responsive Tooltip için)
     useEffect(() => {
         const handleResize = () => setWindowSize({ w: window.innerWidth, h: window.innerHeight });
         window.addEventListener('resize', handleResize);
@@ -32,14 +30,40 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY', maximumFractionDigits: 0 }).format(amount);
     };
 
-    // Şehir Verisi Eşleştirme
+    // 🔥 1. YARDIMCI: İsim Temizleme / Normalleştirme Fonksiyonu
+    // Türkçe karakterleri ve boşlukları temizler (Örn: "Şanlıurfa" -> "sanliurfa")
+    const cleanName = (name: string) => {
+        return name
+            .toLocaleLowerCase('tr')
+            .replace(/ğ/g, 'g')
+            .replace(/ü/g, 'u')
+            .replace(/ş/g, 's')
+            .replace(/ı/g, 'i')
+            .replace(/ö/g, 'o')
+            .replace(/ç/g, 'c')
+            .replace(/[^a-z0-9]/g, ''); // Harf ve rakam dışındakileri sil
+    };
+
+    // 🔥 2. GÜNCELLENMİŞ: Şehir Verisi Eşleştirme
     const getCityStats = (geoName: string): CityData | null => {
         if (!geoName) return null;
 
-        const key = Object.keys(cityData).find(k =>
-            k.toLocaleLowerCase('tr').trim() === geoName.toLocaleLowerCase('tr').trim() ||
-            k.toLocaleLowerCase('tr').includes(geoName.toLocaleLowerCase('tr'))
-        );
+        const mapNameClean = cleanName(geoName);
+
+        // Veritabanındaki key'ler arasında dönüp eşleşme arıyoruz
+        const key = Object.keys(cityData).find(dbCityName => {
+            const dbNameClean = cleanName(dbCityName);
+
+            // 1. Tam Eşleşme (sanliurfa === sanliurfa)
+            if (dbNameClean === mapNameClean) return true;
+
+            // 2. Kapsama (afyonkarahisar 'afyon' içeriyor mu? Veya tam tersi)
+            // Harita ismi genelde daha uzundur (Afyonkarahisar), DB ismi kısa olabilir (Afyon)
+            if (mapNameClean.includes(dbNameClean) || dbNameClean.includes(mapNameClean)) return true;
+
+            return false;
+        });
+
         return key ? cityData[key] : null;
     };
 
@@ -55,23 +79,13 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         });
     };
 
-    // Tooltip Pozisyon Hesaplama (Ekrandan taşmaması için)
     const getTooltipStyle = () => {
         if (!tooltip) return {};
-
-        // Varsayılan: İmlecin sağ-alt köşesi
         let top = tooltip.y + 10;
         let left = tooltip.x + 10;
 
-        // Eğer ekranın en altına geldiysek (Son 150px), kutuyu yukarı al
-        if (tooltip.y > windowSize.h - 150) {
-            top = tooltip.y - 100; // Kutuyu yukarı kaydır
-        }
-
-        // Eğer ekranın en sağına geldiysek (Son 200px), kutuyu sola al
-        if (tooltip.x > windowSize.w - 220) {
-            left = tooltip.x - 210; // Kutuyu sola kaydır
-        }
+        if (tooltip.y > windowSize.h - 150) top = tooltip.y - 100;
+        if (tooltip.x > windowSize.w - 220) left = tooltip.x - 210;
 
         return {
             position: "fixed" as const,
@@ -112,7 +126,10 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                 const cityName = geo.properties.name;
                                 const stats = getCityStats(cityName);
                                 const isActive = stats && stats.count > 0;
-                                const centroid = geoCentroid(geo); // Şehrin orta noktasını bul
+                                const centroid = geoCentroid(geo);
+
+                                // DEBUG İÇİN: Eğer boyanmayan şehir varsa konsoldan adını görebilirsiniz
+                                // if (cityName === 'Istanbul') console.log('Harita:', cityName, 'Stats:', stats);
 
                                 return (
                                     <React.Fragment key={geo.rsmKey}>
@@ -129,7 +146,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                                     transition: "all 0.3s"
                                                 },
                                                 hover: {
-                                                    fill: isActive ? "#145a32" : "#94a3b8", // Pasif hover rengi koyulaştırıldı
+                                                    fill: isActive ? "#145a32" : "#94a3b8",
                                                     stroke: "#fff",
                                                     strokeWidth: 1,
                                                     outline: "none",
@@ -138,13 +155,12 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                                 pressed: { fill: "#145a32", outline: "none" }
                                             }}
                                         />
-                                        {/* ŞEHİR İSMİ (MARKER) */}
                                         <Marker coordinates={centroid}>
                                             <text
                                                 y="2"
                                                 fontSize={8}
                                                 textAnchor="middle"
-                                                fill={isActive ? "#ffffff" : "#475569"} // Aktifse beyaz, değilse koyu gri
+                                                fill={isActive ? "#ffffff" : "#475569"}
                                                 style={{ pointerEvents: 'none', fontWeight: isActive ? 'bold' : 'normal' }}
                                             >
                                                 {cityName}
@@ -160,10 +176,26 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                     <Geographies geography={CYPRUS_TOPO_URL}>
                         {({ geographies }: { geographies: any[] }) =>
                             geographies.map((geo: any) => {
-                                const possibleNames = ["Kıbrıs", "KKTC", "Lefkoşa", "Girne", "Gazimağusa"];
-                                const matchedName = possibleNames.find(name => getCityStats(name) !== null);
-                                const displayAndLookupName = matchedName || "Kıbrıs";
-                                const stats = getCityStats(displayAndLookupName);
+                                // Kıbrıs için özel kontrol (Haritada bölge isimleri farklı olabilir)
+                                const possibleNames = ["Kıbrıs", "KKTC", "Lefkoşa", "Girne", "Gazimağusa", "Northern Cyprus"];
+
+                                // Haritadaki bölge ismini de kontrol et
+                                const mapGeoName = geo.properties.name;
+
+                                // Önce harita ismine göre bak, yoksa genel isimlere bak
+                                let stats = getCityStats(mapGeoName);
+                                let displayAndLookupName = mapGeoName;
+
+                                if (!stats) {
+                                    const matchedName = possibleNames.find(name => getCityStats(name) !== null);
+                                    if (matchedName) {
+                                        displayAndLookupName = matchedName;
+                                        stats = getCityStats(matchedName);
+                                    } else {
+                                        displayAndLookupName = "Kıbrıs";
+                                    }
+                                }
+
                                 const isActive = stats && stats.count > 0;
                                 const centroid = geoCentroid(geo);
 
@@ -193,7 +225,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                         />
                                         <Marker coordinates={centroid}>
                                             <text y="2" fontSize={8} textAnchor="middle" fill="#475569" style={{ pointerEvents: 'none' }}>
-                                                Kıbrıs
+                                                {displayAndLookupName}
                                             </text>
                                         </Marker>
                                     </React.Fragment>
@@ -205,7 +237,6 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                 </ZoomableGroup>
             </ComposableMap>
 
-            {/* AKILLI TOOLTIP */}
             {tooltip && (
                 <div style={getTooltipStyle()}>
                     <div style={{ fontWeight: '700', fontSize: '13px', marginBottom: '6px', paddingBottom: '4px', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
