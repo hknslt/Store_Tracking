@@ -13,7 +13,7 @@ import Register from "./pages/auth/Register";
 import ProductAdd from "./pages/products/ProductAdd";
 import ProductList from "./pages/products/ProductList";
 import DefinitionsPage from "./pages/definitions/groups/DefinitionsPage";
-import PriceList from "./pages/prices/PriceList";
+
 import PurchaseList from "./pages/purchases/PurchaseList";
 import PurchaseAdd from "./pages/purchases/PurchaseAdd";
 import StoreList from "./pages/stores/StoreList";
@@ -57,6 +57,10 @@ import SaleEdit from "./pages/sales/SaleEdit";
 import PurchaseEdit from "./pages/purchases/PurchaseEdit";
 import UserEdit from "./pages/admin/UserEdit";
 import UserList from "./pages/admin/UserList";
+import PriceList from "./pages/prices/PriceList";
+import PriceDetail from "./pages/prices/PriceDetail";
+import PaymentDetail from "./pages/payments/PaymentDetail";
+import PaymentEdit from "./pages/payments/PaymentEdit";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -262,6 +266,10 @@ function App() {
             {/* Price, Stock & Purchase */}
             <Route path="/prices/list" element={<PriceList />} />
             <Route path="/prices/manage" element={<PriceManager />} />
+            <Route path="/prices/manage/:id" element={<PriceManager />} />
+            <Route path="/prices/detail/:id" element={<PriceDetail />} />
+
+
             <Route path="/store-stocks" element={<StoreStockManager />} />
             <Route path="/purchases" element={<PurchaseList />} />
             <Route path="/purchases/add" element={<PurchaseAdd />} />
@@ -292,8 +300,10 @@ function App() {
             {/* Payment Methods & Transactions */}
             <Route path="/payments/add" element={<PaymentAdd />} />
             <Route path="/payments/list" element={<PaymentList />} />
+            <Route path="/payments/detail/:id" element={<PaymentDetail />} />
+            <Route path="/payments/edit/:id" element={<PaymentEdit />} /> 
 
-            {/* SSH Records */}
+              {/* SSH Records */}
             <Route path="/ssh/list" element={<SSHList />} />
             <Route path="/ssh/add" element={<SSHAdd />} />
             <Route path="/ssh/:id" element={<SSHDetail />} />

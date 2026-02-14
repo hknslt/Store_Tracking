@@ -231,11 +231,13 @@ export interface PendingRequest {
     productNote?: string;
 }
 
-export interface Price {
-    id?: string;        // Firebase Doc ID (örn: "prod123_dim456")
-    productId: string;
-    dimensionId: string | null; // null ise standart fiyat, dolu ise o ebata ait fiyat
-    amount: number;
+export interface PriceListModel {
+    id?: string;
+    name: string;
+    type: 'perakende' | 'toptan';
+    storeIds: string[]; 
+    prices: Record<string, number>; 
+    createdAt?: string;
 }
 
 

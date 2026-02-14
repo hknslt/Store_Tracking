@@ -209,7 +209,7 @@ const SSHDetail = () => {
 
             <div className="page-header">
                 <div>
-                    <button onClick={() => navigate("/ssh")} className="btn-back">← Geri Dön</button>
+                    <button onClick={() => navigate("/ssh/list")} className="btn-back">← Geri Dön</button>
                     <h2 className="page-title" style={{ marginTop: '10px' }}>SSH Kayıt Detayı</h2>
                     <p style={{ color: '#666' }}>Fiş No: <strong>{record.saleReceiptNo}</strong> | Müşteri: <strong>{record.customerName}</strong></p>
                 </div>

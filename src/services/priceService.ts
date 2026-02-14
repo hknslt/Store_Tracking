@@ -1,37 +1,72 @@
+// src/services/priceService.ts
 import { db } from "../firebase";
-import { collection, getDocs, doc, setDoc } from "firebase/firestore";
-import type { Price } from "../types";
+import { collection, getDocs, doc, setDoc, getDoc, addDoc, deleteDoc } from "firebase/firestore";
 
-const PRICE_COLLECTION = "prices";
+const PRICE_LISTS_COLLECTION = "price_lists";
 
-// Tüm fiyatları getir
-export const getAllPrices = async (): Promise<Price[]> => {
+export interface PriceListModel {
+    id?: string;
+    name: string;
+    type: 'perakende' | 'toptan';
+    storeIds: string[]; // Bu listeyi kullanan mağazaların ID'leri
+    prices: Record<string, number>; // Örn: { "prodId_std": 100, "prodId_dimId": 120 }
+    createdAt?: string;
+}
+
+// Tüm Fiyat Listelerini Getir
+export const getPriceLists = async (): Promise<PriceListModel[]> => {
     try {
-        const snapshot = await getDocs(collection(db, PRICE_COLLECTION));
+        const snapshot = await getDocs(collection(db, PRICE_LISTS_COLLECTION));
         return snapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
-        })) as Price[];
+        })) as PriceListModel[];
     } catch (error) {
-        console.error("Fiyat çekme hatası:", error);
+        console.error("Fiyat listeleri çekme hatası:", error);
         return [];
     }
 };
 
-// Fiyat Kaydet (Tekil veya Ebatlı)
-export const saveProductPrice = async (productId: string, dimensionId: string | null, amount: number) => {
+// Tek Bir Fiyat Listesini Getir (Düzenleme için)
+export const getPriceListById = async (id: string): Promise<PriceListModel | null> => {
     try {
-        const docId = dimensionId ? `${productId}_${dimensionId}` : `${productId}_std`;
-        const priceRef = doc(db, PRICE_COLLECTION, docId);
-
-        await setDoc(priceRef, {
-            productId,
-            dimensionId: dimensionId || null,
-            amount: Number(amount)
-        }, { merge: true });
-
+        const docRef = doc(db, PRICE_LISTS_COLLECTION, id);
+        const snapshot = await getDoc(docRef);
+        return snapshot.exists() ? { id: snapshot.id, ...snapshot.data() } as PriceListModel : null;
     } catch (error) {
-        console.error("Fiyat kaydetme hatası:", error);
+        console.error("Fiyat listesi detay hatası:", error);
+        return null;
+    }
+};
+
+// Fiyat Listesi Oluştur veya Güncelle
+export const savePriceList = async (data: PriceListModel, id?: string): Promise<string> => {
+    try {
+        if (id) {
+            // Güncelleme
+            const docRef = doc(db, PRICE_LISTS_COLLECTION, id);
+            await setDoc(docRef, data, { merge: true });
+            return id;
+        } else {
+            // Yeni Ekleme
+            const docRef = await addDoc(collection(db, PRICE_LISTS_COLLECTION), {
+                ...data,
+                createdAt: new Date().toISOString()
+            });
+            return docRef.id; // 🔥 Oluşturulan yeni ID'yi döndür
+        }
+    } catch (error) {
+        console.error("Fiyat listesi kaydetme hatası:", error);
+        throw error;
+    }
+};
+
+// Fiyat Listesi Sil
+export const deletePriceList = async (id: string) => {
+    try {
+        await deleteDoc(doc(db, PRICE_LISTS_COLLECTION, id));
+    } catch (error) {
+        console.error("Fiyat listesi silme hatası:", error);
         throw error;
     }
 };

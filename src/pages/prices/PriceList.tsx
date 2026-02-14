@@ -1,191 +1,172 @@
 // src/pages/prices/PriceList.tsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
-import { getProducts } from "../../services/productService";
-import { getAllPrices } from "../../services/priceService";
-import { getGroups, getCategories, getDimensions } from "../../services/definitionService";
-import type { Product, Group, Category, Dimension } from "../../types";
+import { useNavigate } from "react-router-dom";
+import { getPriceLists, deletePriceList } from "../../services/priceService";
+import { getStores } from "../../services/storeService";
+import type { Store, PriceListModel } from "../../types";
 import "../../App.css";
 
-// Tabloda gösterilecek satır yapısı
-interface PriceRow {
-  key: string; // unique key
-  productName: string;
-  categoryName: string;
-  dimensionName?: string | null; // Varsa ebat ismi
-  price: number;
-  groupId: string; // Filtreleme için
-}
-
 const PriceList = () => {
-  // Ham Veriler
-  const [products, setProducts] = useState<Product[]>([]);
-  const [groups, setGroups] = useState<Group[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [dimensions, setDimensions] = useState<Dimension[]>([]);
-  const [priceMap, setPriceMap] = useState<Record<string, number>>({});
-
-  // İşlenmiş (Düzleştirilmiş) Veriler
-  const [displayRows, setDisplayRows] = useState<PriceRow[]>([]);
-
-  // Filtreleme
-  const [selectedGroupId, setSelectedGroupId] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-
+  const navigate = useNavigate();
+  const [priceLists, setPriceLists] = useState<PriceListModel[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 1. Verileri Çek
+  // --- KENDİ MESAJ VE MODAL STATE'LERİMİZ ---
+  const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [listToDelete, setListToDelete] = useState<string | null>(null);
+
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [p, g, c, d, pr] = await Promise.all([
-          getProducts(), getGroups(), getCategories(), getDimensions(), getAllPrices()
-        ]);
-        setProducts(p); setGroups(g); setCategories(c); setDimensions(d);
+    if (message) {
+      const timer = setTimeout(() => setMessage(null), 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [message]);
 
-        const map: Record<string, number> = {};
-        pr.forEach(x => {
-          const key = x.dimensionId ? `${x.productId}_${x.dimensionId}` : `${x.productId}_std`;
-          map[key] = x.amount;
-        });
-        setPriceMap(map);
-      } catch (e) { console.error(e); } finally { setLoading(false); }
-    };
-    loadData();
-  }, []);
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [lists, sData] = await Promise.all([getPriceLists(), getStores()]);
+      setPriceLists(lists);
+      setStores(sData);
+    } catch (error) {
+      console.error(error);
+      setMessage({ type: 'error', text: "Veriler yüklenirken hata oluştu." });
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // 2. Verileri İşle (Fiyatı olanları listeye dök)
-  useEffect(() => {
-    if (products.length === 0) return;
+  useEffect(() => { loadData(); }, []);
 
-    const rows: PriceRow[] = [];
+  // SİLME BUTONUNA BASILDIĞINDA MODALI AÇ
+  const handleDeleteClick = (id: string) => {
+    setListToDelete(id);
+    setShowDeleteModal(true);
+  };
 
-    products.forEach(p => {
-      const categoryName = categories.find(c => c.id === p.categoryId)?.categoryName || "";
+  // MODALDAN "EVET" DENİLDİĞİNDE ÇALIŞACAK FONKSİYON
+  const confirmDelete = async () => {
+    if (!listToDelete) return;
+    try {
+      await deletePriceList(listToDelete);
+      setMessage({ type: 'success', text: "✅ Fiyat listesi başarıyla silindi." });
+      loadData(); // Listeyi yenile
+    } catch (error) {
+      setMessage({ type: 'error', text: "Silme işlemi sırasında bir hata oluştu." });
+    } finally {
+      setShowDeleteModal(false);
+      setListToDelete(null);
+    }
+  };
 
-      // A) Standart Fiyat Kontrolü
-      const stdKey = `${p.id}_std`;
-      const stdPrice = priceMap[stdKey];
-      if (stdPrice && stdPrice > 0) {
-        rows.push({
-          key: stdKey,
-          productName: p.productName,
-          categoryName: categoryName,
-          dimensionName: null,
-          price: stdPrice,
-          groupId: p.groupId
-        });
-      }
-
-      // B) Ebat Fiyatları Kontrolü
-      dimensions.forEach(d => {
-        const dimKey = `${p.id}_${d.id}`;
-        const dimPrice = priceMap[dimKey];
-        if (dimPrice && dimPrice > 0) {
-          rows.push({
-            key: dimKey,
-            productName: p.productName,
-            categoryName: categoryName,
-            dimensionName: d.dimensionName,
-            price: dimPrice,
-            groupId: p.groupId
-          });
-        }
-      });
-    });
-
-    // İsteğe bağlı: İsme göre sırala
-    rows.sort((a, b) => a.productName.localeCompare(b.productName));
-
-    setDisplayRows(rows);
-
-  }, [products, priceMap, categories, dimensions]);
-
-  // 3. Filtreleme Mantığı
-  const filteredRows = displayRows.filter(row => {
-    const matchesGroup = selectedGroupId ? row.groupId === selectedGroupId : true;
-    const matchesSearch = row.productName.toLowerCase().includes(searchTerm.toLowerCase());
-    return matchesGroup && matchesSearch;
-  });
+  // Mağaza ID'lerini isimlere çeviren yardımcı fonksiyon
+  const getStoreNames = (storeIds: string[]) => {
+    if (!storeIds || storeIds.length === 0) return "Hiçbir Mağaza Seçilmedi";
+    return storeIds.map(id => stores.find(s => s.id === id)?.storeName || "Bilinmeyen").join(", ");
+  };
 
   if (loading) return <div className="page-container">Yükleniyor...</div>;
 
+  // Modal Stilleri
+  const modalOverlayStyle: React.CSSProperties = {
+    position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000
+  };
+  const modalContentStyle: React.CSSProperties = {
+    backgroundColor: 'white', padding: '25px', borderRadius: '12px', width: '350px', textAlign: 'center', boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
+  };
+
   return (
     <div className="page-container">
-      <div className="page-header">
-        <div className="page-title">
-          <h2>Ürün Fiyat Listesi</h2>
-          <p>Sadece fiyatı tanımlanmış ürünler listelenmektedir.</p>
-        </div>
 
-        <Link to="/prices/manage" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-          ⚙️ Fiyatları Düzenle
-        </Link>
+      {/* TOAST MESAJI */}
+      {message && (
+        <div style={{
+          position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+          padding: '15px 25px', borderRadius: '8px', color: 'white',
+          fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+          backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444',
+          animation: 'fadeIn 0.3s ease-in-out'
+        }}>
+          {message.text}
+        </div>
+      )}
+
+      {/* SİLME ONAY MODALI */}
+      {showDeleteModal && (
+        <div style={modalOverlayStyle}>
+          <div style={modalContentStyle}>
+            <h3 style={{ margin: '0 0 10px 0', color: '#dc2626' }}>🗑️ Listeyi Sil?</h3>
+            <p style={{ color: '#666', fontSize: '14px', marginBottom: '20px' }}>
+              Bu fiyat listesini silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+            </p>
+            <div style={{ display: 'flex', gap: '10px', justifyContent: 'center' }}>
+              <button onClick={() => setShowDeleteModal(false)} className="modern-btn btn-secondary">Vazgeç</button>
+              <button onClick={confirmDelete} className="modern-btn" style={{ backgroundColor: '#dc2626', color: 'white', border: 'none' }}>Evet, Sil</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="modern-header">
+        <div>
+          <h2>Fiyat Listeleri Yönetimi</h2>
+          <p>Sistemde tanımlı tüm toptan ve perakende fiyat listeleri.</p>
+        </div>
+        <button onClick={() => navigate('/prices/manage')} className="modern-btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+          + Yeni Fiyat Listesi Oluştur
+        </button>
       </div>
 
-      {/* FİLTRELER */}
-      <div className="card" style={{ marginBottom: '20px', padding: '15px', display: 'flex', gap: '15px', alignItems: 'center' }}>
-        <select className="form-input" value={selectedGroupId} onChange={e => setSelectedGroupId(e.target.value)} style={{ maxWidth: '200px' }}>
-          <option value="">Tüm Gruplar</option>
-          {groups.map(g => <option key={g.id} value={g.id}>{g.groupName}</option>)}
-        </select>
-        <input
-          type="text"
-          className="form-input"
-          placeholder="Ürün Ara..."
-          value={searchTerm}
-          onChange={e => setSearchTerm(e.target.value)}
-          style={{ maxWidth: '300px' }}
-        />
-        <div style={{ flex: 1, textAlign: 'right', fontSize: '13px', color: '#777' }}>
-          Toplam {filteredRows.length} fiyat kaydı bulundu.
-        </div>
-      </div>
-
-      {/* TABLO */}
       <div className="card">
         <div className="card-body" style={{ padding: 0 }}>
-          <table className="data-table">
+          <table className="modern-table">
             <thead>
-              <tr style={{ backgroundColor: '#2c3e50', color: 'white' }}>
-                <th style={{ width: '70%' }}>Ürün Bilgisi</th>
-                <th style={{ width: '30%', textAlign: 'right' }}>Satış Fiyatı</th>
+              <tr style={{ backgroundColor: '#f8fafc' }}>
+                <th style={{ width: '25%' }}>Liste Adı</th>
+                <th style={{ width: '15%' }}>Tür</th>
+                <th style={{ width: '35%' }}>Kullanılan Mağazalar</th>
+                <th style={{ width: '25%', textAlign: 'right' }}>İşlemler</th>
               </tr>
             </thead>
             <tbody>
-              {filteredRows.length > 0 ? (
-                filteredRows.map(row => (
-                  <tr key={row.key} className="hover-row" style={{ borderBottom: '1px solid #eee' }}>
-                    <td style={{ padding: '12px 15px' }}>
-                      {/* ÜRÜN ADI */}
-                      <span style={{ fontWeight: '700', color: '#2c3e50', fontSize: '15px', marginRight: '8px' }}>
-                        {row.productName}
-                      </span>
-
-                      {/* EBAT (Varsa) - Turuncu */}
-                      {row.dimensionName && (
-                        <span style={{ color: '#e67e22', fontWeight: '600', marginRight: '8px', fontSize: '14px' }}>
-                          {row.dimensionName}
-                        </span>
-                      )}
-
-                      {/* KATEGORİ - Gri */}
-                      <span style={{ color: '#95a5a6', fontStyle: 'italic', fontSize: '13px' }}>
-                        {row.categoryName}
+              {priceLists.length > 0 ? (
+                priceLists.map(list => (
+                  <tr key={list.id} className="hover-row">
+                    {/* 🔥 Liste Adı Tıklanabilir Yapıldı */}
+                    <td
+                      style={{ fontWeight: '700', color: '#3b82f6', cursor: 'pointer' }}
+                      onClick={() => navigate(`/prices/detail/${list.id}`)}
+                    >
+                      {list.name}
+                    </td>
+                    <td>
+                      <span className={`status-badge ${list.type === 'toptan' ? 'warning' : 'success'}`}>
+                        {list.type === 'toptan' ? 'Toptan' : 'Perakende'}
                       </span>
                     </td>
-
-                    {/* FİYAT */}
-                    <td style={{ textAlign: 'right', padding: '12px 15px', fontWeight: 'bold', fontSize: '16px', color: '#27ae60' }}>
-                      {row.price} ₺
+                    <td style={{ fontSize: '13px', color: '#64748b' }}>
+                      {getStoreNames(list.storeIds)}
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <button onClick={() => navigate(`/prices/detail/${list.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer', display: 'inline-block' }}>
+                        🔍 Detay
+                      </button>
+                      <button onClick={() => navigate(`/prices/manage/${list.id}`)} className="modern-btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px', display: 'inline-block' }}>
+                        ✏️ Düzenle
+                      </button>
+                      <button onClick={() => handleDeleteClick(list.id!)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer' }}>
+                        🗑️ Sil
+                      </button>
                     </td>
                   </tr>
                 ))
               ) : (
                 <tr>
-                  <td colSpan={2} style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
-                    Kriterlere uygun fiyat kaydı bulunamadı. <br />
-                    <small>Ürünlerin fiyatı girilmemiş olabilir.</small>
+                  <td colSpan={4} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                    Henüz oluşturulmuş bir fiyat listesi yok.
                   </td>
                 </tr>
               )}

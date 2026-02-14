@@ -10,10 +10,10 @@ import autoTable from "jspdf-autotable";
 
 // Tanımlar ve Servisler
 import { getProducts } from "../../services/productService";
-import { getAllPrices } from "../../services/priceService";
+import { getPriceLists } from "../../services/priceService"; // 🔥 YENİ: Fiyat Listeleri Servisi
 import { getCategories, getColors, getDimensions, getGroups } from "../../services/definitionService";
 
-import type { Store, Product, Category, Color, Dimension, StoreStock, SystemUser, Group } from "../../types";
+import type { Store, Product, Category, Color, Dimension, StoreStock, SystemUser, Group, PriceListModel } from "../../types";
 import "../../App.css";
 
 import StoreIcon from "../../assets/icons/store.svg";
@@ -42,8 +42,9 @@ const StoreStockManager = () => {
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
 
-    // Fiyat Haritası
-    const [priceMap, setPriceMap] = useState<Record<string, number>>({});
+    // 🔥 Fiyat Listeleri State'leri
+    const [allPriceLists, setAllPriceLists] = useState<PriceListModel[]>([]);
+    const [activePriceMap, setActivePriceMap] = useState<Record<string, number>>({});
 
     const [stocks, setStocks] = useState<StoreStock[]>([]);
     const [loading, setLoading] = useState(true);
@@ -83,45 +84,65 @@ const StoreStockManager = () => {
         const loadBase = async () => {
             if (!currentUser) return;
             try {
-                const [s, p, c, col, dim, grp, prices] = await Promise.all([
-                    getStores(), getProducts(), getCategories(), getColors(), getDimensions(), getGroups(), getAllPrices()
+                // 🔥 getPriceLists kullanıyoruz
+                const [s, p, c, col, dim, grp, pLists] = await Promise.all([
+                    getStores(), getProducts(), getCategories(), getColors(), getDimensions(), getGroups(), getPriceLists()
                 ]);
 
                 setStores(s); setProducts(p); setCategories(c); setColors(col); setDimensions(dim); setGroups(grp);
+                setAllPriceLists(pLists as PriceListModel[]); // Fiyat listelerini hafızaya al
 
-                const pMap: Record<string, number> = {};
-                prices.forEach(pr => {
-                    const key = pr.dimensionId ? `${pr.productId}_${pr.dimensionId}` : `${pr.productId}_std`;
-                    pMap[key] = pr.amount;
-                });
-                setPriceMap(pMap);
-
-                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-                if (userDoc.exists()) {
-                    const u = userDoc.data() as SystemUser;
-                    if (['admin', 'control', 'report'].includes(u.role)) {
-                        setIsAdmin(true);
-                    } else {
-                        setIsAdmin(false);
-                        if (u.storeId) setSelectedStoreId(u.storeId);
-                    }
+                const userDoc = await getDoc(doc(db, "users", currentUser.uid)); // 'users' koleksiyonu
+                if (!userDoc.exists()) {
+                    // Geriye dönük uyumluluk
+                    const pDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                    if (pDoc.exists()) handleUserRole(pDoc.data() as SystemUser);
+                } else {
+                    handleUserRole(userDoc.data() as SystemUser);
                 }
             } catch (err) { console.error(err); }
             finally { setLoading(false); }
         };
+
+        const handleUserRole = (u: SystemUser) => {
+            if (['admin', 'control', 'report'].includes(u.role)) {
+                setIsAdmin(true);
+            } else {
+                setIsAdmin(false);
+                if (u.storeId) setSelectedStoreId(u.storeId);
+            }
+        };
+
         loadBase();
     }, [currentUser]);
 
-    const refreshStocks = () => {
-        if (!selectedStoreId) { setStocks([]); return; }
+    // --- MAĞAZA SEÇİMİ DEĞİŞTİĞİNDE: STOKLARI VE FİYAT LİSTESİNİ GÜNCELLE ---
+    useEffect(() => {
+        if (!selectedStoreId) {
+            setStocks([]);
+            setActivePriceMap({});
+            return;
+        }
+
+        // 1. Stokları Getir
         setLoading(true);
         getStoreStocks(selectedStoreId).then(data => {
             setStocks(data);
             setLoading(false);
         });
-    };
 
-    useEffect(() => { refreshStocks(); }, [selectedStoreId]);
+        // 2. 🔥 Seçili Mağazanın "Perakende" Fiyat Listesini Bul
+        const retailList = allPriceLists.find(
+            list => list.type === 'perakende' && list.storeIds?.includes(selectedStoreId)
+        );
+
+        if (retailList && retailList.prices) {
+            setActivePriceMap(retailList.prices);
+        } else {
+            setActivePriceMap({}); // Fiyat listesi yoksa boşalt
+        }
+
+    }, [selectedStoreId, allPriceLists]);
 
     // --- YARDIMCILAR ---
     const getCatName = (prodId: string) => {
@@ -131,12 +152,14 @@ const StoreStockManager = () => {
     const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
     const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
 
+    // 🔥 YENİ FİYAT GETİRME MANTIĞI
     const getProductPrice = (prodId: string, dimId?: string | null) => {
         const key = dimId ? `${prodId}_${dimId}` : `${prodId}_std`;
-        const price = priceMap[key];
+        const price = activePriceMap[key];
 
         if (!price && dimId) {
-            const stdPrice = priceMap[`${prodId}_std`];
+            // Ebat fiyatı yoksa standart fiyatı dene
+            const stdPrice = activePriceMap[`${prodId}_std`];
             return stdPrice ? `${stdPrice.toLocaleString('tr-TR')} ₺` : "-";
         }
         return price ? `${price.toLocaleString('tr-TR')} ₺` : "-";
@@ -295,7 +318,14 @@ const StoreStockManager = () => {
             });
 
             setIsModalOpen(false);
-            refreshStocks();
+
+            // Stokları Yenile
+            setLoading(true);
+            getStoreStocks(selectedStoreId).then(data => {
+                setStocks(data);
+                setLoading(false);
+            });
+
             setMessage({ type: 'success', text: "Stok başarıyla güncellendi." });
         } catch (error) {
             setMessage({ type: 'error', text: "Kaydedilirken bir hata oluştu." });
@@ -331,7 +361,7 @@ const StoreStockManager = () => {
                         <label style={{ fontWeight: 'bold', display: 'block', marginBottom: '5px', fontSize: '12px', color: '#64748b' }}>MAĞAZA</label>
                         {isAdmin ? (
                             <div style={{ position: 'relative' }}>
-                                <img src={StoreIcon} width="16" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} />
+                                <img src={StoreIcon} width="16" style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', opacity: 0.5 }} alt="" />
                                 <select className="form-input" style={{ width: '100%', paddingLeft: '35px' }} value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)}>
                                     <option value="">-- Seçiniz --</option>
                                     {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
@@ -400,7 +430,7 @@ const StoreStockManager = () => {
 
                         {isAdmin && selectedStoreId && (
                             <button onClick={handleAddNewClick} className="btn btn-primary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px', padding: '0 10px' }}>
-                                <img src={PlusIcon} style={{ width: 16, filter: 'invert(1)' }} /> Yeni Ekle
+                                <img src={PlusIcon} style={{ width: 16, filter: 'invert(1)' }} alt="" /> Yeni Ekle
                             </button>
                         )}
                     </div>
@@ -415,7 +445,7 @@ const StoreStockManager = () => {
                                 <tr style={{ backgroundColor: '#f1f2f6' }}>
                                     <th style={{ width: '25%' }}>Ürün Bilgisi</th>
                                     <th style={{ width: '15%' }}>Renk</th>
-                                    <th style={{ width: '10%', textAlign: 'right', paddingRight: '20px' }}>Fiyat</th>
+                                    <th style={{ width: '10%', textAlign: 'right', paddingRight: '20px' }}>Satış Fiyatı</th>
                                     <th style={{ textAlign: 'center', backgroundColor: '#d4edda', color: '#155724' }}>Serbest</th>
                                     <th style={{ textAlign: 'center', backgroundColor: '#fff3cd', color: '#856404' }}>Rezerve</th>
                                     <th style={{ textAlign: 'center', backgroundColor: '#d1ecf1', color: '#0c5460' }}>Gelecek(Depo)</th>
@@ -444,6 +474,7 @@ const StoreStockManager = () => {
                                             </td>
                                             <td style={{ color: '#555', padding: '8px 12px', fontSize: '13px' }}>{getColorName(stock.colorId)}</td>
 
+                                            {/* 🔥 DİNAMİK SATIŞ FİYATI */}
                                             <td style={{ textAlign: 'right', fontWeight: '600', color: '#1e293b', fontSize: '13px', paddingRight: '20px' }}>
                                                 {getProductPrice(stock.productId, stock.dimensionId)}
                                             </td>
@@ -460,7 +491,7 @@ const StoreStockManager = () => {
                                                         style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px' }}
                                                         title="Stoğu Düzenle"
                                                     >
-                                                        <img src={EditIcon} style={{ width: 16, opacity: 0.6 }} />
+                                                        <img src={EditIcon} style={{ width: 16, opacity: 0.6 }} alt="" />
                                                     </button>
                                                 </td>
                                             )}
@@ -591,18 +622,6 @@ const StoreStockManager = () => {
                             </div>
                         </div>
                     </div>
-                </div>
-            )}
-
-            {message && (
-                <div style={{
-                    position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
-                    padding: '15px 25px', borderRadius: '8px', color: 'white',
-                    fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
-                    backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444',
-                    animation: 'fadeIn 0.3s ease-in-out'
-                }}>
-                    {message.type === 'success' ? '✅' : '⚠️'} {message.text}
                 </div>
             )}
         </div>

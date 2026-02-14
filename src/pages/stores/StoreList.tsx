@@ -9,7 +9,15 @@ const StoreList = () => {
     const navigate = useNavigate();
 
     useEffect(() => {
-        getStores().then(setStores);
+        getStores().then((data) => {
+            // Mağazaları storeCode'a göre (alfabetik/sayısal) sırala
+            const sortedStores = data.sort((a, b) => {
+                const codeA = a.storeCode || "";
+                const codeB = b.storeCode || "";
+                return codeA.localeCompare(codeB);
+            });
+            setStores(sortedStores);
+        });
     }, []);
 
     return (
@@ -26,7 +34,7 @@ const StoreList = () => {
                             <th style={{ padding: '12px' }}>Kod</th>
                             <th style={{ padding: '12px' }}>Mağaza Adı</th>
                             <th style={{ padding: '12px' }}>Telefon</th>
-                            <th style={{ padding: '12px' }}>Adres</th>
+                            <th style={{ padding: '12px' }}>İl / İlçe</th>
                             <th style={{ width: '180px', textAlign: 'center' }}>İşlemler</th>
                         </tr>
                     </thead>
@@ -36,7 +44,18 @@ const StoreList = () => {
                                 <td style={{ padding: '12px', fontWeight: 'bold' }}>{s.storeCode}</td>
                                 <td style={{ padding: '12px' }}>{s.storeName}</td>
                                 <td style={{ padding: '12px' }}>{s.phone}</td>
-                                <td style={{ padding: '12px', fontSize: '13px', color: '#666' }}>{s.address}</td>
+
+                                {/* 🔥 İl / İlçe Gösterimi */}
+                                <td style={{ padding: '12px', fontSize: '13px', color: '#666' }}>
+                                    {s.city || s.district ? (
+                                        <span style={{ fontWeight: '500', color: '#334155' }}>
+                                            {s.city || "İl Belirtilmemiş"} {s.city && s.district ? " / " : ""} {s.district || ""}
+                                        </span>
+                                    ) : (
+                                        <span>{s.address || "-"}</span>
+                                    )}
+                                </td>
+
                                 <td style={{ padding: '12px', textAlign: 'center' }}>
                                     <div style={{ display: 'flex', gap: '5px', justifyContent: 'center' }}>
                                         {/* YÖNET (Dashboard) */}

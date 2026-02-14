@@ -1,31 +1,22 @@
 // src/pages/payments/PaymentList.tsx
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import { getPaymentsByStore } from "../../services/paymentService";
+import { Link, useNavigate } from "react-router-dom";
 
 import type { PaymentDocument, Store, SystemUser } from "../../types";
 import "../../App.css";
-
 
 import StoreIcon from "../../assets/icons/store.svg";
 
 const PaymentList = () => {
     const { currentUser } = useAuth();
+    const navigate = useNavigate();
 
-    // --- STATE'LER ---
-    const [payments, setPayments] = useState<PaymentDocument[]>([]);
-    const [stores, setStores] = useState<Store[]>([]);
-    const [selectedStoreId, setSelectedStoreId] = useState("");
-    const [isAdmin, setIsAdmin] = useState(false);
-    const [loading, setLoading] = useState(true);
-
-    const [expandedRowId, setExpandedRowId] = useState<string | null>(null);
-
-    // BUGÜNÜN TARİHİ (YYYY-MM-DD Formatında)
+    // --- YARDIMCI FONKSİYONLAR ---
     const getTodayString = () => {
         const d = new Date();
         const year = d.getFullYear();
@@ -36,12 +27,33 @@ const PaymentList = () => {
 
     const TODAY = getTodayString();
 
-    // Filtreler (Varsayılan olarak BUGÜN seçili gelir ama değiştirilebilir)
-    const [searchTerm, setSearchTerm] = useState("");
-    const [startDate, setStartDate] = useState(TODAY);
-    const [endDate, setEndDate] = useState(TODAY);
+    // --- STATE'LER (Hafıza / Cache Destekli) ---
+    const [payments, setPayments] = useState<PaymentDocument[]>([]);
+    const [stores, setStores] = useState<Store[]>([]);
+    const [isAdmin, setIsAdmin] = useState(false);
+    const [loading, setLoading] = useState(true);
 
-    // --- BAŞLANGIÇ ---
+    // Filtreleri SessionStorage'dan al veya varsayılanı kullan
+    const cachedStoreId = sessionStorage.getItem("paymentList_storeId") || "";
+    const cachedStart = sessionStorage.getItem("paymentList_startDate") || TODAY;
+    const cachedEnd = sessionStorage.getItem("paymentList_endDate") || TODAY;
+
+    const [selectedStoreId, setSelectedStoreId] = useState(cachedStoreId);
+    const [startDate, setStartDate] = useState(cachedStart);
+    const [endDate, setEndDate] = useState(cachedEnd);
+    const [searchTerm, setSearchTerm] = useState("");
+
+    // --- HAFIZAYA KAYDETME (SessionStorage) ---
+    useEffect(() => {
+        sessionStorage.setItem("paymentList_startDate", startDate);
+        sessionStorage.setItem("paymentList_endDate", endDate);
+    }, [startDate, endDate]);
+
+    useEffect(() => {
+        if (selectedStoreId) sessionStorage.setItem("paymentList_storeId", selectedStoreId);
+    }, [selectedStoreId]);
+
+    // --- BAŞLANGIÇ YÜKLEMESİ ---
     useEffect(() => {
         const init = async () => {
             if (!currentUser) return;
@@ -49,38 +61,54 @@ const PaymentList = () => {
                 const sData = await getStores();
                 setStores(sData);
 
-                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-                if (userDoc.exists()) {
-                    const u = userDoc.data() as SystemUser;
-                    if (['admin', 'control', 'report'].includes(u.role)) {
-                        setIsAdmin(true);
-                    } else {
-                        setIsAdmin(false);
-                        if (u.storeId) setSelectedStoreId(u.storeId);
+                const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+                let uData = userDoc.exists() ? userDoc.data() as SystemUser : null;
+
+                if (!uData) {
+                    const pDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                    if (pDoc.exists()) uData = pDoc.data() as SystemUser;
+                }
+
+                if (uData) {
+                    const hasAdminAccess = ['admin', 'control', 'report'].includes(uData.role);
+                    setIsAdmin(hasAdminAccess);
+
+                    if (!hasAdminAccess) {
+                        // Admin değilse tarihi BUGÜN'e zorla ve mağazasını sabitle
+                        if (uData.storeId) setSelectedStoreId(uData.storeId);
+                        setStartDate(TODAY);
+                        setEndDate(TODAY);
                     }
                 }
-            } catch (error) { console.error(error); } finally { setLoading(false); }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
         };
         init();
-    }, [currentUser]);
+    }, [currentUser, TODAY]);
 
-    // Verileri Çek
+    // --- VERİLERİ ÇEK ---
     useEffect(() => {
         if (selectedStoreId) {
-            getPaymentsByStore(selectedStoreId).then(setPayments);
+            setLoading(true);
+            getPaymentsByStore(selectedStoreId).then(data => {
+                setPayments(data);
+                setLoading(false);
+            });
         } else {
             setPayments([]);
         }
     }, [selectedStoreId]);
 
-    // --- 1. LİSTE FİLTRESİ (Kullanıcının seçtiği tarihe göre) ---
+    // --- 1. LİSTE FİLTRESİ ---
     const filteredPayments = payments.filter(p => {
         const pDate = new Date(p.date);
         const start = new Date(`${startDate}T00:00:00`);
         const end = new Date(`${endDate}T23:59:59`);
 
         const isDateInRange = pDate >= start && pDate <= end;
-
         const lowerSearch = searchTerm.toLowerCase();
         const matchesSearch =
             p.receiptNo.toLowerCase().includes(lowerSearch) ||
@@ -90,14 +118,9 @@ const PaymentList = () => {
         return isDateInRange && matchesSearch;
     });
 
-    // --- 2. GÜNLÜK ÖZET HESAPLAMA (Her zaman BUGÜNÜN verisi) ---
-    // Filtreden bağımsız, sadece 'TODAY' ile eşleşenleri toplar.
+    // --- 2. GÜNLÜK ÖZET (Sadece Bugünü Hesaplar) ---
     const calculateDailySummary = () => {
-        let tahsilat = 0;
-        let masraf = 0;
-        let merkez = 0;
-
-        // Tüm ödemeler içinde sadece tarihi BUGÜN olanları bul
+        let tahsilat = 0, masraf = 0, merkez = 0;
         const todaysData = payments.filter(p => p.date.startsWith(TODAY));
 
         for (const p of todaysData) {
@@ -111,189 +134,167 @@ const PaymentList = () => {
         return { tahsilat, masraf, merkez };
     };
 
-    const dailyStats = calculateDailySummary(); // <-- Kartlarda bunu kullanacağız
-
-    // --- YARDIMCILAR ---
+    const dailyStats = calculateDailySummary();
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
 
-    const toggleRow = (id: string) => {
-        if (expandedRowId === id) setExpandedRowId(null);
-        else setExpandedRowId(id);
-    };
-
-    if (loading) return <div className="page-container" style={{ textAlign: 'center', paddingTop: '100px' }}>Yükleniyor...</div>;
+    if (loading && payments.length === 0) return <div className="page-container" style={{ textAlign: 'center', paddingTop: '100px' }}>Yükleniyor...</div>;
 
     return (
         <div className="page-container">
-            <div className="modern-header">
+            {/* ÜST BİLGİ */}
+            <div className="modern-header" style={{ marginBottom: '25px' }}>
                 <div>
                     <h2>Kasa Hareketleri</h2>
-                    <p>Ödeme, Tahsilat ve Masraf Listesi</p>
+                    <p style={{ color: '#64748b' }}>Ödeme, Tahsilat ve Masraf Listesi</p>
                 </div>
-                <Link to="/payments/add" className="modern-btn btn-primary">
-                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem
+                <Link to="/payments/add" className="modern-btn" style={{ backgroundColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem Ekle
                 </Link>
             </div>
 
-            {/* --- ÖZET KARTLARI (SABİT BUGÜNÜ GÖSTERİR) --- */}
-            {/* Bu kısım filtrelerden etkilenmez, her zaman bugünün canlı verisidir */}
+            {/* --- ÖZET KARTLARI --- */}
             {selectedStoreId && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '20px', marginBottom: '30px' }}>
-
-                    {/* GÜNLÜK TAHSİLAT */}
-                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #10b981', background: 'white' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>GÜNLÜK TAHSİLAT</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', marginBottom: '20px' }}>
+                    <div className="card" style={{ padding: '20px', borderLeft: '4px solid #10b981', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>GÜNLÜK TAHSİLAT</div>
                             <span className="status-badge success" style={{ fontSize: '10px' }}>BUGÜN</span>
                         </div>
-                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#10b981' }}>+{dailyStats.tahsilat.toFixed(2)} ₺</div>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: '#10b981' }}>+{dailyStats.tahsilat.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
                     </div>
 
-                    {/* GÜNLÜK MASRAF */}
-                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #f59e0b', background: 'white' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>GÜNLÜK MASRAF</div>
+                    <div className="card" style={{ padding: '20px', borderLeft: '4px solid #f59e0b', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>GÜNLÜK MASRAF</div>
                             <span className="status-badge warning" style={{ fontSize: '10px' }}>BUGÜN</span>
                         </div>
-                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#f59e0b' }}>-{dailyStats.masraf.toFixed(2)} ₺</div>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: '#f59e0b' }}>-{dailyStats.masraf.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
                     </div>
 
-                    {/* GÜNLÜK MERKEZ */}
-                    <div className="card" style={{ padding: '20px', borderLeft: '5px solid #ef4444', background: 'white' }}>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
-                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: 'bold', textTransform: 'uppercase' }}>MERKEZE TRANSFER</div>
+                    <div className="card" style={{ padding: '20px', borderLeft: '4px solid #ef4444', background: 'white' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                            <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700' }}>MERKEZE TRANSFER</div>
                             <span className="status-badge danger" style={{ fontSize: '10px' }}>BUGÜN</span>
                         </div>
-                        <div style={{ fontSize: '28px', fontWeight: '800', color: '#ef4444' }}>-{dailyStats.merkez.toFixed(2)} ₺</div>
+                        <div style={{ fontSize: '24px', fontWeight: '800', color: '#ef4444' }}>-{dailyStats.merkez.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</div>
                     </div>
                 </div>
             )}
 
-            {/* --- FİLTRE BARI (LİSTEYİ ETKİLER) --- */}
-            <div className="filter-bar">
-                {/* Mağaza Seçimi */}
-                {isAdmin ? (
-                    <select className="soft-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ minWidth: '200px' }}>
-                        <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
-                    </select>
-                ) : (
-                    <div className="status-badge neutral" style={{ padding: '10px 15px', fontSize: '14px' }}>
-                        {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+            {/* --- FİLTRE ÇUBUĞU (Kompakt ve Düzenli Grid) --- */}
+            <div className="card" style={{ marginBottom: '20px', padding: '15px 20px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '20px', alignItems: 'end' }}>
+
+                    {/* Mağaza Seçimi */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '5px' }}>Mağaza</label>
+                        {isAdmin ? (
+                            <select className="form-input" value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)} style={{ width: '100%', borderColor: '#cbd5e1', padding: '8px 12px' }}>
+                                <option value="">-- Mağaza Seçiniz --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                            </select>
+                        ) : (
+                            <div style={{ padding: '8px 15px', backgroundColor: '#e2e8f0', borderRadius: '8px', color: '#334155', fontWeight: '600', fontSize: '14px', border: '1px solid #cbd5e1' }}>
+                                {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+                            </div>
+                        )}
                     </div>
-                )}
 
-                {/* Tarih Aralığı */}
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                    <input type="date" className="soft-input" value={startDate} onChange={e => setStartDate(e.target.value)} />
-                    <span style={{ color: '#94a3b8' }}>-</span>
-                    <input type="date" className="soft-input" value={endDate} onChange={e => setEndDate(e.target.value)} />
+                    {/* Tarih Aralığı */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '5px' }}>
+                            Tarih Aralığı {!isAdmin && <span style={{ color: '#ef4444', fontSize: '10px', marginLeft: '5px' }}>(Sadece Yöneticiler)</span>}
+                        </label>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={startDate}
+                                onChange={e => setStartDate(e.target.value)}
+                                disabled={!isAdmin}
+                                style={{ flex: 1, borderColor: '#cbd5e1', backgroundColor: !isAdmin ? '#f1f5f9' : 'white', cursor: !isAdmin ? 'not-allowed' : 'auto', color: !isAdmin ? '#94a3b8' : 'inherit', padding: '8px 12px' }}
+                            />
+                            <span style={{ color: '#94a3b8', fontWeight: 'bold' }}>-</span>
+                            <input
+                                type="date"
+                                className="form-input"
+                                value={endDate}
+                                onChange={e => setEndDate(e.target.value)}
+                                disabled={!isAdmin}
+                                style={{ flex: 1, borderColor: '#cbd5e1', backgroundColor: !isAdmin ? '#f1f5f9' : 'white', cursor: !isAdmin ? 'not-allowed' : 'auto', color: !isAdmin ? '#94a3b8' : 'inherit', padding: '8px 12px' }}
+                            />
+                        </div>
+                    </div>
+
+                    {/* Arama */}
+                    <div>
+                        <label style={{ display: 'block', fontSize: '12px', fontWeight: '600', color: '#475569', marginBottom: '5px' }}>İşlem Ara</label>
+                        <input
+                            type="text"
+                            placeholder="Makbuz, Müşteri veya Açıklama..."
+                            className="form-input"
+                            value={searchTerm}
+                            onChange={e => setSearchTerm(e.target.value)}
+                            style={{ width: '100%', borderColor: '#cbd5e1', padding: '8px 12px' }}
+                        />
+                    </div>
                 </div>
-
-                {/* Arama Kutusu */}
-                <input
-                    type="text"
-                    placeholder="Makbuz, Personel veya Açıklama..."
-                    className="soft-input"
-                    value={searchTerm}
-                    onChange={e => setSearchTerm(e.target.value)}
-                    style={{ flex: 1, minWidth: '200px' }}
-                />
             </div>
 
-            {/* --- LİSTE (SEÇİLEN TARİHE GÖRE) --- */}
-            <div className="modern-table-container">
-                {selectedStoreId ? (
-                    <table className="modern-table">
-                        <thead>
-                            <tr>
-                                <th style={{ width: '50px' }}></th>
-                                <th>Tarih</th>
-                                <th>Makbuz No</th>
-                                <th>İşlemi Yapan</th>
-                                <th>Özet</th>
-                                <th style={{ textAlign: 'right' }}>Toplam Tutar</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filteredPayments.length > 0 ? (
-                                filteredPayments.map(p => (
-                                    <>
-                                        {/* ANA SATIR */}
-                                        <tr key={p.id} onClick={() => toggleRow(p.id!)} className="modern-row">
-                                            <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '10px' }}>
-                                                {expandedRowId === p.id ? '▼' : '▶'}
+            {/* --- LİSTE --- */}
+            <div className="card">
+                <div className="card-body" style={{ padding: 0 }}>
+                    {selectedStoreId ? (
+                        <table className="modern-table">
+                            <thead>
+                                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                                    <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
+                                    <th style={{ width: '15%' }}>Tarih</th>
+                                    <th style={{ width: '20%' }}>Makbuz No</th>
+                                    <th style={{ width: '25%' }}>İşlemi Yapan</th>
+                                    <th style={{ width: '15%' }}>Özet</th>
+                                    <th style={{ textAlign: 'right', width: '20%' }}>Toplam Tutar</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {filteredPayments.length > 0 ? (
+                                    filteredPayments.map(p => (
+                                        <tr key={p.id} className="hover-row">
+                                            <td style={{ textAlign: 'center' }}>
+                                                <button onClick={() => navigate(`/payments/detail/${p.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer' }}>
+                                                    🔍 Detay
+                                                </button>
                                             </td>
                                             <td style={{ color: '#64748b' }}>{formatDate(p.date)}</td>
-                                            <td style={{ fontWeight: '600', color: '#1e293b' }}>{p.receiptNo}</td>
+                                            <td style={{ fontWeight: '700', color: '#334155' }}>{p.receiptNo}</td>
                                             <td style={{ color: '#475569' }}>{p.personnelName}</td>
                                             <td style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                {p.items.length} adet işlem...
+                                                {p.items.length} adet işlem
                                             </td>
-                                            <td style={{ textAlign: 'right', fontWeight: '700', color: '#1e293b' }}>
-                                                {p.totalAmount.toFixed(2)} ₺
+                                            <td style={{ textAlign: 'right', fontWeight: '800', color: '#1e293b', fontSize: '15px' }}>
+                                                {p.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                             </td>
                                         </tr>
-
-                                        {/* DETAY SATIRI */}
-                                        {expandedRowId === p.id && (
-                                            <tr style={{ backgroundColor: '#f8fafc' }}>
-                                                <td colSpan={6} style={{ padding: '0 20px 20px 20px', border: 'none' }}>
-                                                    <div className="detail-content">
-                                                        <table className="modern-table" style={{ fontSize: '13px' }}>
-                                                            <thead>
-                                                                <tr>
-                                                                    <th style={{ width: '100px' }}>Tür</th>
-                                                                    <th>İlgili Kişi</th>
-                                                                    <th>Ödeme Yöntemi</th>
-                                                                    <th>Açıklama</th>
-                                                                    <th style={{ textAlign: 'right' }}>Tutar</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {p.items.map((item, idx) => (
-                                                                    <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0' }}>
-                                                                        <td style={{ padding: '10px' }}>
-                                                                            <span className={`status-badge ${item.type === 'Tahsilat' ? 'success' :
-                                                                                    item.type === 'Merkez' ? 'danger' :
-                                                                                        item.type === 'Masraf' ? 'warning' : 'neutral'
-                                                                                }`}>
-                                                                                {item.type}
-                                                                            </span>
-                                                                        </td>
-                                                                        <td style={{ padding: '10px' }}>
-                                                                            {item.customerName ? (
-                                                                                <div>
-                                                                                    <strong>{item.customerName}</strong>
-                                                                                    <div style={{ fontSize: '11px', color: '#94a3b8' }}>Fiş: {item.saleReceiptNo}</div>
-                                                                                </div>
-                                                                            ) : "-"}
-                                                                        </td>
-                                                                        <td style={{ padding: '10px', color: '#475569' }}>{item.paymentMethodId}</td>
-                                                                        <td style={{ padding: '10px', color: '#475569' }}>{item.description}</td>
-                                                                        <td style={{ textAlign: 'right', fontWeight: 'bold', color: item.type === 'Tahsilat' ? '#16a34a' : '#dc2626', padding: '10px' }}>
-                                                                            {item.type === 'Tahsilat' ? '+' : '-'}{Number(item.amount).toFixed(2)} ₺
-                                                                        </td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </>
-                                ))
-                            ) : (
-                                <tr><td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>Seçilen tarihte kayıt bulunamadı.</td></tr>
-                            )}
-                        </tbody>
-                    </table>
-                ) : (
-                    <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
-                        <div style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }}><img src={StoreIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div>
-                        <p>İşlem yapmak için lütfen yukarıdan bir mağaza seçiniz.</p>
-                    </div>
-                )}
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                            <div style={{ fontSize: '24px', marginBottom: '10px' }}>🧾</div>
+                                            Belirtilen kriterlerde işlem bulunamadı.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    ) : (
+                        <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8' }}>
+                            <div style={{ fontSize: '40px', marginBottom: '10px', opacity: 0.5 }}>
+                                <img src={StoreIcon} alt="" style={{ width: '40px', opacity: 0.6 }} />
+                            </div>
+                            <p style={{ fontSize: '16px', fontWeight: '500' }}>İşlemleri görüntülemek için lütfen yukarıdan bir mağaza seçiniz.</p>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
