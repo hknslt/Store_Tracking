@@ -30,6 +30,18 @@ const AttendanceManager = () => {
 
     const [isAdmin, setIsAdmin] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // 🔥 Kendi Mesaj Sistemimiz
+    const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
+
+    // Otomatik Mesaj Kapatma
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
 
     // Ayın günleri
     const daysInMonth = new Date(selectedYear, selectedMonth, 0).getDate();
@@ -42,14 +54,22 @@ const AttendanceManager = () => {
             const sData = await getStores();
             setStores(sData);
 
-            const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-            if (userDoc.exists()) {
-                const u = userDoc.data() as SystemUser;
-                if (u.role === 'admin' || u.role === 'control') { // Admin veya Kontrol yetkilisi
+            // Önce 'users' tablosuna bakıyoruz (Yeni sistem)
+            let userDoc = await getDoc(doc(db, "users", currentUser.uid));
+            let uData = userDoc.exists() ? userDoc.data() as SystemUser : null;
+
+            // Yoksa eski 'personnel' tablosuna bak
+            if (!uData) {
+                userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
+                if (userDoc.exists()) uData = userDoc.data() as SystemUser;
+            }
+
+            if (uData) {
+                if (['admin', 'control', 'report'].includes(uData.role)) {
                     setIsAdmin(true);
-                } else if (u.role === 'store_admin') {
+                } else {
                     setIsAdmin(false);
-                    if (u.storeId) setSelectedStoreId(u.storeId);
+                    if (uData.storeId) setSelectedStoreId(uData.storeId);
                 }
             }
         };
@@ -65,6 +85,7 @@ const AttendanceManager = () => {
             return;
         }
 
+        setLoading(true);
         try {
             const pQuery = query(collection(db, "personnel"), where("storeId", "==", selectedStoreId), where("isActive", "==", true));
             const pSnap = await getDocs(pQuery);
@@ -84,6 +105,9 @@ const AttendanceManager = () => {
 
         } catch (error) {
             console.error(error);
+            setMessage({ type: 'error', text: "Veriler yüklenirken hata oluştu." });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -93,10 +117,9 @@ const AttendanceManager = () => {
     const cycleStatus = (personnelId: string, day: number) => {
         const key = `${personnelId}_${String(day).padStart(2, '0')}`;
 
-        // 🔒 KİLİT KONTROLÜ: Eğer bu kayıt veritabanında zaten varsa (originalMap), değiştirilemez.
+        // KİLİT KONTROLÜ: Eğer bu kayıt veritabanında zaten varsa değiştirilemez.
         if (originalMap[key]) {
-            // İsteğe bağlı: Kullanıcıya uyarı verilebilir
-            // alert("Kaydedilmiş puantaj değiştirilemez!"); 
+            setMessage({ type: 'warning', text: "🔒 Kaydedilmiş (eski) puantaj kayıtları değiştirilemez!" });
             return;
         }
 
@@ -123,13 +146,16 @@ const AttendanceManager = () => {
     // --- KAYDETME ---
     const handleSave = async () => {
         if (!hasChanges) return;
+        setLoading(true);
         try {
             await saveBulkAttendance(selectedStoreId, selectedYear, selectedMonth, localMap);
             setOriginalMap(localMap); // Başarılı kayıttan sonra local veriyi original yap (artık kilitli olur)
             setHasChanges(false);
-            alert("✅ Kayıt Başarılı!");
+            setMessage({ type: 'success', text: "Puantaj başarıyla kaydedildi!" });
         } catch (error) {
-            alert("Kayıt sırasında hata oluştu!");
+            setMessage({ type: 'error', text: "Kayıt sırasında hata oluştu!" });
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -164,63 +190,89 @@ const AttendanceManager = () => {
 
     return (
         <div className="page-container">
+            {/* TOAST MESAJI */}
+            {message && (
+                <div style={{
+                    position: 'fixed', top: '20px', right: '20px', zIndex: 9999,
+                    padding: '15px 25px', borderRadius: '8px', color: 'white',
+                    fontWeight: '600', boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
+                    backgroundColor: message.type === 'success' ? '#10b981' : message.type === 'warning' ? '#f59e0b' : '#ef4444',
+                    animation: 'fadeIn 0.3s ease-in-out'
+                }}>
+                    {message.type === 'success' ? '✅' : message.type === 'warning' ? '⚠️' : '❌'} {message.text}
+                </div>
+            )}
+
             <div className="page-header">
                 <div className="page-title">
                     <h2>Personel Puantaj</h2>
+                    <p style={{ color: '#64748b' }}>Çalışanların günlük devam durumunu işaretleyin.</p>
                 </div>
                 {hasChanges && (
-                    <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 25px', fontSize: '15px', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}>
-                        DEĞİŞİKLİKLERİ KAYDET
+                    <button onClick={handleSave} disabled={loading} className="modern-btn btn-primary" style={{ backgroundColor: '#10b981', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {loading ? 'Kaydediliyor...' : 'DEĞİŞİKLİKLERİ KAYDET'}
                     </button>
                 )}
             </div>
 
-            <div className="card" style={{ marginBottom: '15px', padding: '15px' }}>
+            <div className="card" style={{ marginBottom: '15px', padding: '15px', backgroundColor: '#f8fafc', border: '1px solid #e2e8f0' }}>
                 <div style={{ display: 'flex', gap: '20px', alignItems: 'center' }}>
-                    <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '120px' }}>
-                        {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
-                    </select>
-                    <select className="form-input" value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ width: '120px' }}>
-                        {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
-                            <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('tr-TR', { month: 'long' })}</option>
-                        ))}
-                    </select>
-                    {isAdmin && (
-                        <select className="form-input" value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)} style={{ minWidth: '200px' }}>
-                            <option value="">-- Mağaza Seç --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Yıl</label>
+                        <select className="form-input" value={selectedYear} onChange={e => setSelectedYear(Number(e.target.value))} style={{ width: '120px', padding: '8px' }}>
+                            {yearOptions.map(y => <option key={y} value={y}>{y}</option>)}
                         </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                        <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Ay</label>
+                        <select className="form-input" value={selectedMonth} onChange={e => setSelectedMonth(Number(e.target.value))} style={{ width: '160px', padding: '8px' }}>
+                            {Array.from({ length: 12 }, (_, i) => i + 1).map(m => (
+                                <option key={m} value={m}>{new Date(0, m - 1).toLocaleString('tr-TR', { month: 'long' })}</option>
+                            ))}
+                        </select>
+                    </div>
+                    {isAdmin && (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', flex: 1, maxWidth: '300px' }}>
+                            <label style={{ fontSize: '12px', fontWeight: '600', color: '#475569' }}>Mağaza Seçimi</label>
+                            <select className="form-input" value={selectedStoreId} onChange={e => setSelectedStoreId(e.target.value)} style={{ width: '100%', padding: '8px' }}>
+                                <option value="">-- Mağaza Seç --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                            </select>
+                        </div>
                     )}
                 </div>
             </div>
 
-            {selectedStoreId && personnelList.length > 0 && (
+            {loading ? (
+                <div style={{ textAlign: 'center', padding: '50px', color: '#94a3b8' }}>Veriler Yükleniyor...</div>
+            ) : selectedStoreId && personnelList.length > 0 ? (
                 <div className="card" style={{ marginBottom: '15px' }}>
-                    <div className="card-header" style={{ backgroundColor: '#fdfdfd' }}>
-                        <h3 className="card-title" style={{ fontSize: '14px' }}>📊 {selectedMonth}. Ay Özeti</h3>
+                    <div className="card-header" style={{ backgroundColor: '#f8fafc', borderBottom: '1px solid #e2e8f0', padding: '12px 20px' }}>
+                        <h3 className="card-title" style={{ fontSize: '15px', color: '#334155', margin: 0 }}>📊 {new Date(0, selectedMonth - 1).toLocaleString('tr-TR', { month: 'long' })} Ayı Özeti</h3>
                     </div>
                     <div className="card-body" style={{ padding: '0', overflowX: 'auto' }}>
-                        <table className="data-table dense">
+                        <table className="modern-table dense">
                             <thead>
-                                <tr style={{ backgroundColor: '#f8f9fa', fontSize: '11px' }}>
-                                    <th>Personel</th>
-                                    <th style={{ textAlign: 'center', color: '#2ecc71' }}>Geldi</th>
-                                    <th style={{ textAlign: 'center', color: '#3498db' }}>Haftalık</th>
-                                    <th style={{ textAlign: 'center', color: '#e67e22' }}>Yıllık</th>
-                                    <th style={{ textAlign: 'center', color: '#f1c40f' }}>Raporlu</th>
-                                    <th style={{ textAlign: 'center', color: '#e74c3c' }}>Ücretsiz</th>
+                                <tr style={{ backgroundColor: '#f1f5f9', fontSize: '12px' }}>
+                                    <th style={{ width: '200px' }}>Personel</th>
+                                    <th style={{ textAlign: 'center', color: '#16a34a' }}>Geldi (✔)</th>
+                                    <th style={{ textAlign: 'center', color: '#0284c7' }}>Haftalık (H)</th>
+                                    <th style={{ textAlign: 'center', color: '#ea580c' }}>Yıllık (Y)</th>
+                                    <th style={{ textAlign: 'center', color: '#ca8a04' }}>Raporlu (R)</th>
+                                    <th style={{ textAlign: 'center', color: '#dc2626' }}>Ücretsiz (Ü)</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 {personnelList.map(p => {
                                     const stats = calculateSummary(p.id!);
                                     return (
-                                        <tr key={p.id} style={{ borderBottom: '1px solid #eee' }}>
-                                            <td style={{ fontWeight: '600', fontSize: '12px' }}>{p.fullName}</td>
-                                            <td style={{ textAlign: 'center', fontWeight: 'bold' }}>{stats.geldi || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>{stats.haftalik || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>{stats.yillik || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>{stats.raporlu || '-'}</td>
-                                            <td style={{ textAlign: 'center' }}>{stats.ucretsiz || '-'}</td>
+                                        <tr key={p.id} className="hover-row">
+                                            <td style={{ fontWeight: '600', fontSize: '13px', color: '#334155' }}>{p.fullName}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: 'bold', fontSize: '14px', color: '#16a34a' }}>{stats.geldi || '-'}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: '600', color: '#0284c7' }}>{stats.haftalik || '-'}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: '600', color: '#ea580c' }}>{stats.yillik || '-'}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: '600', color: '#ca8a04' }}>{stats.raporlu || '-'}</td>
+                                            <td style={{ textAlign: 'center', fontWeight: '600', color: '#dc2626' }}>{stats.ucretsiz || '-'}</td>
                                         </tr>
                                     );
                                 })}
@@ -228,23 +280,28 @@ const AttendanceManager = () => {
                         </table>
                     </div>
                 </div>
-            )}
+            ) : selectedStoreId ? (
+                <div style={{ textAlign: 'center', padding: '50px', color: '#94a3b8', backgroundColor: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                    Seçili mağazada aktif personel bulunmamaktadır.
+                </div>
+            ) : null}
 
-            <div className="card">
-                <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
-                    {selectedStoreId ? (
+            {selectedStoreId && personnelList.length > 0 && (
+                <div className="card">
+                    <div className="card-body" style={{ padding: 0, overflowX: 'auto' }}>
                         <table className="data-table dense" style={{ borderCollapse: 'collapse', width: '100%', fontSize: '12px' }}>
                             <thead>
-                                <tr style={{ backgroundColor: '#f1f2f6' }}>
-                                    <th style={{ position: 'sticky', left: 0, zIndex: 10, backgroundColor: '#f1f2f6', borderRight: '2px solid #ddd', minWidth: '150px', padding: '8px' }}>
-                                        Personel
+                                <tr style={{ backgroundColor: '#f1f5f9' }}>
+                                    <th style={{ position: 'sticky', left: 0, zIndex: 10, backgroundColor: '#f1f5f9', borderRight: '2px solid #cbd5e1', minWidth: '150px', padding: '10px' }}>
+                                        Personel Listesi
                                     </th>
                                     {daysArray.map(day => {
                                         const date = new Date(selectedYear, selectedMonth - 1, day);
-                                        const isWeekend = date.getDay() === 0;
+                                        const isWeekend = date.getDay() === 0; // Pazar günleri
                                         return (
-                                            <th key={day} style={{ minWidth: '28px', textAlign: 'center', padding: '4px', backgroundColor: isWeekend ? '#ffebee' : 'inherit', color: isWeekend ? '#c0392b' : 'inherit', borderLeft: '1px solid #eee' }}>
-                                                {day}<br /><span style={{ fontSize: '9px', fontWeight: 'normal', opacity: 0.7 }}>{date.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2)}</span>
+                                            <th key={day} style={{ minWidth: '32px', textAlign: 'center', padding: '6px 2px', backgroundColor: isWeekend ? '#fee2e2' : 'inherit', color: isWeekend ? '#dc2626' : '#475569', borderLeft: '1px solid #e2e8f0' }}>
+                                                <div style={{ fontSize: '13px', fontWeight: 'bold' }}>{day}</div>
+                                                <div style={{ fontSize: '10px', fontWeight: 'normal', opacity: 0.8 }}>{date.toLocaleDateString('tr-TR', { weekday: 'short' }).slice(0, 2)}</div>
                                             </th>
                                         );
                                     })}
@@ -253,7 +310,7 @@ const AttendanceManager = () => {
                             <tbody>
                                 {personnelList.map(person => (
                                     <tr key={person.id}>
-                                        <td style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: 'white', borderRight: '2px solid #ddd', fontWeight: '600', color: '#2c3e50', padding: '6px 10px' }}>
+                                        <td style={{ position: 'sticky', left: 0, zIndex: 5, backgroundColor: 'white', borderRight: '2px solid #cbd5e1', fontWeight: '600', color: '#334155', padding: '8px 10px', boxShadow: '2px 0 5px rgba(0,0,0,0.02)' }}>
                                             {person.fullName}
                                         </td>
                                         {daysArray.map(day => {
@@ -271,21 +328,22 @@ const AttendanceManager = () => {
                                                     onClick={() => cycleStatus(person.id!, day)}
                                                     style={{
                                                         textAlign: 'center',
-                                                        cursor: isLocked ? 'not-allowed' : 'pointer', // Kilitliyse imleç değişir
-                                                        backgroundColor: status ? style.bg : (isWeekend ? '#fafafa' : 'white'),
+                                                        cursor: isLocked ? 'not-allowed' : 'pointer',
+                                                        backgroundColor: status ? style.bg : (isWeekend ? '#fef2f2' : 'white'),
                                                         color: style.color,
                                                         fontWeight: 'bold',
-                                                        fontSize: '13px',
-                                                        borderLeft: '1px solid #eee',
-                                                        borderBottom: '1px solid #eee',
+                                                        fontSize: '14px',
+                                                        borderLeft: '1px solid #e2e8f0',
+                                                        borderBottom: '1px solid #e2e8f0',
                                                         userSelect: 'none',
-                                                        height: '35px',
+                                                        height: '40px',
                                                         padding: 0,
-                                                        opacity: isLocked ? 0.8 : 1 // Kilitli olduğunu görsel olarak da hissettir
+                                                        opacity: isLocked ? 0.7 : 1,
+                                                        transition: 'background-color 0.2s'
                                                     }}
-                                                    title={isLocked ? "🔒 Kayıtlı Veri Değiştirilemez" : (status || "Boş")}
+                                                    title={isLocked ? "Kaydedilmiş puantaj değiştirilemez" : "Değiştirmek için tıklayın"}
                                                 >
-                                                    {status ? style.text : (isLocked ? '' : '')}
+                                                    {status ? style.text : ''}
                                                 </td>
                                             );
                                         })}
@@ -293,18 +351,16 @@ const AttendanceManager = () => {
                                 ))}
                             </tbody>
                         </table>
-                    ) : (
-                        <div style={{ padding: '50px', textAlign: 'center', color: '#999' }}>Lütfen mağaza seçiniz.</div>
-                    )}
+                    </div>
                 </div>
-            </div>
+            )}
 
-            <div style={{ marginTop: '15px', display: 'flex', gap: '15px', fontSize: '11px', color: '#555', flexWrap: 'wrap', justifyContent: 'center' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#2ecc71' }}></span> Geldi</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#3498db' }}></span> Haftalık İzin</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#e67e22' }}></span> Yıllık İzin</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#f1c40f' }}></span> Raporlu</div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}><span style={{ width: '12px', height: '12px', background: '#e74c3c' }}></span> Ücretsiz İzin</div>
+            <div style={{ marginTop: '20px', display: 'flex', gap: '20px', fontSize: '12px', color: '#64748b', flexWrap: 'wrap', justifyContent: 'center', backgroundColor: 'white', padding: '15px', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}><span style={{ width: '16px', height: '16px', background: '#2ecc71', borderRadius: '4px' }}></span> Geldi (✔)</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}><span style={{ width: '16px', height: '16px', background: '#3498db', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px' }}>H</span> Haftalık İzin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}><span style={{ width: '16px', height: '16px', background: '#e67e22', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px' }}>Y</span> Yıllık İzin</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}><span style={{ width: '16px', height: '16px', background: '#f1c40f', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'black', fontSize: '10px' }}>R</span> Raporlu</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: '600' }}><span style={{ width: '16px', height: '16px', background: '#e74c3c', borderRadius: '4px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', fontSize: '10px' }}>Ü</span> Ücretsiz İzin</div>
             </div>
         </div>
     );

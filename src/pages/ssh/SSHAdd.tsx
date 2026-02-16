@@ -34,7 +34,7 @@ const SSHAdd = () => {
 
     const [isAdmin, setIsAdmin] = useState(false);
 
-    // Mesaj State (Alert yerine)
+
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     const showToast = (type: 'success' | 'error', text: string) => {
