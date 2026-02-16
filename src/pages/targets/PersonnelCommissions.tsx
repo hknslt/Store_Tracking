@@ -3,19 +3,21 @@ import { useEffect, useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getMonthlySalesByPersonnel, updateStoreCommissionModel, updatePersonnelCommissionRate } from "../../services/commissionService";
-// 👇 DÜZELTME 1: İsim çakışmasını önlemek için servisten gelene 'as' ile yeni isim verdik
 import { getAllTargets, setStoreTarget as saveStoreTargetToDb } from "../../services/targetService";
+import { useNavigate } from "react-router-dom"; // 🔥 Yönlendirme için eklendi
 import type { Store, Personnel, CommissionResult } from "../../types";
 import "../../App.css";
 
 // İkonlar
 import EditIcon from "../../assets/icons/edit.svg";
+import targetIcon from "../../assets/icons/target.svg";
 import SaveIcon from "../../assets/icons/save.svg";
 import CancelIcon from "../../assets/icons/close-circle.svg";
 
 const PersonnelCommissions = () => {
     const { userRole, userData } = useAuth();
     const isAdmin = userRole === 'admin' || userRole === 'control';
+    const navigate = useNavigate(); // 🔥 Yönlendirme tanımlandı
 
     // Veri Stateleri
     const [stores, setStores] = useState<Store[]>([]);
@@ -23,7 +25,6 @@ const PersonnelCommissions = () => {
     const [personnelList, setPersonnelList] = useState<Personnel[]>([]);
     const [salesMap, setSalesMap] = useState<Record<string, number>>({});
 
-    // 👇 State olan (Arayüzdeki inputu yöneten)
     const [storeTarget, setStoreTarget] = useState<number>(0);
 
     // UI Stateleri
@@ -52,7 +53,6 @@ const PersonnelCommissions = () => {
             } else if (userData?.storeId) {
                 setSelectedStoreId(userData.storeId);
             }
-            // Admin değilse ve mağaza seçili değilse loading false olsun ki sonsuz dönmesin
             if (!isAdmin && !userData?.storeId) {
                 setLoading(false);
             }
@@ -79,14 +79,11 @@ const PersonnelCommissions = () => {
             setSalesMap(salesData);
             setPersonnelList(personnelData as Personnel[]);
 
-            // Hedefi Bul
             const targetObj = targetsData.find(t => t.storeId === selectedStoreId);
             setStoreTarget(targetObj ? targetObj.targetAmount : 0);
 
-            // Modeli Bul
             setCurrentModel(storeData?.commissionModel || 'flat_rate');
 
-            // Toplam Mağaza Satışını Hesapla
             const total = Object.values(salesData).reduce((a, b) => a + b, 0);
             setStoreTotalSales(total);
 
@@ -100,7 +97,7 @@ const PersonnelCommissions = () => {
     useEffect(() => {
         fetchData();
         setIsEditing(false);
-    }, [selectedStoreId]); // stores bağımlılığına gerek yok
+    }, [selectedStoreId]);
 
     // 3. Hesaplama Motoru
     useEffect(() => {
@@ -145,8 +142,6 @@ const PersonnelCommissions = () => {
 
 
     // --- İŞLEMLER ---
-
-    // Sadece state'i günceller
     const handleRateChange = (personnelId: string, newRate: string) => {
         const updatedList = personnelList.map(p =>
             p.id === personnelId ? { ...p, commissionRate: Number(newRate) } : p
@@ -164,14 +159,9 @@ const PersonnelCommissions = () => {
         if (!selectedStoreId) return;
         setLoading(true);
         try {
-            // 1. Mağaza Modelini Güncelle
             await updateStoreCommissionModel(selectedStoreId, currentModel);
-
-            // 2. Mağaza Hedefini Güncelle
-            // 👇 DÜZELTME 2: İsim değiştirdiğimiz fonksiyonu çağırıyoruz (Servis fonksiyonu)
             await saveStoreTargetToDb(selectedStoreId, Number(storeTarget));
 
-            // 3. Personel Oranlarını Güncelle
             const updates = personnelList.map(p =>
                 updatePersonnelCommissionRate(p.id!, p.commissionRate || 0)
             );
@@ -188,7 +178,6 @@ const PersonnelCommissions = () => {
         }
     };
 
-    // 👇 DÜZELTME 3: Loading durumunu kullanıyoruz
     if (loading && !selectedStoreId && isAdmin) return <div className="page-container">Yükleniyor...</div>;
 
     return (
@@ -201,23 +190,31 @@ const PersonnelCommissions = () => {
                     <p>Satış performansı ve hakedişler</p>
                 </div>
 
-                {/* BUTONLAR */}
-                {isAdmin && selectedStoreId && (
+                {isAdmin && (
                     <div style={{ display: 'flex', gap: '10px' }}>
-                        {!isEditing ? (
-                            <button onClick={() => setIsEditing(true)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                <img src={EditIcon} width="16" style={{ opacity: 0.6 }} /> Düzenle
-                            </button>
-                        ) : (
-                            <>
-                                {/* 👇 DÜZELTME 4: CancelIcon'ı kullandık */}
-                                <button onClick={handleCancel} className="btn btn-secondary" style={{ backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <img src={CancelIcon} width="16" style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' }} /> İptal
+                        <button
+                            onClick={() => navigate('/targets')}
+                            className="btn btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#145a32', color: '#fcfcfc', border: 'none' }}
+                        >
+                            <img src={targetIcon} width="16" style={{ filter: 'invert(1)' }} /> Mağaza Hedefleri
+                        </button>
+
+                        {selectedStoreId && (
+                            !isEditing ? (
+                                <button onClick={() => setIsEditing(true)} className="btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                    <img src={EditIcon} width="16" style={{ opacity: 0.6 }} /> Düzenle
                                 </button>
-                                <button onClick={handleSaveAll} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <img src={SaveIcon} width="16" style={{ filter: 'invert(1)' }} /> Kaydet
-                                </button>
-                            </>
+                            ) : (
+                                <>
+                                    <button onClick={handleCancel} className="btn btn-secondary" style={{ backgroundColor: '#fee2e2', color: '#ef4444', border: 'none', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <img src={CancelIcon} width="16" style={{ filter: 'invert(27%) sepia(51%) saturate(2878%) hue-rotate(346deg) brightness(104%) contrast(97%)' }} /> İptal
+                                    </button>
+                                    <button onClick={handleSaveAll} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                        <img src={SaveIcon} width="16" style={{ filter: 'invert(1)' }} /> Kaydet
+                                    </button>
+                                </>
+                            )
                         )}
                     </div>
                 )}

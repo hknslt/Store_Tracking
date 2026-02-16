@@ -1,7 +1,7 @@
 // src/pages/payments/PaymentAdd.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { useLocation } from "react-router-dom"; // 🔥 Eklendi
+import { useLocation, useNavigate } from "react-router-dom"; // 🔥 useNavigate eklendi
 import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
@@ -13,7 +13,8 @@ import "../../App.css";
 
 const PaymentAdd = () => {
     const { currentUser } = useAuth();
-    const location = useLocation(); // 🔥 Gelen veriyi yakalamak için
+    const location = useLocation();
+    const navigate = useNavigate(); // 🔥 Yönlendirme için tanımlandı
 
     // --- STATE'LER ---
     const [stores, setStores] = useState<Store[]>([]);
@@ -86,20 +87,15 @@ const PaymentAdd = () => {
 
     // 🔥 OTOMATİK DOLDURMA (DebtList'ten gelindiyse)
     useEffect(() => {
-        // Eğer location.state içinde veri varsa ve mağazalar/borçlar yüklendiyse
         if (location.state?.preSelectedDebt && headerData.storeId) {
             const preData = location.state.preSelectedDebt;
 
-            // Eğer admin değilse veya admin ise ve mağaza seçimi eşleşiyorsa
-            // (Admin farklı mağazadan gelmiş olabilir, kontrol etmekte fayda var)
             if (headerData.storeId === preData.storeId) {
-
-                // İlk satırı güncelle
                 const newItem = {
                     type: 'Tahsilat' as TransactionType,
-                    paymentMethodId: "", // Kullanıcı seçsin
-                    currency: 'TL' as const, // 'TL' literal type olarak cast edildi
-                    originalAmount: preData.remainingAmount, // Kalan tutarı öner
+                    paymentMethodId: "",
+                    currency: 'TL' as const,
+                    originalAmount: preData.remainingAmount,
                     exchangeRate: 1,
                     amount: preData.remainingAmount,
                     description: "Borç Tahsilatı",
@@ -109,18 +105,12 @@ const PaymentAdd = () => {
                 };
                 setItems([newItem]);
             } else {
-                // Eğer admin başka mağazadan geldiyse, önce o mağazayı seçtir
                 if (isAdmin) {
                     setHeaderData(prev => ({ ...prev, storeId: preData.storeId }));
-                    // Mağaza değişimi useEffect'i tetikleyecek ve borçları çekecek, 
-                    // ancak items'ı burada set etmek için bir sonraki render'ı beklemeliyiz veya
-                    // mağaza değişim effect'ine bir flag koymalıyız.
-                    // Şimdilik basitçe mağazayı seçtiriyoruz, items'ı manuel seçmesi gerekebilir 
-                    // veya debts yüklendikten sonra tekrar kontrol edilebilir.
                 }
             }
         }
-    }, [location.state, headerData.storeId, isAdmin]); // Bağımlılıklar
+    }, [location.state, headerData.storeId, isAdmin]);
 
     // Mağaza değişince
     useEffect(() => {
@@ -232,16 +222,12 @@ const PaymentAdd = () => {
                 createdAt: new Date()
             });
 
-            setMessage({ type: 'success', text: "✅ İşlem Başarıyla Kaydedildi!" });
+            setMessage({ type: 'success', text: "✅ İşlem Başarıyla Kaydedildi! Yönlendiriliyorsunuz..." });
 
-            // Temizlik
-            setHeaderData(prev => ({ ...prev, receiptNo: "" }));
-            handleTypeChange('Tahsilat');
-            if (headerData.storeId) {
-                getDebtsByStore(headerData.storeId).then(setDebts);
-                getNextPaymentReceiptNo(headerData.storeId).then(nextNo => setHeaderData(prev => ({ ...prev, receiptNo: nextNo })));
-            }
-            setTimeout(() => setMessage(null), 3000);
+            // 🔥 BAŞARILI KAYIT SONRASI YÖNLENDİRME (1.5 saniye sonra)
+            setTimeout(() => {
+                navigate('/payments/list');
+            }, 1500);
 
         } catch (error: any) {
             console.error(error);
@@ -264,15 +250,17 @@ const PaymentAdd = () => {
                 <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 30px', fontSize: '16px' }}>KAYDET</button>
             </div>
 
+            {/* 🔥 TOAST MESAJ YERİNE DAHA ŞIK BİR KUTU */}
             {message && (
                 <div style={{
                     padding: '15px', marginBottom: '20px', borderRadius: '8px',
                     backgroundColor: message.type === 'success' ? '#dcfce7' : '#fee2e2',
                     color: message.type === 'success' ? '#166534' : '#991b1b',
                     border: `1px solid ${message.type === 'success' ? '#bbf7d0' : '#fecaca'}`,
-                    display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500'
+                    display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500',
+                    animation: 'fadeIn 0.3s ease-out'
                 }}>
-                    <span>{message.type === 'success' ? '✓' : '⚠️'}</span>
+                    <span>{message.type === 'success' ? '✅' : '⚠️'}</span>
                     {message.text}
                 </div>
             )}

@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import { updatePurchase } from "../../services/purchaseService"; 
+import { updatePurchase } from "../../services/purchaseService";
 import { getGroups, getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
 import { getProducts } from "../../services/productService";
 import { useNavigate, useLocation, useParams } from "react-router-dom";
@@ -38,7 +38,10 @@ const PurchaseEdit = () => {
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
 
+    // Mesaj ve Modal State'leri
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [itemIndexToDelete, setItemIndexToDelete] = useState<number | null>(null);
 
     // Başlangıç Verilerini Yükle
     useEffect(() => {
@@ -78,6 +81,13 @@ const PurchaseEdit = () => {
         };
         init();
     }, [id, storeId]);
+
+    useEffect(() => {
+        if (message) {
+            const timer = setTimeout(() => setMessage(null), 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [message]);
 
     // Yardımcılar
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
@@ -125,18 +135,33 @@ const PurchaseEdit = () => {
         setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
     };
 
+    // 🔥 SİLME İŞLEMLERİ (MODAL YÖNETİMİ)
     const removeLineItem = (index: number) => {
         const itemToRemove = currentItems[index];
 
-        // Eğer ürün 'Sipariş' kaynaklıysa veya requestId varsa uyarı ver
+        // Eğer ürün 'Sipariş' kaynaklıysa veya requestId varsa uyarı vermek için Modalı aç
         if (itemToRemove.itemType === 'Sipariş' || (itemToRemove as any).requestId) {
-            const confirmDelete = window.confirm("⚠️ DİKKAT: Bu ürün bir müşteri siparişine bağlıdır!\n\nEğer bu ürünü silerseniz, müşteri siparişinin tedarik süreci aksayabilir.\nYine de silmek istiyor musunuz?");
-            if (!confirmDelete) return;
+            setItemIndexToDelete(index);
+            setShowDeleteModal(true);
+            return;
         }
 
+        // Değilse direkt sil
+        executeDelete(index);
+    };
+
+    const executeDelete = (index: number) => {
         const newItems = [...currentItems];
         newItems.splice(index, 1);
         setCurrentItems(newItems);
+    };
+
+    const confirmDelete = () => {
+        if (itemIndexToDelete !== null) {
+            executeDelete(itemIndexToDelete);
+        }
+        setShowDeleteModal(false);
+        setItemIndexToDelete(null);
     };
 
     // GÜNCELLEME İŞLEMİ
@@ -152,7 +177,7 @@ const PurchaseEdit = () => {
                 curr.productId === orig.productId &&
                 curr.colorId === orig.colorId &&
                 curr.dimensionId === orig.dimensionId &&
-                curr.amount === orig.amount 
+                curr.amount === orig.amount
             );
 
             if (matchIdx > -1) {
@@ -182,9 +207,35 @@ const PurchaseEdit = () => {
     const selectStyle = { width: '100%', padding: '6px', fontSize: '12px' };
     const filterSelectStyle = { width: '90px', padding: '6px', fontSize: '11px', marginRight: '4px' };
 
+    const modalOverlayStyle: React.CSSProperties = { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.6)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000, animation: 'fadeIn 0.2s ease-out' };
+    const modalContentStyle: React.CSSProperties = { backgroundColor: 'white', padding: '30px', borderRadius: '12px', width: '400px', textAlign: 'center', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' };
+
     return (
         <div className="page-container">
-            {message && <div className={`toast-message ${message.type === 'success' ? 'toast-success' : 'toast-error'}`}>{message.text}</div>}
+            {/* TOAST MESAJ */}
+            {message && (
+                <div style={{ position: 'fixed', top: '20px', right: '20px', zIndex: 9999, padding: '15px 25px', borderRadius: '8px', color: 'white', fontWeight: '600', backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444', boxShadow: '0 4px 12px rgba(0,0,0,0.15)', animation: 'fadeIn 0.3s' }}>
+                    {message.text}
+                </div>
+            )}
+
+            {/* 🔥 SİLME ONAY MODALI */}
+            {showDeleteModal && (
+                <div style={modalOverlayStyle}>
+                    <div style={modalContentStyle}>
+                        <div style={{ fontSize: '40px', marginBottom: '10px' }}>⚠️</div>
+                        <h3 style={{ margin: '0 0 10px 0', color: '#1e293b' }}>Ürünü Sil?</h3>
+                        <p style={{ color: '#64748b', fontSize: '14px', marginBottom: '25px', lineHeight: '1.5' }}>
+                            <strong style={{ color: '#dc2626' }}>DİKKAT: Bu ürün bir müşteri siparişine bağlıdır!</strong><br /><br />
+                            Eğer bu ürünü silerseniz, müşteri siparişinin tedarik süreci aksayabilir. Yine de silmek istiyor musunuz?
+                        </p>
+                        <div style={{ display: 'flex', gap: '15px', justifyContent: 'center' }}>
+                            <button onClick={() => { setShowDeleteModal(false); setItemIndexToDelete(null); }} className="modern-btn btn-secondary" style={{ flex: 1 }}>İptal</button>
+                            <button onClick={confirmDelete} className="modern-btn" style={{ flex: 1, backgroundColor: '#dc2626', color: 'white', border: 'none' }}>Evet, Sil</button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             <div className="modern-header">
                 <div>

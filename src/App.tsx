@@ -47,7 +47,7 @@ import StockReport from "./pages/reports/StockReport";
 import PersonnelReport from "./pages/reports/PersonnelReport";
 import ReportsDashboard from "./pages/Dashboard/ReportsDashboard";
 import StoreTargets from "./pages/targets/StoreTargets";
-import PersonnelCommissions from "./pages/personnel/PersonnelCommissions";
+import PersonnelCommissions from "./pages/targets/PersonnelCommissions";
 import InvoiceTracking from "./pages/tracking/InvoiceTracking";
 import PersonnelEdit from "./pages/personnel/PersonnelEdit";
 import StoreEdit from "./pages/stores/StoreEdit";
@@ -61,6 +61,8 @@ import PriceList from "./pages/prices/PriceList";
 import PriceDetail from "./pages/prices/PriceDetail";
 import PaymentDetail from "./pages/payments/PaymentDetail";
 import PaymentEdit from "./pages/payments/PaymentEdit";
+import DeviceRequests from "./pages/admin/DeviceRequests";
+import RegisteredDevices from "./pages/admin/RegisteredDevices";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -251,6 +253,8 @@ function App() {
 
             <Route path="/admin/users" element={<UserList />} />
             <Route path="/admin/users/edit/:id" element={<UserEdit />} />
+            <Route path="/admin/devices" element={<RegisteredDevices />} />
+            <Route path="/admin/devices/requests" element={<DeviceRequests />} />
 
             {/* Products */}
             <Route path="/products" element={<ProductList />} />

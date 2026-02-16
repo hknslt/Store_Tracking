@@ -60,6 +60,7 @@ export interface SystemUser {
     address?: string;
     isActive: boolean;
     commissionRate?: number;
+    allowedDevices?: string[]; // Onaylanmış cihazların kimlik numaraları
 }
 export interface Personnel {
     id?: string;
@@ -235,8 +236,8 @@ export interface PriceListModel {
     id?: string;
     name: string;
     type: 'perakende' | 'toptan';
-    storeIds: string[]; 
-    prices: Record<string, number>; 
+    storeIds: string[];
+    prices: Record<string, number>;
     createdAt?: string;
 }
 
@@ -353,4 +354,23 @@ export interface CommissionResult {
     commissionRate: number;  // Prim Oranı (%)
     commissionAmount: number;// Hakediş (TL)
     isEligible: boolean;     // Hedef tuttu mu? (Almaya hak kazandı mı?)
+}
+
+
+export interface DeviceRequest {
+    id?: string;
+    storeId?: string;
+    personnelId: string;
+    personnelName: string;
+    deviceId: string;
+    status: 'pending' | 'approved' | 'rejected';
+    requestedAt: any;
+}
+
+declare global {
+    interface Window {
+        electronAPI?: {
+            getMachineId: () => Promise<string>;
+        };
+    }
 }
