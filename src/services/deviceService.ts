@@ -15,27 +15,64 @@ export const getPendingDeviceRequests = async (): Promise<DeviceRequest[]> => {
 };
 
 // Cihazı Onayla
-export const approveDevice = async (requestId: string, personnelId: string, deviceId: string) => {
+export const approveDevice = async (requestId: string, personnelId: string, deviceId: string, deviceName: string) => {
     try {
-        // 1. İsteğin durumunu 'approved' (onaylandı) yap
         const requestRef = doc(db, "device_requests", requestId);
         await updateDoc(requestRef, { status: 'approved', updatedAt: new Date().toISOString() });
 
-        // 2. Kullanıcının allowedDevices dizisine bu cihaz kodunu ekle
-        // (Kullanıcı 'users' tablosunda da olabilir, 'personnel' tablosunda da)
         const userRef = doc(db, "users", personnelId);
         const userSnap = await getDoc(userRef);
 
+        // allowedDevices dizisine ID eklerken, deviceNames objesine de ID: İsim olarak kayıt atıyoruz
+        const updateData = {
+            allowedDevices: arrayUnion(deviceId),
+            [`deviceNames.${deviceId}`]: deviceName
+        };
+
         if (userSnap.exists()) {
-            await updateDoc(userRef, { allowedDevices: arrayUnion(deviceId) });
+            await updateDoc(userRef, updateData);
         } else {
-            // Eğer users'da yoksa eski personnel tablosundadır
-            const personnelRef = doc(db, "personnel", personnelId);
-            await updateDoc(personnelRef, { allowedDevices: arrayUnion(deviceId) });
+            await updateDoc(doc(db, "personnel", personnelId), updateData);
         }
     } catch (error) {
         console.error("Cihaz onaylama hatası:", error);
         throw error;
+    }
+};
+
+export const addDeviceManually = async (personnelId: string, deviceId: string, deviceName: string) => {
+    try {
+        const userRef = doc(db, "users", personnelId);
+        const userSnap = await getDoc(userRef);
+
+        const updateData = {
+            allowedDevices: arrayUnion(deviceId),
+            [`deviceNames.${deviceId}`]: deviceName
+        };
+
+        if (userSnap.exists()) {
+            await updateDoc(userRef, updateData);
+        } else {
+            await updateDoc(doc(db, "personnel", personnelId), updateData);
+        }
+    } catch (error) {
+        console.error("Manuel cihaz ekleme hatası:", error);
+        throw error;
+    }
+};
+
+export const getAllPersonnelForDevice = async () => {
+    try {
+        const usersSnap = await getDocs(collection(db, "users"));
+        let allUsers = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+        const personnelSnap = await getDocs(collection(db, "personnel"));
+        const personnelUsers = personnelSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as any));
+
+        allUsers = [...allUsers, ...personnelUsers];
+        return Array.from(new Map(allUsers.map(item => [item.id, item])).values());
+    } catch (error) {
+        return [];
     }
 };
 
@@ -93,9 +130,9 @@ export const revokeDeviceAccess = async (userId: string, deviceId: string) => {
             where("personnelId", "==", userId),
             where("deviceId", "==", deviceId)
         );
-        
+
         const reqSnap = await getDocs(reqQuery);
-        
+
         // Bulunan eski isteklerin hepsini sil
         const deletePromises = reqSnap.docs.map(requestDoc => deleteDoc(requestDoc.ref));
         await Promise.all(deletePromises);

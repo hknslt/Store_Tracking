@@ -72,8 +72,9 @@ const StoreCashRegisters = () => {
                 });
             });
 
-            // TL bakiyesine göre sırala
-            setStores(storesData.sort((a, b) => b.balances.TL - a.balances.TL));
+            // 🔥 A'dan Z'ye İsme Göre Sıralama
+            setStores(storesData.sort((a, b) => a.name.localeCompare(b.name, 'tr')));
+
             setTotalSystemBalances(grandTotals);
             setLoading(false);
 
@@ -151,7 +152,8 @@ const StoreCashRegisters = () => {
             {/* --- KART LİSTESİ --- */}
             <div style={{
                 display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))',
+                // 🔥 minmax(320px) yerine minmax(250px) yaptık ki satıra 4 tane sığabilsin
+                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
                 gap: '20px'
             }}>
                 {stores.map((store, index) => (
@@ -159,11 +161,11 @@ const StoreCashRegisters = () => {
                         key={store.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.1 }}
+                        transition={{ delay: index * 0.05 }} // Animasyonu da hızlandırdık
                         style={{
                             background: 'white',
                             borderRadius: '16px',
-                            padding: '20px',
+                            padding: '15px', // Padding'i biraz daralttık
                             border: '1px solid #e2e8f0',
                             cursor: 'pointer',
                             transition: 'all 0.3s',
@@ -184,30 +186,33 @@ const StoreCashRegisters = () => {
                         }}
                     >
                         {/* Üst Kısım: Mağaza İsmi */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '20px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
                             <div style={{
-                                width: '45px', height: '45px',
+                                width: '40px', height: '40px', // İkon kutusunu da biraz ufalttık
                                 background: '#f0fdf4',
-                                borderRadius: '12px',
+                                borderRadius: '10px',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid #dcfce7'
+                                border: '1px solid #dcfce7',
+                                flexShrink: 0
                             }}>
-                                <img src={storeIcon} alt="" style={{ width: '24px', opacity: 0.8 }} />
+                                <img src={storeIcon} alt="" style={{ width: '20px', opacity: 0.8 }} />
                             </div>
-                            <div>
-                                <h3 style={{ fontSize: '16px', fontWeight: '700', color: '#1e293b', margin: 0 }}>{store.name}</h3>
-                                <span style={{ fontSize: '12px', color: '#64748b' }}>Şube Kasası</span>
+                            <div style={{ overflow: 'hidden' }}>
+                                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                    {store.name}
+                                </h3>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>Şube Kasası</span>
                             </div>
                         </div>
 
                         {/* Orta Kısım: ÇOKLU BAKİYE LİSTESİ */}
                         <div style={{
                             background: '#f8fafc',
-                            borderRadius: '12px',
-                            padding: '15px',
+                            borderRadius: '10px',
+                            padding: '12px',
                             flex: 1
                         }}>
-                            <div style={{ fontSize: '12px', color: '#94a3b8', fontWeight: '700', marginBottom: '10px', textTransform: 'uppercase' }}>
+                            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase' }}>
                                 MEVCUT BAKİYELER
                             </div>
 
@@ -217,8 +222,8 @@ const StoreCashRegisters = () => {
                             <BalanceRow label="GBP" amount={store.balances.GBP} color="#0f172a" suffix="£" />
                         </div>
 
-                        <div style={{ marginTop: '15px', textAlign: 'right' }}>
-                            <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: '600' }}>
+                        <div style={{ marginTop: '12px', textAlign: 'right' }}>
+                            <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600' }}>
                                 Detaylara Git ➜
                             </span>
                         </div>
@@ -238,12 +243,12 @@ const BalanceRow = ({ label, amount, color, suffix }: any) => {
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '8px',
+            marginBottom: '6px',
             opacity: isZero ? 0.3 : 1
         }}>
-            <span style={{ fontSize: '13px', fontWeight: '600', color: '#64748b' }}>{label}</span>
+            <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>{label}</span>
             <span style={{
-                fontSize: '15px',
+                fontSize: '14px',
                 fontWeight: '700',
                 color: color
             }}>
