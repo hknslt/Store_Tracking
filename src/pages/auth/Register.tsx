@@ -1,8 +1,8 @@
 // src/pages/Register.tsx (veya Auth/Register.tsx)
 import { useState, useEffect } from "react";
 import { createUserWithEmailAndPassword, getAuth, signOut } from "firebase/auth";
-import { initializeApp, getApp, deleteApp } from "firebase/app"; // 🔥 Yeni importlar
-import { db } from "../../firebase"; // Mevcut db bağlantısı (Admin yetkisi için)
+import { initializeApp, getApp, deleteApp } from "firebase/app";
+import { db } from "../../firebase";
 import { doc, setDoc } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 import type { Store } from "../../types";
@@ -15,7 +15,6 @@ const Register = () => {
     const [fullName, setFullName] = useState("");
     const [role, setRole] = useState("store_admin");
 
-    // Mağaza Müdürü Özel Alanları
     const [storeId, setStoreId] = useState("");
     const [phone, setPhone] = useState("");
     const [address, setAddress] = useState("");
@@ -23,6 +22,9 @@ const Register = () => {
     const [error, setError] = useState("");
     const [message, setMessage] = useState("");
     const [loading, setLoading] = useState(false);
+
+    // Şifre Göster/Gizle State'i
+    const [showPassword, setShowPassword] = useState(false);
 
     useEffect(() => {
         getStores().then(setStores);
@@ -41,20 +43,15 @@ const Register = () => {
         let secondaryApp;
 
         try {
-            // 1. Mevcut Firebase konfigürasyonunu al
             const app = getApp();
             const config = app.options;
 
-            // 2. Geçici bir "İkincil" Firebase uygulaması başlat
-            // Bu sayede yeni kullanıcı oluşsa bile ana 'auth' oturumu değişmez.
             secondaryApp = initializeApp(config, "SecondaryApp");
             const secondaryAuth = getAuth(secondaryApp);
 
-            // 3. Yeni kullanıcıyı bu ikincil auth üzerinden oluştur
             const userCredential = await createUserWithEmailAndPassword(secondaryAuth, email, password);
             const user = userCredential.user;
 
-            // 4. Firestore'a kaydet (Ana 'db' bağlantısını kullanıyoruz ki Admin yetkisiyle yazabilelim)
             const userData = {
                 fullName,
                 email,
@@ -66,15 +63,10 @@ const Register = () => {
                 createdAt: new Date().toISOString()
             };
 
-            // ÖNEMLİ: Auth ID ile Firestore ID'yi eşliyoruz
             await setDoc(doc(db, "personnel", user.uid), userData);
-
-            // 5. Oluşturulan kullanıcının oturumunu ikincil app'ten kapat (Garanti olsun)
             await signOut(secondaryAuth);
 
             setMessage("✅ Kullanıcı başarıyla oluşturuldu! (Mevcut oturumunuz devam ediyor)");
-
-            // Formu temizle
             setEmail(""); setPassword(""); setFullName(""); setPhone(""); setAddress("");
 
         } catch (err: any) {
@@ -83,7 +75,6 @@ const Register = () => {
             else if (err.code === 'auth/weak-password') setError("Şifre en az 6 karakter olmalıdır.");
             else setError("Bir hata oluştu: " + err.message);
         } finally {
-            // 6. İkincil uygulamayı bellekten sil
             if (secondaryApp) {
                 await deleteApp(secondaryApp);
             }
@@ -100,7 +91,6 @@ const Register = () => {
 
             <form onSubmit={handleRegister}>
 
-                {/* ROL SEÇİMİ */}
                 <div className="form-group">
                     <label className="form-label">Kullanıcı Rolü</label>
                     <select
@@ -116,7 +106,6 @@ const Register = () => {
                     </select>
                 </div>
 
-                {/* MAĞAZA MÜDÜRÜ İÇİN EK ALANLAR */}
                 {role === 'store_admin' && (
                     <div className="store-select-box">
                         <h4 style={{ marginTop: 0, marginBottom: '15px', color: '#334155' }}>Mağaza Bilgileri</h4>
@@ -142,7 +131,6 @@ const Register = () => {
                     </div>
                 )}
 
-                {/* GENEL BİLGİLER */}
                 <div className="form-group">
                     <label className="form-label">Ad Soyad</label>
                     <input type="text" required value={fullName} onChange={e => setFullName(e.target.value)} className="form-input" placeholder="Adı Soyadı" />
@@ -155,7 +143,39 @@ const Register = () => {
                     </div>
                     <div className="form-group">
                         <label className="form-label">Şifre</label>
-                        <input type="password" required value={password} onChange={e => setPassword(e.target.value)} className="form-input" placeholder="******" />
+                        <div style={{ position: 'relative' }}>
+                            <input
+                                type={showPassword ? "text" : "password"}
+                                required
+                                value={password}
+                                onChange={e => setPassword(e.target.value)}
+                                className="form-input"
+                                placeholder="******"
+                                style={{ paddingRight: '40px' }}
+                            />
+                            {/* İkon Butonu */}
+                            <button
+                                type="button"
+                                onClick={() => setShowPassword(!showPassword)}
+                                style={{
+                                    position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)',
+                                    background: 'none', border: 'none', cursor: 'pointer', padding: 0,
+                                    display: 'flex', alignItems: 'center', color: '#94a3b8'
+                                }}
+                            >
+                                {showPassword ? (
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                ) : (
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+                                        <line x1="1" y1="1" x2="23" y2="23"></line>
+                                    </svg>
+                                )}
+                            </button>
+                        </div>
                     </div>
                 </div>
 

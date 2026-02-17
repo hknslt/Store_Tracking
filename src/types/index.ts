@@ -374,3 +374,12 @@ declare global {
         };
     }
 }
+
+
+export interface CalendarNote {
+    id?: string;
+    dateKey: string; // Örn: "2024-05-20"
+    text: string;
+    createdAt: string; // ISO formatında tarih (30 gün kontrolü için)
+    userId: string;
+}

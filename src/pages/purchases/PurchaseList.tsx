@@ -2,8 +2,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
-import { db } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore";
 
 // Servisler
 import { getPurchasesByStore, updatePurchaseItemStatus, cancelPurchaseComplete } from "../../services/purchaseService";
@@ -15,7 +13,7 @@ import { generatePurchasePDF } from "../../services/pdfService";
 import PurchasesTableView from "../../components/purchases/PurchasesTableView";
 import PurchasesGridView from "../../components/purchases/PurchasesGridView";
 
-import type { Purchase, Store, SystemUser, Category, Cushion, Color, Dimension, PurchaseStatus } from "../../types";
+import type { Purchase, Store, Category, Cushion, Color, Dimension, PurchaseStatus } from "../../types";
 import "../../App.css";
 import StoreIcon from "../../assets/icons/store.svg";
 
@@ -32,8 +30,16 @@ const Icons = {
 };
 
 const PurchaseList = () => {
-    const { currentUser } = useAuth();
+    // 🔥 Rol ve kullanıcı verisini direkt Context'ten çekiyoruz
+    const { currentUser, userRole, userData } = useAuth();
     const navigate = useNavigate();
+
+    // --- YETKİ KONTROLLERİ ---
+    // Sadece Admin, Kontrolcü ve Raporlayıcı mağazaları filtreleyebilir
+    const canSelectStore = ['admin', 'control', 'report'].includes(userRole || '');
+
+    // Sadece Admin ve Kontrolcü işlemleri düzenleyip / iptal edebilir
+    const canEditDelete = ['admin', 'control'].includes(userRole || '');
 
     // Veri State'leri
     const [purchases, setPurchases] = useState<Purchase[]>([]);
@@ -44,7 +50,6 @@ const PurchaseList = () => {
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
 
     const [selectedStoreId, setSelectedStoreId] = useState("");
-    const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
     // UI State'leri
@@ -71,23 +76,27 @@ const PurchaseList = () => {
     // --- VERİ ÇEKME ---
     useEffect(() => {
         const init = async () => {
-            if (!currentUser) return;
             try {
                 const [sData, cats, cushs, cols, dims] = await Promise.all([
                     getStores(), getCategories(), getCushions(), getColors(), getDimensions()
                 ]);
                 setStores(sData); setCategories(cats); setCushions(cushs); setColors(cols); setDimensions(dims);
 
-                const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
-                if (userDoc.exists()) {
-                    const u = userDoc.data() as SystemUser;
-                    if (['admin', 'control', 'report'].includes(u.role)) { setIsAdmin(true); }
-                    else { setIsAdmin(false); if (u.storeId) setSelectedStoreId(u.storeId); }
+                // Eğer kişi tek bir mağazaya bağlıysa ve filtreleme yetkisi yoksa (Örn: store_admin)
+                if (!canSelectStore && userData?.storeId) {
+                    setSelectedStoreId(userData.storeId);
                 }
-            } catch (error) { console.error(error); } finally { setLoading(false); }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
         };
-        init();
-    }, [currentUser]);
+
+        if (currentUser) {
+            init();
+        }
+    }, [currentUser, userRole, userData, canSelectStore]);
 
     const refreshPurchases = async () => {
         if (!selectedStoreId) return;
@@ -168,7 +177,7 @@ const PurchaseList = () => {
                     display: 'flex', alignItems: 'center', gap: '6px',
                     padding: '8px 16px', borderRadius: '30px',
                     border: isSelected ? `1px solid ${color}` : '1px solid #e2e8f0',
-                    backgroundColor: isSelected ? `${color}15` : 'white', // Hafif transparan arka plan
+                    backgroundColor: isSelected ? `${color}15` : 'white',
                     color: isSelected ? color : '#64748b',
                     fontSize: '12px', fontWeight: '700', cursor: 'pointer',
                     transition: 'all 0.2s ease-in-out',
@@ -183,7 +192,6 @@ const PurchaseList = () => {
 
     return (
         <div className="page-container">
-            {/* CSS STİLLERİ */}
             <style>{`
                 .control-bar { display: grid; grid-template-columns: 220px 1fr 200px auto; gap: 15px; alignItems: center; background: white; padding: 15px 20px; border-radius: 12px; box-shadow: 0 2px 5px rgba(0,0,0,0.03); marginBottom: 15px; }
                 .form-control-wrapper { position: relative; width: 100%; }
@@ -199,7 +207,6 @@ const PurchaseList = () => {
 
             {message && <div style={{ position: 'fixed', top: '20px', right: '20px', padding: '15px 25px', borderRadius: '8px', color: 'white', backgroundColor: message.type === 'success' ? '#10b981' : '#ef4444', zIndex: 9999 }}>{message.text}</div>}
 
-            {/* İPTAL MODALI */}
             {cancelModal.show && (
                 <div style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(0,0,0,0.5)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 }}>
                     <div style={{ backgroundColor: 'white', padding: '20px', borderRadius: '8px', width: '350px', textAlign: 'center' }}>
@@ -220,24 +227,29 @@ const PurchaseList = () => {
                     <button onClick={handlePrintPDF} className="btn btn-secondary" style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {Icons.pdf} PDF Çıkar
                     </button>
-                    <Link to="/purchases/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {Icons.plus} Yeni Alış
-                    </Link>
+                    {/* Sadece Report rolü DEĞİLSE Alış Ekleyebilir */}
+                    {userRole !== 'report' && (
+                        <Link to="/purchases/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            {Icons.plus} Yeni Alış
+                        </Link>
+                    )}
                 </div>
             </div>
 
-            {/* 🔥 MODERN KONTROL ÇUBUĞU */}
             <div className="control-bar">
                 <div>
-                    {isAdmin ? (
+                    {canSelectStore ? (
                         <div className="form-control-wrapper">
                             <span className="form-icon"><img src={StoreIcon} width="16" style={{ opacity: 0.5 }} /></span>
                             <select value={selectedStoreId} onChange={(e) => setSelectedStoreId(e.target.value)}>
-                                <option value="">-- Mağaza Seçiniz --</option>{stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
+                                <option value="">-- Mağaza Seçiniz --</option>
+                                {stores.map(s => <option key={s.id} value={s.id}>{s.storeName}</option>)}
                             </select>
                         </div>
                     ) : (
-                        <div style={{ fontWeight: 'bold', padding: '10px 15px', backgroundColor: '#ecf0f1', borderRadius: '8px', color: '#2c3e50', whiteSpace: 'nowrap', height: '42px', display: 'flex', alignItems: 'center', border: '1px solid #e2e8f0' }}>{stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}</div>
+                        <div style={{ fontWeight: 'bold', padding: '10px 15px', backgroundColor: '#ecf0f1', borderRadius: '8px', color: '#2c3e50', whiteSpace: 'nowrap', height: '42px', display: 'flex', alignItems: 'center', border: '1px solid #e2e8f0' }}>
+                            {stores.find(s => s.id === selectedStoreId)?.storeName || "Mağazam"}
+                        </div>
                     )}
                 </div>
 
@@ -261,7 +273,6 @@ const PurchaseList = () => {
                 </div>
             </div>
 
-            {/* 🔥 MODERN FİLTRE ÇUBUĞU (ŞIK TASARIM) */}
             {activeTab === 'active' && (
                 <div className="filter-bar">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px', fontWeight: '700', color: '#475569', marginRight: '10px' }}>
@@ -274,13 +285,11 @@ const PurchaseList = () => {
                 </div>
             )}
 
-            {/* TAB BUTONLARI */}
             <div style={{ display: 'flex', gap: '10px', marginBottom: '15px', marginTop: '10px' }}>
                 <button onClick={() => setActiveTab('active')} className={`btn ${activeTab === 'active' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1 }}>Devam Eden Siparişler</button>
                 <button onClick={() => setActiveTab('completed')} className={`btn ${activeTab === 'completed' ? 'btn-past' : 'btn-secondary'}`} style={{ flex: 1 }}>Tamamlananlar (Geçmiş)</button>
             </div>
 
-            {/* İÇERİK ALANI */}
             <div className="card" style={{ backgroundColor: viewMode === 'grid' ? 'transparent' : 'white', boxShadow: viewMode === 'grid' ? 'none' : '0 2px 5px rgba(0,0,0,0.05)', border: 'none' }}>
                 <div className="card-body" style={{ padding: viewMode === 'grid' ? '0' : '0' }}>
                     {selectedStoreId ? (
@@ -293,7 +302,8 @@ const PurchaseList = () => {
                                 handleStatusClick={handleStatusClick}
                                 getButtonText={getButtonText}
                                 getButtonColor={getButtonColor}
-                                isAdmin={isAdmin}
+                                // 🔥 YETKİ BURADAN GÖNDERİLİYOR
+                                isAdmin={canEditDelete}
                                 setCancelModal={setCancelModal}
                                 goToDetail={goToDetail}
                                 getCatName={getCatName}

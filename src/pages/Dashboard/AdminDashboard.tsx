@@ -19,6 +19,8 @@ import storeIcon from "../../assets/icons/wallet-money.svg";
 import timeIcon from "../../assets/icons/calendar-clock.svg";
 import commissionIcon from "../../assets/icons/commission.svg";
 import invoiceIcon from "../../assets/icons/invoice.svg";
+import truckIcon from "../../assets/icons/truck.svg";
+import ShopingcartIcon from "../../assets/icons/shopping-cart.svg";
 
 // RENK TEMASI
 const THEME = {
@@ -126,7 +128,7 @@ const AdminDashboard = () => {
                     <div className="card" style={{ marginBottom: '25px' }}>
                         <div className="card-header" style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0, fontSize: '16px', color: '#334155', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ background: '#dcfce7', color: '#16a34a', padding: '5px', borderRadius: '6px' }}>🛒</span>
+                                <span style={{ background: '#145a32', color: '#16a34a', padding: '5px', borderRadius: '6px' }}><span className="nav-icon"><img src={ShopingcartIcon} alt="" /></span></span>
                                 Bugünün Satışları
                             </h3>
                             <button onClick={() => navigate('/sales')} className="text-btn">Tümünü Gör →</button>
@@ -162,7 +164,7 @@ const AdminDashboard = () => {
                     <div className="card">
                         <div className="card-header" style={{ padding: '20px', borderBottom: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h3 style={{ margin: 0, fontSize: '16px', color: '#334155', display: 'flex', alignItems: 'center', gap: '10px' }}>
-                                <span style={{ background: '#e0f2fe', color: '#0284c7', padding: '5px', borderRadius: '6px' }}>🚛</span>
+                                <span style={{ background: '#14316b', color: '#0284c7', padding: '5px', borderRadius: '6px' }}><span className="nav-icon"><img src={truckIcon} alt="" /></span></span>
                                 Bugünün Alışları
                             </h3>
                             <button onClick={() => navigate('/purchases')} className="text-btn">Tümünü Gör →</button>

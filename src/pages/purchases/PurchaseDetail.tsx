@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-// 🔥 EKLENDİ: resetPurchaseToPending import edildi
 import { cancelPurchaseComplete, deletePurchaseComplete, resetPurchaseToPending } from "../../services/purchaseService";
 import { getCategories, getColors, getDimensions, getCushions } from "../../services/definitionService";
 import { useAuth } from "../../context/AuthContext";
@@ -16,8 +15,11 @@ const PurchaseDetail = () => {
     const { storeId, id } = useParams();
     const navigate = useNavigate();
     const location = useLocation();
+
+    // 🔥 YETKİLENDİRME
     const { userRole } = useAuth();
-    const isAdmin = userRole === 'admin';
+    // Admin ve Control düzenleme/silme/iptal/sıfırlama yapabilir
+    const canEditDelete = ['admin', 'control'].includes(userRole || '');
 
     const [purchase, setPurchase] = useState<Purchase | null>(location.state?.purchase || null);
     const [loading, setLoading] = useState(!location.state?.purchase);
@@ -62,7 +64,7 @@ const PurchaseDetail = () => {
         initData();
     }, [storeId, id, purchase, navigate]);
 
-    const getName = (list: any[], id: string | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
+    const getName = (list: any[], itemId: string | undefined, key: string) => list.find(x => x.id === itemId)?.[key] || "-";
     const formatDate = (date: string) => new Date(date).toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const handlePrint = () => { window.print(); };
@@ -80,7 +82,6 @@ const PurchaseDetail = () => {
                 setTimeout(() => navigate("/purchases"), 1500);
                 return;
             } else if (modal.action === 'reset') {
-                // 🔥 SIFIRLAMA İŞLEMİ
                 await resetPurchaseToPending(storeId, id);
                 setMessage({ type: 'success', text: "Fiş 'Beklemede' durumuna geri alındı." });
             }
@@ -106,8 +107,10 @@ const PurchaseDetail = () => {
 
     const isCancelled = purchase.items.every(i => i.status === 'İptal');
     const isCompleted = purchase.items.every(i => i.status === 'Tamamlandı');
-    // Eğer en az bir ürün "Beklemede" veya "İptal" DEĞİLSE, süreç başlamış demektir.
     const isProcessStarted = purchase.items.some(i => i.status !== 'Beklemede' && i.status !== 'İptal');
+
+    // Sadece hepsi "Beklemede" ise Düzenlenebilir
+    const isAllPending = purchase.items.every(i => i.status === 'Beklemede');
 
     return (
         <div className="page-container">
@@ -138,9 +141,20 @@ const PurchaseDetail = () => {
                 <button onClick={() => navigate(-1)} className="btn btn-secondary">← Listeye Dön</button>
 
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {isAdmin && (
+                    {/* Sadece Admin ve Kontrolcü butonları görür */}
+                    {canEditDelete && (
                         <>
-                            {/* 🔥 SIFIRLAMA BUTONU: Süreç başlamışsa (Onaylandı/Üretim vs) ve tamamlanmamışsa görünür */}
+                            {/* 🔥 DÜZENLE BUTONU: Sadece iptal edilmemişse ve hepsi beklemedeyse görünür */}
+                            {!isCancelled && isAllPending && (
+                                <button
+                                    onClick={() => navigate(`/purchases/${storeId}/edit/${purchase.id}`, { state: { purchase } })}
+                                    className="btn btn-primary"
+                                >
+                                    ✎ Düzenle
+                                </button>
+                            )}
+
+                            {/* BEKLEMEYE AL (SIFIRLAMA) BUTONU */}
                             {!isCancelled && !isCompleted && isProcessStarted && (
                                 <button
                                     onClick={() => setModal({ show: true, action: 'reset' })}
@@ -151,16 +165,20 @@ const PurchaseDetail = () => {
                                 </button>
                             )}
 
+                            {/* İPTAL ET BUTONU */}
                             {!isCancelled && !isCompleted && (
                                 <button onClick={() => setModal({ show: true, action: 'cancel' })} className="btn btn-warning" style={{ backgroundColor: '#f39c12' }}>
                                     İptal Et
                                 </button>
                             )}
+
+                            {/* SİL BUTONU */}
                             <button onClick={() => setModal({ show: true, action: 'delete' })} className="btn btn-danger">
                                 Sil
                             </button>
                         </>
                     )}
+
                     <button onClick={handlePrint} className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
                         Yazdır /PDF
                     </button>

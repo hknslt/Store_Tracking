@@ -51,7 +51,7 @@ const UserList = () => {
                 colorClass = "badge-primary"; // Mavi
                 break;
             case 'control':
-                label = 'Kontrol / Sevkiyat';
+                label = 'Kontrol';
                 colorClass = "badge-warning"; // Turuncu
                 break;
             case 'report':

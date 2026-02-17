@@ -1,3 +1,4 @@
+// src/components/Sidebar.tsx
 import { useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
@@ -43,7 +44,8 @@ const Sidebar = () => {
 
   const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
 
-  if (userRole === 'store_admin' || userRole === 'staff' || userRole === 'report') return null;
+  // 🔥 KONTROLCÜ (control) ROLÜ DE EKLENDİ, SIDEBAR GİZLENDİ
+  if (userRole === 'store_admin' || userRole === 'staff' || userRole === 'report' || userRole === 'control') return null;
 
   return (
     <div className={`sidebar ${isCollapsed ? "collapsed" : ""}`}>

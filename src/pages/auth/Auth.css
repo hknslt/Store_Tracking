@@ -2,8 +2,8 @@
 
 /* --- DEĞİŞKENLER --- */
 :root {
-  --primary-color: #4f46e5; /* Modern İndigo Mavisi */
-  --primary-hover: #4338ca;
+  --primary-color: #145a32; /* Modern İndigo Mavisi */
+  --primary-hover: #12512e;
   --bg-gradient: linear-gradient(135deg, #f0f2f5 0%, #e0e7ff 100%);
   --card-bg: #ffffff;
   --text-main: #1f2937;
@@ -139,7 +139,7 @@
 
 
 .login-logo {
-  height: 100px; /* Logonun yüksekliğini buradan ayarlayabilirsiniz */
+  height: 120px; /* Logonun yüksekliğini buradan ayarlayabilirsiniz */
   width: auto;  /* Orantıyı korur */
   margin-bottom: 1rem;
   object-fit: contain; /* Resim bozulmadan sığdırılır */
