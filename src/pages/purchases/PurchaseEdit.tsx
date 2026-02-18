@@ -328,7 +328,11 @@ const PurchaseEdit = () => {
                                     <td style={{ textAlign: 'right' }}>{Number(item.amount / item.quantity).toFixed(2)} ₺</td>
                                     <td style={{ padding: '10px 15px', color: '#666', fontStyle: 'italic' }}>{item.explanation}</td>
                                     <td style={{ textAlign: 'center' }}>
-                                        <button onClick={() => removeLineItem(idx)} style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold' }}>×</button>
+                                        {item.status === 'Tamamlandı' || item.status === 'İptal' ? (
+                                            <span style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold' }}>{item.status}</span>
+                                        ) : (
+                                            <button onClick={() => removeLineItem(idx)} style={{ color: '#ef4444', border: 'none', background: 'none', cursor: 'pointer', fontWeight: 'bold', fontSize: '16px' }} title="Listeden Çıkar">×</button>
+                                        )}
                                     </td>
                                 </tr>
                             ))}

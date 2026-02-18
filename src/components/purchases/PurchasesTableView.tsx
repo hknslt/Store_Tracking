@@ -50,9 +50,8 @@ const PurchasesTableView: React.FC<Props> = ({
                     const isAllCompleted = p.items.every(item => item.status === 'Tamamlandı');
                     const isCanceled = p.items.every(item => item.status === 'İptal');
 
-                    // 🔥 YENİ KONTROL: Fişin içinde 'Beklemede' olmayan aktif bir ürün var mı?
-                    // Eğer hepsi 'Beklemede' ise düzenlenebilir. Değilse kilitli.
-                    const isEditable = !isCanceled && !isAllCompleted && p.items.every(i => i.status === 'Beklemede' || i.status === 'İptal');
+                    // Fişin içinde 'Beklemede' veya 'İptal' dışında (yani sürece girmiş) bir ürün var mı?
+                    const isEditable = !isCanceled && !isAllCompleted && p.items.every(i => i.status === 'Beklemede' || i.status === 'İptal' || i.status === 'Tamamlandı');
 
                     return (
                         <React.Fragment key={p.id}>
@@ -105,7 +104,13 @@ const PurchasesTableView: React.FC<Props> = ({
                                             </thead>
                                             <tbody>
                                                 {p.items.map((item, idx) => {
-                                                    let isButtonDisabled = item.status === 'Tamamlandı' || item.status === 'İptal';
+                                                    // 🔥 MAĞAZA İÇİN BUTON KİLİDİ:
+                                                    // Kullanıcı Admin/Control DEĞİLSE ve ürün "Sevkiyat" aşamasında DEĞİLSE buton kilitlenir.
+                                                    // Ürün zaten "Tamamlandı" veya "İptal" ise buton her türlü kilitlenir.
+                                                    const isProcessFinished = item.status === 'Tamamlandı' || item.status === 'İptal';
+                                                    const isStoreLocked = !isAdmin && item.status !== 'Sevkiyat';
+                                                    const isButtonDisabled = isProcessFinished || isStoreLocked;
+
                                                     return (
                                                         <tr key={idx} style={{ borderBottom: '1px solid #f9f9f9' }}>
                                                             <td style={{ padding: '8px' }}>
@@ -122,10 +127,17 @@ const PurchasesTableView: React.FC<Props> = ({
                                                             </td>
                                                             <td style={{ textAlign: 'center' }}>
                                                                 <button
-                                                                    onClick={() => handleStatusClick(p.id!, idx, item.status)}
+                                                                    onClick={() => !isButtonDisabled && handleStatusClick(p.id!, idx, item.status)}
                                                                     disabled={isButtonDisabled}
                                                                     className={`btn ${getButtonColor(item.status)}`}
-                                                                    style={{ width: '100%', padding: '4px 8px', fontSize: '11px', opacity: isButtonDisabled ? 0.5 : 1, cursor: isButtonDisabled ? 'not-allowed' : 'pointer' }}
+                                                                    style={{
+                                                                        width: '100%',
+                                                                        padding: '4px 8px',
+                                                                        fontSize: '11px',
+                                                                        opacity: isButtonDisabled ? 0.5 : 1,
+                                                                        cursor: isButtonDisabled ? 'not-allowed' : 'pointer'
+                                                                    }}
+                                                                    title={isStoreLocked ? "Bu aşamaya müdahale yetkiniz yok" : ""}
                                                                 >
                                                                     {getButtonText(item.status)}
                                                                 </button>

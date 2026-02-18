@@ -110,7 +110,7 @@ const PurchaseDetail = () => {
     const isProcessStarted = purchase.items.some(i => i.status !== 'Beklemede' && i.status !== 'İptal');
 
     // Sadece hepsi "Beklemede" ise Düzenlenebilir
-    const isAllPending = purchase.items.every(i => i.status === 'Beklemede');
+   const isAllPending = purchase.items.every(i => i.status === 'Beklemede' || i.status === 'İptal' || i.status === 'Tamamlandı');
 
     return (
         <div className="page-container">

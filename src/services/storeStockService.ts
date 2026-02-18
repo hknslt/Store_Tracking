@@ -54,7 +54,7 @@ export const checkAndCleanupStock = async (storeId: string, stockId: string) => 
             (data.incomingStock || 0) === 0 &&
             (data.incomingReservedStock || 0) === 0
         ) {
-            await deleteDoc(stockRef); // Veritabanından sil
+            await deleteDoc(stockRef);  
         }
     }
 };

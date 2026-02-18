@@ -132,7 +132,7 @@ const StoreAdd = () => {
 
                     <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
                         <button type="submit" disabled={loading} className="btn btn-primary" style={{ padding: '12px 35px' }}>
-                            {loading ? 'Kaydediliyor...' : '💾 Kaydet ve Tamamla'}
+                            {loading ? 'Kaydediliyor...' : 'Kaydet ve Tamamla'}
                         </button>
                     </div>
 

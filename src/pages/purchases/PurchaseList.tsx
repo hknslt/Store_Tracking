@@ -30,15 +30,11 @@ const Icons = {
 };
 
 const PurchaseList = () => {
-    // 🔥 Rol ve kullanıcı verisini direkt Context'ten çekiyoruz
     const { currentUser, userRole, userData } = useAuth();
     const navigate = useNavigate();
 
     // --- YETKİ KONTROLLERİ ---
-    // Sadece Admin, Kontrolcü ve Raporlayıcı mağazaları filtreleyebilir
     const canSelectStore = ['admin', 'control', 'report'].includes(userRole || '');
-
-    // Sadece Admin ve Kontrolcü işlemleri düzenleyip / iptal edebilir
     const canEditDelete = ['admin', 'control'].includes(userRole || '');
 
     // Veri State'leri
@@ -82,7 +78,6 @@ const PurchaseList = () => {
                 ]);
                 setStores(sData); setCategories(cats); setCushions(cushs); setColors(cols); setDimensions(dims);
 
-                // Eğer kişi tek bir mağazaya bağlıysa ve filtreleme yetkisi yoksa (Örn: store_admin)
                 if (!canSelectStore && userData?.storeId) {
                     setSelectedStoreId(userData.storeId);
                 }
@@ -167,7 +162,6 @@ const PurchaseList = () => {
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
 
-    // 🔥 TASARIM: Modern Filtre Kapsülleri (Chips)
     const StatusFilterChip = ({ status, label, color }: { status: PurchaseStatus, label: string, color: string }) => {
         const isSelected = selectedStatuses.includes(status);
         return (
@@ -227,7 +221,6 @@ const PurchaseList = () => {
                     <button onClick={handlePrintPDF} className="btn btn-secondary" style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {Icons.pdf} PDF Çıkar
                     </button>
-                    {/* Sadece Report rolü DEĞİLSE Alış Ekleyebilir */}
                     {userRole !== 'report' && (
                         <Link to="/purchases/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                             {Icons.plus} Yeni Alış
@@ -302,7 +295,6 @@ const PurchaseList = () => {
                                 handleStatusClick={handleStatusClick}
                                 getButtonText={getButtonText}
                                 getButtonColor={getButtonColor}
-                                // 🔥 YETKİ BURADAN GÖNDERİLİYOR
                                 isAdmin={canEditDelete}
                                 setCancelModal={setCancelModal}
                                 goToDetail={goToDetail}
@@ -320,10 +312,11 @@ const PurchaseList = () => {
                                 handleStatusClick={handleStatusClick}
                                 getButtonText={getButtonText}
                                 getButtonColor={getButtonColor}
+                                isAdmin={canEditDelete} // 🔥 TS Hatası için eksik olan isAdmin eklendi
                                 getCatName={getCatName}
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
-                                getDimensionName={getDimensionName}
+                                getDimensionName={getDimensionName} // 🔥 TS Hatası için eksik olan getDimensionName eklendi
                             />
                         )
                     ) : (

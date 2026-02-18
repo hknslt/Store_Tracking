@@ -222,7 +222,7 @@ const PaymentAdd = () => {
                 createdAt: new Date()
             });
 
-            setMessage({ type: 'success', text: "✅ İşlem Başarıyla Kaydedildi! Yönlendiriliyorsunuz..." });
+            setMessage({ type: 'success', text: "İşlem Başarıyla Kaydedildi! Yönlendiriliyorsunuz..." });
 
             // 🔥 BAŞARILI KAYIT SONRASI YÖNLENDİRME (1.5 saniye sonra)
             setTimeout(() => {

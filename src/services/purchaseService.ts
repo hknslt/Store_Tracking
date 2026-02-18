@@ -9,54 +9,54 @@ export const addPurchase = async (purchase: Purchase) => {
         await runTransaction(db, async (transaction) => {
 
             // A) OKUMALAR
-            const stockReads = [];
+            const stockDeltas: Record<string, any> = {};
             for (const item of purchase.items) {
+                // 🔥 DİKKAT: cushionId çıkarıldı. Sadece Ürün + Renk + Ebat
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
-                const stockRef = doc(db, "stores", purchase.storeId, "stocks", uniqueStockId);
-                const stockDoc = await transaction.get(stockRef);
-                stockReads.push({ item, ref: stockRef, doc: stockDoc });
+
+                if (!stockDeltas[uniqueStockId]) {
+                    stockDeltas[uniqueStockId] = {
+                        productId: item.productId,
+                        colorId: item.colorId,
+                        dimensionId: item.dimensionId || null,
+                        productName: item.productName,
+                        incomingStock: 0,
+                        incomingReservedStock: 0
+                    };
+                }
+
+                const qty = Number(item.quantity);
+
+                if (item.itemType === 'Stok') {
+                    stockDeltas[uniqueStockId].incomingStock += qty;
+                } else if (item.itemType === 'Sipariş') {
+                    if (!(item as any).requestId) {
+                        stockDeltas[uniqueStockId].incomingReservedStock += qty;
+                    }
+                }
             }
 
             // B) HESAPLAMALAR
             const stockWrites: { ref: any, data: any }[] = [];
 
-            for (const { item, ref, doc } of stockReads) {
-                let currentData = { freeStock: 0, reservedStock: 0, incomingStock: 0, incomingReservedStock: 0, productName: item.productName };
-                if (doc.exists()) {
-                    currentData = doc.data() as any;
-                }
+            for (const uniqueStockId of Object.keys(stockDeltas)) {
+                const delta = stockDeltas[uniqueStockId];
+                const stockRef = doc(db, "stores", purchase.storeId, "stocks", uniqueStockId);
+                const stockDoc = await transaction.get(stockRef);
 
-                const updates: any = {
-                    productId: item.productId,
-                    colorId: item.colorId,
-                    dimensionId: item.dimensionId || null,
-                    productName: item.productName
+                let currentData = { incomingStock: 0, incomingReservedStock: 0 };
+                if (stockDoc.exists()) currentData = stockDoc.data() as any;
+
+                const updates = {
+                    productId: delta.productId,
+                    colorId: delta.colorId,
+                    dimensionId: delta.dimensionId,
+                    productName: delta.productName,
+                    incomingStock: (currentData.incomingStock || 0) + delta.incomingStock,
+                    incomingReservedStock: (currentData.incomingReservedStock || 0) + delta.incomingReservedStock
                 };
 
-                const qty = Number(item.quantity);
-
-                // --- STOK GİRİŞ MANTIĞI (DÜZELTİLDİ) ---
-
-                if (item.itemType === 'Stok') {
-                    // Depo için normal giriş: Beklenen Depo Artar
-                    updates.incomingStock = (currentData.incomingStock || 0) + qty;
-                }
-                else if (item.itemType === 'Sipariş') {
-                    // 🔥 KRİTİK DÜZELTME:
-                    // Eğer bu ürün "Bekleyen Taleplerden" (Pending Request) geldiyse (requestId varsa),
-                    // Satış anında zaten 'incomingReservedStock' artırılmıştı.
-                    // O yüzden burada TEKRAR ARTIRMA! (Çift kayıt olmasın)
-
-                    // Ancak, eğer manuel olarak "Sipariş" tipinde ürün eklediysek (requestId yoksa),
-                    // O zaman artırmamız gerekir.
-
-                    if (!(item as any).requestId) {
-                        updates.incomingReservedStock = (currentData.incomingReservedStock || 0) + qty;
-                    }
-                    // else: requestId varsa stok zaten artmıştır, dokunma.
-                }
-
-                stockWrites.push({ ref, data: updates });
+                stockWrites.push({ ref: stockRef, data: updates });
             }
 
             // C) YAZMALAR
@@ -208,56 +208,44 @@ export const cancelPurchaseComplete = async (storeId: string, purchaseId: string
             const purchase = purchaseDoc.data() as Purchase;
 
             // Stokları Geri Al
+            const stockDeltas: Record<string, any> = {};
+
             for (const item of purchase.items) {
                 if (item.status === 'İptal') continue;
 
+                // Minder yok
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                if (!stockDeltas[uniqueStockId]) {
+                    stockDeltas[uniqueStockId] = { freeStock: 0, incomingStock: 0, reservedStock: 0, incomingReservedStock: 0 };
+                }
+
+                const qty = Number(item.quantity);
+                if (item.itemType === 'Stok') {
+                    if (item.status === 'Tamamlandı') stockDeltas[uniqueStockId].freeStock += qty;
+                    else stockDeltas[uniqueStockId].incomingStock += qty;
+                } else if (item.itemType === 'Sipariş') {
+                    if (!(item as any).requestId) {
+                        if (item.status === 'Tamamlandı') stockDeltas[uniqueStockId].reservedStock += qty;
+                        else stockDeltas[uniqueStockId].incomingReservedStock += qty;
+                    }
+                }
+            }
+
+            for (const uniqueStockId of Object.keys(stockDeltas)) {
+                const delta = stockDeltas[uniqueStockId];
                 const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
                 const stockDoc = await transaction.get(stockRef);
 
                 if (stockDoc.exists()) {
                     const currentData = stockDoc.data();
-                    const qty = Number(item.quantity);
                     const updates: any = {};
 
-                    // 1. Durum: Ürün 'Stok' tipindeyse (Depo girişi)
-                    if (item.itemType === 'Stok') {
-                        if (item.status === 'Tamamlandı') {
-                            updates.freeStock = Math.max(0, (currentData.freeStock || 0) - qty);
-                        } else {
-                            updates.incomingStock = Math.max(0, (currentData.incomingStock || 0) - qty);
-                        }
-                    }
+                    if (delta.freeStock > 0) updates.freeStock = Math.max(0, (currentData.freeStock || 0) - delta.freeStock);
+                    if (delta.incomingStock > 0) updates.incomingStock = Math.max(0, (currentData.incomingStock || 0) - delta.incomingStock);
+                    if (delta.reservedStock > 0) updates.reservedStock = Math.max(0, (currentData.reservedStock || 0) - delta.reservedStock);
+                    if (delta.incomingReservedStock > 0) updates.incomingReservedStock = Math.max(0, (currentData.incomingReservedStock || 0) - delta.incomingReservedStock);
 
-                    // 2. Durum: Ürün 'Sipariş' tipindeyse (Müşteri için)
-                    else if (item.itemType === 'Sipariş') {
-                        // 🔥 ÖNEMLİ: Eğer bu ürün satıştan geldiyse (requestId varsa),
-                        // Alış kaydı sırasında stok artırmamıştık.
-                        // O yüzden iptal ederken de stok DÜŞMEMELİYİZ.
-
-                        // Sadece manuel eklenen (requestId olmayan) siparişler için stok düşülmeli.
-                        if (!(item as any).requestId) {
-                            if (item.status === 'Tamamlandı') {
-                                updates.reservedStock = Math.max(0, (currentData.reservedStock || 0) - qty);
-                            } else {
-                                updates.incomingReservedStock = Math.max(0, (currentData.incomingReservedStock || 0) - qty);
-                            }
-                        } else {
-                            // Eğer requestId varsa, bu ürün satıştan gelmiştir.
-                            // Satış iptal edilmediği sürece bu stok "Gelecek Müşteri" olarak kalmalıdır.
-                            // ANCAK: Alış iptal olduğu için "Tedarik Süreci" durmuş olur.
-                            // Bu durumda stok ne olacak?
-                            // Mantıken satış hala "Merkezden" bekliyor durumunda.
-                            // Yani incomingReservedStock kalmalı mı? Evet.
-                            // Çünkü satış kaydı hala o ürünün geleceğini söylüyor.
-                            // Sadece bu alış fişi iptal oldu, belki başka bir alış fişiyle gelecek.
-                            // O yüzden requestId varsa STOK DÜŞME!
-                        }
-                    }
-
-                    if (Object.keys(updates).length > 0) {
-                        transaction.update(stockRef, updates);
-                    }
+                    if (Object.keys(updates).length > 0) transaction.update(stockRef, updates);
                 }
             }
 
@@ -323,7 +311,7 @@ export const updatePurchase = async (
                 // İptal edilmişse işlem yapma
                 if (item.status === 'İptal') continue;
 
-                const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+               const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                 const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
                 const stockDoc = await transaction.get(stockRef);
 
@@ -396,6 +384,7 @@ export const updatePurchase = async (
                         rem.productId === oldItem.productId &&
                         rem.colorId === oldItem.colorId &&
                         rem.dimensionId === oldItem.dimensionId &&
+                        rem.cushionId === oldItem.cushionId &&
                         rem.amount === oldItem.amount // Fiyatı aynı olanı sil (basit eşleşme)
                     )
                 ),

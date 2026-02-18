@@ -104,7 +104,7 @@ const SSHList = () => {
 
                 <input
                     type="text"
-                    placeholder="🔍 Müşteri veya Fiş No Ara..."
+                    placeholder="Müşteri veya Fiş No Ara..."
                     className="soft-input"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}

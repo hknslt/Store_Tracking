@@ -19,15 +19,16 @@ interface Props {
     handleStatusClick: (id: string, idx: number, status: PurchaseStatus) => void;
     getButtonText: (s: PurchaseStatus) => string;
     getButtonColor: (s: PurchaseStatus) => string;
+    isAdmin: boolean;
     getCatName: (id?: string) => string;
     getCushionName: (id?: string) => string;
     getColorName: (id?: string) => string;
-    getDimensionName: (id?: string | null) => string;
+    getDimensionName: (id?: string | null) => string; // 🔥 TS Hatası için bu eklendi
 }
 
 const PurchasesGridView: React.FC<Props> = ({
     purchases, formatDate, goToDetail, handleStatusClick, getButtonText, getButtonColor,
-    getCatName, getCushionName, getColorName
+    isAdmin, getCatName, getCushionName, getColorName, getDimensionName
 }) => {
 
     const [expandedCards, setExpandedCards] = useState<Record<string, boolean>>({});
@@ -41,6 +42,7 @@ const PurchasesGridView: React.FC<Props> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
             {purchases.length > 0 ? purchases.map(p => {
                 const isCanceled = p.items.every(i => i.status === 'İptal');
+                // 🔥 Kullanılmayan isCompleted değişkeni silindi.
                 const isExpanded = expandedCards[p.id!] || false;
 
                 return (
@@ -86,11 +88,18 @@ const PurchasesGridView: React.FC<Props> = ({
                                         </thead>
                                         <tbody>
                                             {p.items.map((item, idx) => {
-                                                const isBtnDisabled = item.status === 'Tamamlandı' || item.status === 'İptal';
+                                                // 🔥 MAĞAZA İÇİN BUTON KİLİDİ:
+                                                const isProcessFinished = item.status === 'Tamamlandı' || item.status === 'İptal';
+                                                const isStoreLocked = !isAdmin && item.status !== 'Sevkiyat';
+                                                const isButtonDisabled = isProcessFinished || isStoreLocked;
+
                                                 return (
                                                     <tr key={idx} style={{ borderBottom: '1px solid #e2e8f0', backgroundColor: 'white' }}>
                                                         <td style={{ padding: '8px 12px', color: '#334155' }}>
-                                                            <div style={{ fontWeight: '600' }}>{item.productName.split('-')[0]}</div>
+                                                            <div style={{ fontWeight: '600' }}>
+                                                                {item.productName.split('-')[0]}
+                                                                {item.dimensionId && <span style={{ color: '#f59e0b', marginLeft: '4px' }}>{getDimensionName(item.dimensionId)}</span>}
+                                                            </div>
                                                             <div style={{ color: '#94a3b8', fontSize: '11px' }}>{getCatName(item.categoryId)}</div>
                                                         </td>
                                                         <td style={{ padding: '8px 12px', color: '#475569', fontSize: '11px' }}>
@@ -100,10 +109,17 @@ const PurchasesGridView: React.FC<Props> = ({
                                                         </td>
                                                         <td style={{ padding: '8px 12px', textAlign: 'center' }}>
                                                             <button
-                                                                onClick={() => handleStatusClick(p.id!, idx, item.status)}
-                                                                disabled={isBtnDisabled}
+                                                                onClick={() => !isButtonDisabled && handleStatusClick(p.id!, idx, item.status)}
+                                                                disabled={isButtonDisabled}
                                                                 className={`btn ${getButtonColor(item.status)}`}
-                                                                style={{ padding: '4px 8px', fontSize: '10px', width: '100%', opacity: isBtnDisabled ? 0.5 : 1 }}
+                                                                style={{
+                                                                    width: '100%',
+                                                                    padding: '4px 8px',
+                                                                    fontSize: '10px',
+                                                                    opacity: isButtonDisabled ? 0.5 : 1,
+                                                                    cursor: isButtonDisabled ? 'not-allowed' : 'pointer'
+                                                                }}
+                                                                title={isStoreLocked ? "Bu aşamaya müdahale yetkiniz yok" : ""}
                                                             >
                                                                 {getButtonText(item.status)}
                                                             </button>
