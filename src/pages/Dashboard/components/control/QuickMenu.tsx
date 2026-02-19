@@ -1,7 +1,7 @@
 
-import salesIcon from "../../../assets/icons/receipt.svg";
-import cartIcon from "../../../assets/icons/inbox-in.svg";
-import stockIcon from "../../../assets/icons/boxes.svg";
+import salesIcon from "../../../../assets/icons/receipt.svg";
+import cartIcon from "../../../../assets/icons/inbox-in.svg";
+import stockIcon from "../../../../assets/icons/boxes.svg";
 
 const QuickMenu = ({ navigate }: { navigate: any }) => {
     return (

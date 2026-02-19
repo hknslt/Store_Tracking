@@ -11,6 +11,8 @@ import type { PaymentDocument, Store, SystemUser } from "../../types";
 import "../../App.css";
 
 import StoreIcon from "../../assets/icons/store.svg";
+import PaperIcon from "../../assets/icons/paper.svg";
+
 
 const PaymentList = () => {
     const { currentUser } = useAuth();
@@ -279,7 +281,7 @@ const PaymentList = () => {
                                 ) : (
                                     <tr>
                                         <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
-                                            <div style={{ fontSize: '24px', marginBottom: '10px' }}>🧾</div>
+                                            <div style={{ fontSize: '24px', marginBottom: '10px' }}><img src={PaperIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div>
                                             Belirtilen kriterlerde işlem bulunamadı.
                                         </td>
                                     </tr>

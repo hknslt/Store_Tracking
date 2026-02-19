@@ -42,9 +42,11 @@ const StockReport = () => {
     }, []);
 
     useEffect(() => {
-        fetchStocks();
+        if (stores.length > 0) {
+            fetchStocks();
+        }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [selectedStoreId]);
+    }, [selectedStoreId, stores]);
 
     const initData = async () => {
         const sData = await getStores();
@@ -71,7 +73,15 @@ const StockReport = () => {
 
             snapshot.forEach(doc => {
                 const data = doc.data();
-                const parentStoreId = doc.ref.parent.parent?.id || "";
+                const pathSegments = doc.ref.path.split('/');
+
+                let parentStoreId = "";
+                if (pathSegments.length >= 2 && pathSegments[0] === 'stores') {
+                    parentStoreId = pathSegments[1];
+                } else {
+                    parentStoreId = doc.ref.parent.parent?.id || "";
+                }
+
                 const sName = storeMap[parentStoreId] || "Bilinmeyen";
 
                 if (selectedStoreId && parentStoreId !== selectedStoreId) return;

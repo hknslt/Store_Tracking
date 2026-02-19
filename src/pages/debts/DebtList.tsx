@@ -108,7 +108,7 @@ const DebtList = () => {
             <div className="card" style={{ padding: '15px', marginBottom: '20px', display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <input
                     type="text"
-                    placeholder="🔍 Müşteri Adı veya Fiş No Ara..."
+                    placeholder="Müşteri Adı veya Fiş No Ara..."
                     style={{ flex: 1, padding: '12px', borderRadius: '8px', border: '1px solid #ddd', minWidth: '200px' }}
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}

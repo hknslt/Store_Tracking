@@ -1,9 +1,9 @@
 // src/pages/Dashboard/components/MiniCalendar.tsx
 import { useState, useEffect } from 'react';
-import { useAuth } from '../../../context/AuthContext';
-import { db } from '../../../firebase';
+import { useAuth } from '../../../../context/AuthContext';
+import { db } from '../../../../firebase';
 import { collection, addDoc, deleteDoc, doc, getDocs, query, where } from 'firebase/firestore';
-import type { CalendarNote } from '../../../types';
+import type { CalendarNote } from '../../../../types';
 
 const MiniCalendar = () => {
     const { currentUser } = useAuth();

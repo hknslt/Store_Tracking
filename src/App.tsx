@@ -153,7 +153,7 @@ const ProtectedLayout = () => {
   // SÜPER ADMIN GERİ BUTONU KONTROLÜ
   // 1. Mağaza Müdürü değilse
   // 2. Ana Sayfada (/) değilse
-  const showAdminBackButton = !isStoreAdmin && location.pathname !== '/';
+  const showAdminBackButton = !isStoreAdmin && location.pathname !== '/' && location.pathname !== '/reports/dashboard';
 
   return (
     <div style={{ display: 'flex', width: '100vw', height: '100vh', overflow: 'hidden', backgroundColor: '#f8fafc' }}>
@@ -305,9 +305,9 @@ function App() {
             <Route path="/payments/add" element={<PaymentAdd />} />
             <Route path="/payments/list" element={<PaymentList />} />
             <Route path="/payments/detail/:id" element={<PaymentDetail />} />
-            <Route path="/payments/edit/:id" element={<PaymentEdit />} /> 
+            <Route path="/payments/edit/:id" element={<PaymentEdit />} />
 
-              {/* SSH Records */}
+            {/* SSH Records */}
             <Route path="/ssh/list" element={<SSHList />} />
             <Route path="/ssh/add" element={<SSHAdd />} />
             <Route path="/ssh/:id" element={<SSHDetail />} />

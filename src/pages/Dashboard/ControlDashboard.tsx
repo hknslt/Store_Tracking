@@ -9,8 +9,8 @@ import { motion } from "framer-motion";
 import "../../App.css";
 
 // YENİ OLUŞTURDUĞUNUZ ALT BİLEŞENLER
-import MiniCalendar from "./components/MiniCalendar";
-import QuickMenu from "./components/QuickMenu";
+import MiniCalendar from "./components/control/MiniCalendar";
+import QuickMenu from "./components/control/QuickMenu";
 
 import logoutIcon from "../../assets/icons/logout.svg";
 
@@ -129,7 +129,7 @@ const ControlDashboard = () => {
     // Fiş satırına tıklanınca detaya yönlendir
     const goToPurchaseDetail = (purchase: any) => {
         if (purchase.storeId && purchase.id) {
-            navigate(`/purchases/${purchase.storeId}/edit/${purchase.id}`, { state: { purchase } });
+            navigate(`/purchases/${purchase.storeId}/${purchase.id}`, { state: { purchase } });
         }
     };
 

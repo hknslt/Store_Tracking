@@ -8,6 +8,9 @@ import {
     Cell, PieChart, Pie, Legend
 } from 'recharts';
 
+import PaperIcon from "../../assets/icons/paper.svg";
+import DollarIcon from "../../assets/icons/sack-dollar.svg";
+
 interface ReportData {
     storeId: string;
     storeName: string;
@@ -173,14 +176,14 @@ const StoreSalesReport = () => {
                         <div style={{ fontSize: '12px', opacity: 0.8, marginBottom: '5px', textTransform: 'uppercase' }}>TOPLAM CİRO</div>
                         <div style={{ fontSize: '32px', fontWeight: '800' }}>{formatMoney(grandTotal)}</div>
                     </div>
-                    <div style={{ fontSize: '36px', opacity: 0.2 }}>💰</div>
+                    <div style={{ fontSize: '36px', opacity: 0.2 }}><img src={DollarIcon} alt="" style={{ width: '40px', filter: 'invert(1)' }} /></div>
                 </div>
                 <div style={{ background: 'white', padding: '25px', borderRadius: '16px', border: '1px solid #e2e8f0', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div>
                         <div style={{ fontSize: '12px', color: '#64748b', fontWeight: '700', marginBottom: '5px', textTransform: 'uppercase' }}>TOPLAM İŞLEM</div>
                         <div style={{ fontSize: '32px', fontWeight: '800', color: '#1e293b' }}>{totalCount} <span style={{ fontSize: '16px', color: '#94a3b8', fontWeight: '500' }}>Adet</span></div>
                     </div>
-                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}>🧾</div>
+                    <div style={{ width: '60px', height: '60px', borderRadius: '50%', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '24px' }}><img src={PaperIcon} alt="" style={{ width: '40px', opacity: 0.6 }} /></div>
                 </div>
             </div>
 

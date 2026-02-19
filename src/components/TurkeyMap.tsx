@@ -3,9 +3,8 @@ import React, { useState, useEffect } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
 import { geoCentroid } from "d3-geo";
 
-// Harita Verileri
-const TURKEY_TOPO_URL = "https://code.highcharts.com/mapdata/countries/tr/tr-all.topo.json";
-const CYPRUS_TOPO_URL = "https://code.highcharts.com/mapdata/countries/cy/cy-all.topo.json";
+const TURKEY_TOPO_URL = "/tr-all.topo.json";
+const CYPRUS_TOPO_URL = "/cy-all.topo.json";
 
 interface CityData {
     count: number;

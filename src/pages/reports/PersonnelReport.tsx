@@ -12,6 +12,8 @@ import {
 import userIcon from "../../assets/icons/users.svg";
 import moneyIcon from "../../assets/icons/wallet.svg";
 import trendIcon from "../../assets/icons/trend-up.svg";
+import CrownIcon from "../../assets/icons/crown.svg";
+import CupIcon from "../../assets/icons/cup.svg";
 
 interface PersonnelStat {
     id: string;
@@ -172,7 +174,7 @@ const PersonnelReport = () => {
                     color: 'white', border: 'none', position: 'relative', overflow: 'hidden',
                     display: 'flex', flexDirection: 'column', justifyContent: 'center', padding: '25px'
                 }}>
-                    <div style={{ position: 'absolute', right: '-20px', top: '-20px', fontSize: '100px', opacity: 0.15 }}>🏆</div>
+                    <div style={{ position: 'absolute', right: '-0.1px', top: '0px', fontSize: '100px', opacity: 0.15 }}><img src={CupIcon} alt="Cup" style={{ width: '100px', filter: 'invert(1)' }} /></div>
                     <div style={{ fontSize: '12px', opacity: 0.9, marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '1px' }}>DÖNEMİN LİDERİ</div>
                     <div style={{ fontSize: '24px', fontWeight: '800', marginBottom: '5px', lineHeight: '1.2' }}>{topPerformer?.name || "-"}</div>
                     <div>
@@ -275,7 +277,7 @@ const PersonnelReport = () => {
                                     <tr key={index} className="hover-row">
                                         <td style={{ padding: '15px', fontWeight: '600', color: '#334155', verticalAlign: 'middle' }}>
                                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                                {index === 0 && <span style={{ fontSize: '16px' }}>👑</span>}
+                                                {index === 0 && <span style={{ fontSize: '16px' }}><img src={CrownIcon} alt="Kral" style={{ width: '16px', filter: 'invert(0)' }} /></span>}
                                                 {p.name}
                                             </div>
                                         </td>
