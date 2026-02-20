@@ -6,7 +6,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import chartIcon from "../../../../assets/icons/trend-up.svg";
 import walletIcon from "../../../../assets/icons/wallet.svg";
 import boxIcon from "../../../../assets/icons/boxes.svg";
-import userIcon from "../../../../assets/icons/users.svg";
 import storeIcon from "../../../../assets/icons/store.svg";
 import awardIcon from "../../../../assets/icons/cup.svg";
 

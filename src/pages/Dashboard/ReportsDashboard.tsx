@@ -20,7 +20,7 @@ interface CityStats { count: number; revenue: number; }
 
 const ReportsDashboard = () => {
     const navigate = useNavigate();
-    const { currentUser, userData } = useAuth();
+    const {userData } = useAuth();
     const [loading, setLoading] = useState(true);
 
     // State'ler
