@@ -16,7 +16,7 @@ import userIcon from "../assets/icons/users.svg";
 import stockIcon from "../assets/icons/boxes.svg";
 import productIcon from "../assets/icons/product.svg";
 import priceIcon from "../assets/icons/tags.svg";
-import salesIcon from "../assets/icons/receipt.svg";
+import salesIcon from "../assets/icons/cart-shopping-fast.svg";
 import cartIcon from "../assets/icons/inbox-in.svg";
 import walletIcon from "../assets/icons/wallet.svg";
 import toolsIcon from "../assets/icons/customer-service.svg";

@@ -1,5 +1,5 @@
 
-import salesIcon from "../../../../assets/icons/receipt.svg";
+import salesIcon from "../../../../assets/icons/cart-shopping-fast.svg";
 import cartIcon from "../../../../assets/icons/inbox-in.svg";
 import stockIcon from "../../../../assets/icons/boxes.svg";
 

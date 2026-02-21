@@ -300,7 +300,7 @@ function App() {
             <Route path="/sales/add" element={<SaleAdd />} />
             <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
             <Route path="/sales/:storeId/edit/:id" element={<SaleEdit />} />
-
+            
             {/* Payment Methods & Transactions */}
             <Route path="/payments/add" element={<PaymentAdd />} />
             <Route path="/payments/list" element={<PaymentList />} />

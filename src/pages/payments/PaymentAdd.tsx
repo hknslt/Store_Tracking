@@ -1,7 +1,7 @@
 // src/pages/payments/PaymentAdd.tsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../context/AuthContext";
-import { useLocation, useNavigate } from "react-router-dom"; // 🔥 useNavigate eklendi
+import { useLocation, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
@@ -11,10 +11,18 @@ import { getPaymentMethods, addPaymentDocument, getNextPaymentReceiptNo } from "
 import type { Store, SystemUser, PaymentItem, PaymentMethod, Debt, TransactionType, Personnel } from "../../types";
 import "../../App.css";
 
+// 🔥 DIŞARIDAN İKON İMPORTLARI (Dosya yollarını kendi projenize göre ayarlayabilirsiniz)
+import tahsilatIcon from "../../assets/icons/sack-dollar.svg";
+import masrafIcon from "../../assets/icons/receipt.svg";
+import merkezIcon from "../../assets/icons/bank.svg";
+import eksikFazlaIcon from "../../assets/icons/scale.svg";
+import successIcon from "../../assets/icons/verify.svg";
+import errorIcon from "../../assets/icons/close-circle.svg";
+
 const PaymentAdd = () => {
     const { currentUser } = useAuth();
     const location = useLocation();
-    const navigate = useNavigate(); // 🔥 Yönlendirme için tanımlandı
+    const navigate = useNavigate();
 
     // --- STATE'LER ---
     const [stores, setStores] = useState<Store[]>([]);
@@ -224,7 +232,6 @@ const PaymentAdd = () => {
 
             setMessage({ type: 'success', text: "İşlem Başarıyla Kaydedildi! Yönlendiriliyorsunuz..." });
 
-            // 🔥 BAŞARILI KAYIT SONRASI YÖNLENDİRME (1.5 saniye sonra)
             setTimeout(() => {
                 navigate('/payments/list');
             }, 1500);
@@ -250,7 +257,6 @@ const PaymentAdd = () => {
                 <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 30px', fontSize: '16px' }}>KAYDET</button>
             </div>
 
-            {/* 🔥 TOAST MESAJ YERİNE DAHA ŞIK BİR KUTU */}
             {message && (
                 <div style={{
                     padding: '15px', marginBottom: '20px', borderRadius: '8px',
@@ -260,7 +266,18 @@ const PaymentAdd = () => {
                     display: 'flex', alignItems: 'center', gap: '10px', fontWeight: '500',
                     animation: 'fadeIn 0.3s ease-out'
                 }}>
-                    <span>{message.type === 'success' ? '✅' : '⚠️'}</span>
+                    <img
+                        src={message.type === 'success' ? successIcon : errorIcon}
+                        alt="icon"
+                        style={{
+                            width: '20px',
+                            height: '20px',
+                            // Eğer ikon siyah renkteyse ve renklendirmek istiyorsanız:
+                            filter: message.type === 'success'
+                                ? 'invert(31%) sepia(90%) saturate(1001%) hue-rotate(95deg) brightness(97%) contrast(92%)' // Yeşil tonu
+                                : 'invert(19%) sepia(85%) saturate(3015%) hue-rotate(345deg) brightness(85%) contrast(99%)'  // Kırmızı tonu
+                        }}
+                    />
                     {message.text}
                 </div>
             )}
@@ -307,10 +324,26 @@ const PaymentAdd = () => {
                             backgroundColor: selectedType === type ? '#145a32' : 'white',
                             color: selectedType === type ? 'white' : '#7f8c8d',
                             cursor: 'pointer', fontWeight: 'bold', fontSize: '15px',
-                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s'
+                            boxShadow: '0 2px 5px rgba(0,0,0,0.05)', transition: 'all 0.2s',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px'
                         }}
                     >
-                        {type === 'Tahsilat' ? '💰 Tahsilat (Giriş)' : type === 'Masraf' ? '🧾 Masraf (Çıkış)' : type === 'Merkez' ? '🏦 Merkeze Transfer' : '⚖️ Eksik / Fazla'}
+                        <img
+                            src={
+                                type === 'Tahsilat' ? tahsilatIcon :
+                                    type === 'Masraf' ? masrafIcon :
+                                        type === 'Merkez' ? merkezIcon :
+                                            eksikFazlaIcon
+                            }
+                            alt={type}
+                            style={{
+                                width: '18px',
+                                height: '18px',
+                                // Seçili olanın ikonu beyaz, seçili olmayanın ikonu gri olur
+                                filter: selectedType === type ? 'brightness(0) invert(1)' : 'invert(59%) sepia(10%) saturate(417%) hue-rotate(160deg) brightness(91%) contrast(85%)'
+                            }}
+                        />
+                        {type === 'Tahsilat' ? 'Tahsilat (Giriş)' : type === 'Masraf' ? 'Masraf (Çıkış)' : type === 'Merkez' ? 'Merkeze Transfer' : 'Eksik / Fazla'}
                     </button>
                 ))}
             </div>

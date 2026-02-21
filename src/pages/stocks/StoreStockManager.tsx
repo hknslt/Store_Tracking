@@ -5,12 +5,11 @@ import { getStoreStocks, manualAddOrUpdateStock } from "../../services/storeStoc
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
+import * as XLSX from "xlsx"; // 🔥 YENİ: Excel kütüphanesi eklendi
 
 // Tanımlar ve Servisler
 import { getProducts } from "../../services/productService";
-import { getPriceLists } from "../../services/priceService"; // 🔥 YENİ: Fiyat Listeleri Servisi
+import { getPriceLists } from "../../services/priceService";
 import { getCategories, getColors, getDimensions, getGroups } from "../../services/definitionService";
 
 import type { Store, Product, Category, Color, Dimension, StoreStock, SystemUser, Group, PriceListModel } from "../../types";
@@ -25,7 +24,7 @@ const Icons = {
     search: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>,
     filter: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon></svg>,
     sort: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><polyline points="19 12 12 19 5 12"></polyline></svg>,
-    pdf: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+    excel: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="8" y1="13" x2="16" y2="17"></line><line x1="16" y1="13" x2="8" y2="17"></line></svg> // 🔥 Excel İkonu
 };
 
 const StoreStockManager = () => {
@@ -42,7 +41,6 @@ const StoreStockManager = () => {
     const [colors, setColors] = useState<Color[]>([]);
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
 
-    // 🔥 Fiyat Listeleri State'leri
     const [allPriceLists, setAllPriceLists] = useState<PriceListModel[]>([]);
     const [activePriceMap, setActivePriceMap] = useState<Record<string, number>>({});
 
@@ -84,17 +82,15 @@ const StoreStockManager = () => {
         const loadBase = async () => {
             if (!currentUser) return;
             try {
-                // 🔥 getPriceLists kullanıyoruz
                 const [s, p, c, col, dim, grp, pLists] = await Promise.all([
                     getStores(), getProducts(), getCategories(), getColors(), getDimensions(), getGroups(), getPriceLists()
                 ]);
 
                 setStores(s); setProducts(p); setCategories(c); setColors(col); setDimensions(dim); setGroups(grp);
-                setAllPriceLists(pLists as PriceListModel[]); // Fiyat listelerini hafızaya al
+                setAllPriceLists(pLists as PriceListModel[]);
 
-                const userDoc = await getDoc(doc(db, "users", currentUser.uid)); // 'users' koleksiyonu
+                const userDoc = await getDoc(doc(db, "users", currentUser.uid));
                 if (!userDoc.exists()) {
-                    // Geriye dönük uyumluluk
                     const pDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                     if (pDoc.exists()) handleUserRole(pDoc.data() as SystemUser);
                 } else {
@@ -116,7 +112,7 @@ const StoreStockManager = () => {
         loadBase();
     }, [currentUser]);
 
-    // --- MAĞAZA SEÇİMİ DEĞİŞTİĞİNDE: STOKLARI VE FİYAT LİSTESİNİ GÜNCELLE ---
+    // --- MAĞAZA SEÇİMİ DEĞİŞTİĞİNDE ---
     useEffect(() => {
         if (!selectedStoreId) {
             setStocks([]);
@@ -124,14 +120,12 @@ const StoreStockManager = () => {
             return;
         }
 
-        // 1. Stokları Getir
         setLoading(true);
         getStoreStocks(selectedStoreId).then(data => {
             setStocks(data);
             setLoading(false);
         });
 
-        // 2. 🔥 Seçili Mağazanın "Perakende" Fiyat Listesini Bul
         const retailList = allPriceLists.find(
             list => list.type === 'perakende' && list.storeIds?.includes(selectedStoreId)
         );
@@ -139,7 +133,7 @@ const StoreStockManager = () => {
         if (retailList && retailList.prices) {
             setActivePriceMap(retailList.prices);
         } else {
-            setActivePriceMap({}); // Fiyat listesi yoksa boşalt
+            setActivePriceMap({});
         }
 
     }, [selectedStoreId, allPriceLists]);
@@ -152,17 +146,23 @@ const StoreStockManager = () => {
     const getColorName = (id: string) => colors.find(x => x.id === id)?.colorName || "-";
     const getDimName = (id?: string | null) => id ? dimensions.find(x => x.id === id)?.dimensionName : "";
 
-    // 🔥 YENİ FİYAT GETİRME MANTIĞI
     const getProductPrice = (prodId: string, dimId?: string | null) => {
         const key = dimId ? `${prodId}_${dimId}` : `${prodId}_std`;
         const price = activePriceMap[key];
 
         if (!price && dimId) {
-            // Ebat fiyatı yoksa standart fiyatı dene
             const stdPrice = activePriceMap[`${prodId}_std`];
             return stdPrice ? `${stdPrice.toLocaleString('tr-TR')} ₺` : "-";
         }
         return price ? `${price.toLocaleString('tr-TR')} ₺` : "-";
+    };
+
+    // Excel için fiyatı numara olarak döndüren yardımcı
+    const getProductPriceRaw = (prodId: string, dimId?: string | null) => {
+        const key = dimId ? `${prodId}_${dimId}` : `${prodId}_std`;
+        const price = activePriceMap[key];
+        if (!price && dimId) return activePriceMap[`${prodId}_std`] || 0;
+        return price || 0;
     };
 
     const renderVal = (val: number) => val === 0 ? "" : val;
@@ -200,70 +200,60 @@ const StoreStockManager = () => {
 
     const displayStocks = getFilteredStocks();
 
-    // --- TÜRKÇE KARAKTER DÜZELTME ---
-    const replaceTr = (text: string | number | undefined | null) => {
-        if (!text) return "";
-        const str = String(text);
-        const map: Record<string, string> = {
-            'ğ': 'g', 'Ğ': 'G', 'ü': 'u', 'Ü': 'U', 'ş': 's', 'Ş': 'S',
-            'ı': 'i', 'İ': 'I', 'ö': 'o', 'Ö': 'O', 'ç': 'c', 'Ç': 'C'
-        };
-        return str.replace(/[ğĞüÜşŞıİöÖçÇ]/g, (char) => map[char] || char);
-    };
-
-    // --- PDF ÇIKTISI ALMA ---
-    const handleExportPDF = () => {
+    // --- EXCEL ÇIKTISI ALMA ---
+    const handleExportExcel = () => {
         if (!displayStocks || displayStocks.length === 0) {
             setMessage({ type: 'error', text: "Çıktı alınacak stok bulunamadı." });
             return;
         }
 
-        const doc = new jsPDF();
-        const storeName = stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza";
-        const dateStr = new Date().toLocaleDateString('tr-TR');
-
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(14);
-
-        // Başlıkta Türkçe karakter düzeltmesi
-        doc.text(replaceTr(`${storeName} - Stok Listesi`), 14, 15);
-
-        doc.setFontSize(10);
-        doc.text(`Tarih: ${dateStr}`, 14, 22);
-
-        // Tablo verilerini hazırla (Her hücrede replaceTr kullanıyoruz)
-        const tableBody = displayStocks.map(stock => {
+        // 1. Veriyi Excel Formatına Uygun Hale Getir
+        const excelData = displayStocks.map(stock => {
             const dimName = getDimName(stock.dimensionId);
-            const fullProductName = dimName ? `${stock.productName} (${dimName})` : stock.productName;
+            const fullProductName = dimName ? `${stock.productName.split('-')[0].trim()} (${dimName})` : stock.productName.split('-')[0].trim();
+            const categoryName = getCatName(stock.productId);
+            const colorName = getColorName(stock.colorId);
+            const price = getProductPriceRaw(stock.productId, stock.dimensionId);
 
-            return [
-                replaceTr(fullProductName),
-                replaceTr(getColorName(stock.colorId)),
-                renderVal(stock.freeStock),
-                renderVal(stock.reservedStock),
-                renderVal(stock.incomingStock),
-                renderVal(stock.incomingReservedStock)
-            ];
+            return {
+                "Ürün Adı": fullProductName,
+                "Kategori": categoryName,
+                "Renk": colorName,
+                "Serbest Stok": stock.freeStock || 0,
+                "Rezerve Stok": stock.reservedStock || 0,
+                "Gelecek (Depo)": stock.incomingStock || 0,
+                "Gelecek (Müşteri)": stock.incomingReservedStock || 0,
+                "Satış Fiyatı (₺)": price
+            };
         });
 
-        autoTable(doc, {
-            startY: 25,
-            head: [['Urun', 'Renk', 'Serbest', 'Rezerve', 'Gel(Depo)', 'Gel(Mus)']],
-            body: tableBody,
-            theme: 'striped',
-            headStyles: { fillColor: [44, 62, 80], textColor: 255 },
-            styles: { fontSize: 9, cellPadding: 2 },
-            columnStyles: {
-                0: { cellWidth: 60 }, // Ürün
-                1: { cellWidth: 30 }, // Renk
-                2: { halign: 'center' }, // Serbest
-                3: { halign: 'center' }, // Rezerve
-                4: { halign: 'center' }, // Gel(Depo)
-                5: { halign: 'center' }, // Gel(Müş)
-            }
-        });
+        // 2. Worksheet Oluştur
+        const worksheet = XLSX.utils.json_to_sheet(excelData);
 
-        doc.save(`Stok_Listesi_${replaceTr(storeName)}_${dateStr}.pdf`);
+        // Kolon genişliklerini ayarla (opsiyonel)
+        const wscols = [
+            { wch: 40 }, // Ürün Adı
+            { wch: 20 }, // Kategori
+            { wch: 15 }, // Renk
+            { wch: 15 }, // Serbest
+            { wch: 15 }, // Rezerve
+            { wch: 15 }, // Gel(Depo)
+            { wch: 15 }, // Gel(Müş)
+            { wch: 15 }  // Fiyat
+        ];
+        worksheet['!cols'] = wscols;
+
+        // 3. Workbook Oluştur ve İçine Ekle
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, "Stok Listesi");
+
+        // 4. Dosyayı İndir
+        const storeName = stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza";
+        const dateStr = new Date().toISOString().split('T')[0];
+
+        // Temiz dosya adı (Türkçe karakterleri kaldır)
+        const safeStoreName = storeName.replace(/[^a-zA-Z0-9]/g, "_");
+        XLSX.writeFile(workbook, `Stok_Listesi_${safeStoreName}_${dateStr}.xlsx`);
     };
 
     // --- MODAL İŞLEMLERİ ---
@@ -420,11 +410,11 @@ const StoreStockManager = () => {
                         </div>
                     </div>
 
-                    {/* PDF VE YENİ EKLE BUTONLARI */}
+                    {/* EXCEL VE YENİ EKLE BUTONLARI */}
                     <div style={{ display: 'flex', gap: '5px' }}>
                         {selectedStoreId && (
-                            <button onClick={handleExportPDF} className="btn btn-secondary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px', padding: '0 10px' }}>
-                                {Icons.pdf} PDF
+                            <button onClick={handleExportExcel} className="btn btn-secondary" style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px', height: '42px', padding: '0 10px', backgroundColor: '#10b981', color: 'white', border: 'none' }}>
+                                {Icons.excel} Excel İndir
                             </button>
                         )}
 
@@ -474,7 +464,6 @@ const StoreStockManager = () => {
                                             </td>
                                             <td style={{ color: '#555', padding: '8px 12px', fontSize: '13px' }}>{getColorName(stock.colorId)}</td>
 
-                                            {/* 🔥 DİNAMİK SATIŞ FİYATI */}
                                             <td style={{ textAlign: 'right', fontWeight: '600', color: '#1e293b', fontSize: '13px', paddingRight: '20px' }}>
                                                 {getProductPrice(stock.productId, stock.dimensionId)}
                                             </td>

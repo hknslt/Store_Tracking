@@ -11,8 +11,8 @@ import {
 // İKONLAR (Lütfen bu dosyaların assets/icons içinde olduğundan emin olun)
 import walletIcon from "../../assets/icons/wallet.svg";
 import trendIcon from "../../assets/icons/trend-up.svg";
-import receiptIcon from "../../assets/icons/receipt.svg";
-import cartIcon from "../../assets/icons/inbox-in.svg"; // Veya uygun bir sepet ikonu
+import receiptIcon from "../../assets/icons/cart-shopping-fast.svg";
+import cartIcon from "../../assets/icons/inbox-in.svg"; 
 
 interface FinanceData {
     date: string;

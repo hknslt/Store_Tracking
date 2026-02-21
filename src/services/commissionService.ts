@@ -17,8 +17,8 @@ export const getMonthlySalesByPersonnel = async (storeId: string) => {
         const snapshot = await getDocs(q);
 
         // Personel bazlı toplama
-        const salesMap: Record<string, number> = {}; // { "personnelId": 50000 }
-
+        const salesMap: Record<string, number> = {};
+                                                                                                
         snapshot.docs.forEach(doc => {
             const sale = doc.data() as Sale;
             // İptal edilen satışları dahil etme

@@ -7,6 +7,9 @@ import { getStores } from "../../services/storeService"; // Admin için mağaza 
 import type { Debt, Store } from "../../types";
 import { motion } from "framer-motion";
 
+
+import cardIcon from "../../assets/icons/credit-card.svg"; // Veya kart ikonunuzun adı/yolu neyse
+
 const DebtList = () => {
     const { userData, userRole } = useAuth();
     const navigate = useNavigate();
@@ -254,10 +257,21 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
                             cursor: 'pointer',
                             display: 'flex',
                             alignItems: 'center',
-                            gap: '5px'
+                            gap: '6px' // İkon ile yazı arasındaki boşluk
                         }}
                     >
-                        💳 Tahsilat
+                        {/* 🔥 Emoji yerine dışarıdan gelen ikon eklendi */}
+                        <img
+                            src={cardIcon}
+                            alt="Tahsilat"
+                            style={{
+                                width: '16px',
+                                height: '16px',
+                                // Eğer ikonunuz siyahsa ve mavi buton üzerinde beyaz görünmesini istiyorsanız alttaki satırı kullanın:
+                                filter: 'brightness(0) invert(1)'
+                            }}
+                        />
+                        Tahsilat
                     </button>
                 )}
             </div>
