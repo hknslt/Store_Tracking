@@ -40,95 +40,79 @@ export const updatePaymentMethod = async (id: string, name: string) => {
 // --- ÖDEME FİŞİ KAYDETME ---
 export const addPaymentDocument = async (payment: PaymentDocument) => {
     try {
+
+        const checkQuery = query(
+            collection(db, "payments"),
+            where("storeId", "==", payment.storeId),
+            where("receiptNo", "==", payment.receiptNo)
+        );
+        const checkSnap = await getDocs(checkQuery);
+
+        if (!checkSnap.empty) {
+            throw new Error(`Bu makbuz numarası (${payment.receiptNo}) zaten kullanılmış! Lütfen farklı bir numara girin.`);
+        }
         await runTransaction(db, async (transaction) => {
-
-            // --- 1. AŞAMA: OKUMA İŞLEMLERİ (READS) ---
+            // 1. Borç Okumaları
             const debtReads: { ref: any, doc: any, amount: number }[] = [];
-
-            // Borçları oku (Sadece Tahsilat ise ve TL karşılığı üzerinden düşülür)
             for (const item of payment.items) {
                 if (item.type === 'Tahsilat' && item.saleId) {
                     const debtRef = doc(db, "stores", payment.storeId, "debts", item.saleId);
                     const debtDoc = await transaction.get(debtRef);
-
-                    if (debtDoc.exists()) {
-                        // Borçtan Düşülecek Tutar = TL Karşılığı (item.amount)
-                        debtReads.push({
-                            ref: debtRef,
-                            doc: debtDoc,
-                            amount: Number(item.amount)
-                        });
-                    }
+                    if (debtDoc.exists()) debtReads.push({ ref: debtRef, doc: debtDoc, amount: Number(item.amount) });
                 }
             }
 
-            // --- HESAPLAMA: Her Para Birimi İçin Ayrı Değişim ---
-            const balanceChanges = {
-                TL: 0,
-                USD: 0,
-                EUR: 0,
-                GBP: 0
-            };
+            // 🔥 HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla
+            // Örn: { "methodId1": { TL: 100, USD: 0... }, "methodId2": { TL: -50, USD: 0... } }
+            const balanceChanges: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
 
             for (const item of payment.items) {
-                // Kasaya girecek/çıkacak miktar = ORJİNAL MİKTAR (Döviz ise döviz miktarı, TL ise TL)
-                // Eğer originalAmount yoksa (eski kayıt vs.) amount kullanılır.
+                const methodId = item.paymentMethodId;
+                if (!methodId) continue;
+
+                if (!balanceChanges[methodId]) {
+                    balanceChanges[methodId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 };
+                }
+
                 const realAmount = Number(item.originalAmount || item.amount);
-                const currency = item.currency || 'TL'; // Varsayılan TL
+                const currency = item.currency || 'TL';
 
                 if (item.type === 'Tahsilat' || item.type === 'E/F') {
-                    // Kasaya Para Girer (+100 USD gibi)
-                    // Not: E/F pozitif girilirse artar (Arayüzde kontrol edilmeli)
-                    balanceChanges[currency] += realAmount;
+                    balanceChanges[methodId][currency] += realAmount;
                 } else if (item.type === 'Masraf' || item.type === 'Merkez') {
-                    // Kasadan Para Çıkar (-100 USD gibi)
-                    balanceChanges[currency] -= realAmount;
+                    balanceChanges[methodId][currency] -= realAmount;
                 }
             }
 
-            // --- 2. AŞAMA: YAZMA İŞLEMLERİ (WRITES) ---
-
-            // A) Ödeme Belgesini Kaydet
+            // 2. YAZMA İŞLEMLERİ
             const paymentRef = doc(collection(db, "payments"));
             transaction.set(paymentRef, payment);
 
-            // B) Borçları Güncelle (TL Karşılığı Üzerinden)
+            // Borçları Güncelle
             for (const readData of debtReads) {
                 const debt = readData.doc.data() as Debt;
-
-                // Borçtan düşülecek tutar (TL)
                 const newPaid = (debt.paidAmount || 0) + readData.amount;
                 const newRemaining = debt.totalAmount - newPaid;
-
                 let newStatus: Debt['status'] = 'Kısmi Ödeme';
-                if (newRemaining <= 0.5) newStatus = 'Ödendi'; // Küsürat toleransı
+                if (newRemaining <= 0.5) newStatus = 'Ödendi';
                 if (newPaid === 0) newStatus = 'Ödenmedi';
-
-                transaction.update(readData.ref, {
-                    paidAmount: newPaid,
-                    remainingAmount: newRemaining,
-                    status: newStatus,
-                    lastPaymentDate: payment.date
-                });
+                transaction.update(readData.ref, { paidAmount: newPaid, remainingAmount: newRemaining, status: newStatus, lastPaymentDate: payment.date });
             }
 
-            // C) 💰 MAĞAZA KASALARINI AYRI AYRI GÜNCELLE
-            // Firestore "dot notation" (nokta) ile iç objeleri (currentBalance.USD gibi) güncelleyebilir.
+            // 🔥 KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE (Dot Notation)
             const storeRef = doc(db, "stores", payment.storeId);
-
             const updates: any = {};
 
-            // Sadece değişen kasaları güncelle (Gereksiz yazma yapmamak için)
-            if (balanceChanges.TL !== 0) updates["currentBalance.TL"] = increment(balanceChanges.TL);
-            if (balanceChanges.USD !== 0) updates["currentBalance.USD"] = increment(balanceChanges.USD);
-            if (balanceChanges.EUR !== 0) updates["currentBalance.EUR"] = increment(balanceChanges.EUR);
-            if (balanceChanges.GBP !== 0) updates["currentBalance.GBP"] = increment(balanceChanges.GBP);
+            for (const mId in balanceChanges) {
+                if (balanceChanges[mId].TL !== 0) updates[`currentBalance.${mId}.TL`] = increment(balanceChanges[mId].TL);
+                if (balanceChanges[mId].USD !== 0) updates[`currentBalance.${mId}.USD`] = increment(balanceChanges[mId].USD);
+                if (balanceChanges[mId].EUR !== 0) updates[`currentBalance.${mId}.EUR`] = increment(balanceChanges[mId].EUR);
+                if (balanceChanges[mId].GBP !== 0) updates[`currentBalance.${mId}.GBP`] = increment(balanceChanges[mId].GBP);
+            }
 
-            // Eğer herhangi bir güncelleme varsa yap
             if (Object.keys(updates).length > 0) {
                 transaction.update(storeRef, updates);
             }
-
         });
     } catch (error) {
         console.error("Ödeme ve Kasa Güncelleme hatası:", error);
@@ -207,85 +191,72 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
         await runTransaction(db, async (transaction) => {
             const paymentRef = doc(db, "payments", id);
             const paymentDoc = await transaction.get(paymentRef);
-
             if (!paymentDoc.exists()) throw new Error("Güncellenecek ödeme bulunamadı.");
             const oldPayment = paymentDoc.data() as PaymentDocument;
 
-            // 1. İlgili tüm satış ID'lerini topla (Eski ve Yeni)
             const saleIds = new Set<string>();
             oldPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) saleIds.add(i.saleId); });
             newPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) saleIds.add(i.saleId); });
 
-            // 2. Borç (Debt) belgelerini oku
             const debtDocs: Record<string, { ref: any, data: Debt }> = {};
             for (const saleId of saleIds) {
                 const debtRef = doc(db, "stores", newPayment.storeId, "debts", saleId);
                 const dDoc = await transaction.get(debtRef);
-                if (dDoc.exists()) {
-                    debtDocs[saleId] = { ref: debtRef, data: dDoc.data() as Debt };
-                }
+                if (dDoc.exists()) debtDocs[saleId] = { ref: debtRef, data: dDoc.data() as Debt };
             }
 
-            // 3. Borç farklarını hesapla (Yeni tahsilat - Eski tahsilat)
             const debtDifferences: Record<string, number> = {};
-            oldPayment.items.forEach(i => {
-                if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) - Number(i.amount);
-            });
-            newPayment.items.forEach(i => {
-                if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) + Number(i.amount);
-            });
+            oldPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) - Number(i.amount); });
+            newPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) + Number(i.amount); });
 
-            // 4. Kasa (Döviz/TL) farklarını hesapla
-            const balanceDiff = { TL: 0, USD: 0, EUR: 0, GBP: 0 };
+            // 🔥 KASA FARKLARINI ÖDEME YÖNTEMİNE GÖRE HESAPLA
+            const balanceDiff: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
+            const initMethod = (mId: string) => { if (!balanceDiff[mId]) balanceDiff[mId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 }; };
 
-            // Eski işlemi kasadan TERSİNE ÇEVİR
+            // Eski işlemi TERSİNE çevir
             oldPayment.items.forEach(i => {
+                if (!i.paymentMethodId) return;
+                initMethod(i.paymentMethodId);
                 const amt = Number(i.originalAmount || i.amount);
                 const cur = i.currency || 'TL';
-                if (i.type === 'Tahsilat' || i.type === 'E/F') balanceDiff[cur] -= amt;
-                else balanceDiff[cur] += amt;
+                if (i.type === 'Tahsilat' || i.type === 'E/F') balanceDiff[i.paymentMethodId][cur] -= amt;
+                else balanceDiff[i.paymentMethodId][cur] += amt;
             });
 
-            // Yeni işlemi kasaya UYGULA
+            // Yeni işlemi UYGULA
             newPayment.items.forEach(i => {
+                if (!i.paymentMethodId) return;
+                initMethod(i.paymentMethodId);
                 const amt = Number(i.originalAmount || i.amount);
                 const cur = i.currency || 'TL';
-                if (i.type === 'Tahsilat' || i.type === 'E/F') balanceDiff[cur] += amt;
-                else balanceDiff[cur] -= amt;
+                if (i.type === 'Tahsilat' || i.type === 'E/F') balanceDiff[i.paymentMethodId][cur] += amt;
+                else balanceDiff[i.paymentMethodId][cur] -= amt;
             });
 
-            // --- YAZMA İŞLEMLERİ ---
-
-            // A) Ödeme Belgesini Güncelle
             transaction.update(paymentRef, { ...newPayment, updatedAt: new Date() });
 
-            // B) Borçları Güncelle
             for (const saleId in debtDifferences) {
                 const diff = debtDifferences[saleId];
                 if (diff !== 0 && debtDocs[saleId]) {
                     const debt = debtDocs[saleId].data;
                     const newPaid = (debt.paidAmount || 0) + diff;
                     const newRemaining = debt.totalAmount - newPaid;
-
                     let newStatus: Debt['status'] = 'Kısmi Ödeme';
                     if (newRemaining <= 0.5) newStatus = 'Ödendi';
                     if (newPaid <= 0) newStatus = 'Ödenmedi';
-
-                    transaction.update(debtDocs[saleId].ref, {
-                        paidAmount: newPaid,
-                        remainingAmount: newRemaining,
-                        status: newStatus
-                    });
+                    transaction.update(debtDocs[saleId].ref, { paidAmount: newPaid, remainingAmount: newRemaining, status: newStatus });
                 }
             }
 
-            // C) Kasa Bakiyelerini Güncelle
+            // 🔥 GÜNCEL KASAYI YAZ
             const storeRef = doc(db, "stores", newPayment.storeId);
             const updates: any = {};
-            if (balanceDiff.TL !== 0) updates["currentBalance.TL"] = increment(balanceDiff.TL);
-            if (balanceDiff.USD !== 0) updates["currentBalance.USD"] = increment(balanceDiff.USD);
-            if (balanceDiff.EUR !== 0) updates["currentBalance.EUR"] = increment(balanceDiff.EUR);
-            if (balanceDiff.GBP !== 0) updates["currentBalance.GBP"] = increment(balanceDiff.GBP);
+            for (const mId in balanceDiff) {
+                if (balanceDiff[mId].TL !== 0) updates[`currentBalance.${mId}.TL`] = increment(balanceDiff[mId].TL);
+                if (balanceDiff[mId].USD !== 0) updates[`currentBalance.${mId}.USD`] = increment(balanceDiff[mId].USD);
+                if (balanceDiff[mId].EUR !== 0) updates[`currentBalance.${mId}.EUR`] = increment(balanceDiff[mId].EUR);
+                if (balanceDiff[mId].GBP !== 0) updates[`currentBalance.${mId}.GBP`] = increment(balanceDiff[mId].GBP);
+            }
 
             if (Object.keys(updates).length > 0) {
                 transaction.update(storeRef, updates);
@@ -293,6 +264,67 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
         });
     } catch (error) {
         console.error("Ödeme güncelleme hatası:", error);
+        throw error;
+    }
+};
+
+
+// --- MERKEZ TRANSFERLERİ ÖZEL LİSTESİ ---
+export const getCenterTransfers = async (storeId?: string) => {
+    try {
+        let q;
+        if (storeId) {
+            // Mağaza kullanıcısı ise sadece kendi mağazasının ödemelerini çek
+            q = query(collection(db, "payments"), where("storeId", "==", storeId), orderBy("date", "desc"));
+        } else {
+            // Admin ise tüm mağazaların ödemelerini çek
+            q = query(collection(db, "payments"), orderBy("date", "desc"));
+        }
+
+        const snapshot = await getDocs(q);
+        const allPayments = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as PaymentDocument[];
+
+        // Sadece 'Merkez' tipindeki işlemleri düzleştirerek (flatten) diziye çıkarıyoruz
+        const centerTransfers: any[] = [];
+
+        allPayments.forEach(payment => {
+            payment.items.forEach((item, index) => {
+                if (item.type === 'Merkez') {
+                    centerTransfers.push({
+                        paymentId: payment.id,
+                        storeId: payment.storeId,
+                        receiptNo: payment.receiptNo,
+                        date: payment.date,
+                        personnelName: payment.personnelName,
+                        itemIndex: index, // Hangi satır olduğunu bilmek için
+                        ...item
+                    });
+                }
+            });
+        });
+
+        return centerTransfers;
+    } catch (error) {
+        console.error("Merkez transferleri çekilirken hata:", error);
+        return [];
+    }
+};
+
+// --- MERKEZ ONAY TİKİ GÜNCELLEME ---
+export const toggleCenterTransferCheck = async (paymentId: string, itemIndex: number, currentStatus: boolean) => {
+    try {
+        const docRef = doc(db, "payments", paymentId);
+        const snap = await getDoc(docRef);
+
+        if (snap.exists()) {
+            const data = snap.data() as PaymentDocument;
+            data.items[itemIndex].isCenterChecked = !currentStatus; // Durumu tersine çevir
+
+            await updateDoc(docRef, { items: data.items });
+            return !currentStatus;
+        }
+    } catch (error) {
+        console.error("Onay güncellenirken hata:", error);
         throw error;
     }
 };

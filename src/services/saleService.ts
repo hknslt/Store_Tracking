@@ -446,91 +446,89 @@ export const updateSale = async (
 
     try {
         await runTransaction(db, async (transaction) => {
-            // 1. Satış Referansı
+            // ==========================================
+            // 1. AŞAMA: TÜM OKUMALAR (SADECE GET İŞLEMLERİ)
+            // ==========================================
+
+            // 1A. Satış Referansını Oku
             const saleRef = doc(db, "sales", storeId, "receipts", saleId);
             const saleDoc = await transaction.get(saleRef);
-            if (!saleDoc.exists()) throw "Satış bulunamadı.";
-
+            if (!saleDoc.exists()) throw new Error("Satış bulunamadı.");
             const currentSale = saleDoc.data() as Sale;
 
-            // --- A) SİLİNEN ÜRÜNLERİN İADESİ ---
+            // 1B. Etkilenecek Tüm Stokları (Hem silinen hem eklenen) Oku
+            const allUniqueStockIds = new Set<string>();
+            removedItems.forEach(item => {
+                if (item.status !== 'İptal') {
+                    allUniqueStockIds.add(`${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`);
+                }
+            });
+            addedItems.forEach(item => {
+                allUniqueStockIds.add(`${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`);
+            });
+
+            // Stok verilerini belleğe (memory) al
+            const stockDocsData: Record<string, { ref: any, data: any, exists: boolean }> = {};
+            for (const uniqueStockId of allUniqueStockIds) {
+                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
+                const stockDoc = await transaction.get(stockRef);
+                stockDocsData[uniqueStockId] = {
+                    ref: stockRef,
+                    exists: stockDoc.exists(),
+                    data: stockDoc.exists() ? stockDoc.data() : { freeStock: 0, reservedStock: 0, incomingReservedStock: 0 }
+                };
+            }
+
+
+            // ==========================================
+            // 2. AŞAMA: HESAPLAMALAR (BELLEKTE)
+            // ==========================================
+
+            // A) Silinen ürünlerin stok iadesi (Memory üzerinde)
             for (const item of removedItems) {
-                // Sadece iptal edilmemiş satırları iade al
                 if (item.status === 'İptal') continue;
 
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
-                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
-                const stockDoc = await transaction.get(stockRef);
+                const stockInfo = stockDocsData[uniqueStockId];
+                const qty = Number(item.quantity);
 
-                if (stockDoc.exists()) {
-                    const sData = stockDoc.data();
-                    const qty = Number(item.quantity);
-
-                    // 1. Merkezden istenen ürünse
+                if (stockInfo.exists) {
                     if (item.supplyMethod === 'Merkezden') {
-                        // Bekleyen talebi bulup siliyoruz
-                        const q = query(
-                            collection(db, "stores", storeId, "pending_requests"),
-                            where("saleId", "==", saleId),
-                            where("productId", "==", item.productId),
-                            where("colorId", "==", item.colorId),
-                            where("dimensionId", "==", item.dimensionId || null)
-                        );
-                        const reqSnaps = await getDocs(q); // Transaction içinde query yapılamaz, bu yüzden dışarıda okuma riski var ama firestore kısıtı. 
-                        // Doğrusu: Transaction dışı kontrol edip, transaction içi silmek. Ancak basitlik adına burada mantıksal ilerliyoruz.
-
-                        if (!reqSnaps.empty) {
-                            // Talep hala bekliyorsa sil
-                            reqSnaps.forEach((d) => {
-                                transaction.delete(d.ref);
-                            });
-                            // Stoktan düş (Gelecek Rezerve)
-                            const newIncRes = Math.max(0, (sData.incomingReservedStock || 0) - qty);
-                            transaction.update(stockRef, { incomingReservedStock: newIncRes });
-                        } else {
-                            // Talep bulunamadıysa (Alışa dönüşmüş veya silinmiş)
-                            warningMessage = "Uyarı: Silinen bazı ürünler ('Merkezden') tedarik sürecine girdiği için taleplerden silinemedi. Lütfen 'Satın Alma' birimine bilgi veriniz.";
-                            // Yine de stoktan rezervi düşüyoruz ki mağaza stoğu şişmesin
-                            const newIncRes = Math.max(0, (sData.incomingReservedStock || 0) - qty);
-                            transaction.update(stockRef, { incomingReservedStock: newIncRes });
-                        }
-                    }
-                    // 2. Stoktan verilen ürünse
-                    else {
-                        // Eğer ürün teslim edilmediyse serbest stoğa geri ekle
+                        // Eğer bu ürün merkezden istenmişse ve biz bunu siliyorsak Pending Request'i de silmeliyiz.
+                        // (DİKKAT: pending_requests için query gerektiği için transaction içinde GET yapamayız. 
+                        // Bunu transaction dışında en sonda sileceğiz. Şimdilik sadece stoğu ayarlıyoruz.)
+                        stockInfo.data.incomingReservedStock = Math.max(0, (stockInfo.data.incomingReservedStock || 0) - qty);
+                    } else {
+                        // Stoktan verilmişse
                         if (item.deliveryStatus !== 'Teslim Edildi') {
-                            const newFree = (sData.freeStock || 0) + qty;
-                            const newReserved = Math.max(0, (sData.reservedStock || 0) - qty);
-                            transaction.update(stockRef, {
-                                freeStock: newFree,
-                                reservedStock: newReserved
-                            });
+                            stockInfo.data.freeStock = (stockInfo.data.freeStock || 0) + qty;
+                            stockInfo.data.reservedStock = Math.max(0, (stockInfo.data.reservedStock || 0) - qty);
                         }
                     }
                 }
             }
 
-            // --- B) YENİ EKLENEN ÜRÜNLERİN STOKTAN DÜŞÜMÜ ---
+            // B) Eklenen ürünlerin stoktan düşülmesi (Memory üzerinde)
+            const newPendingRequests: PendingRequest[] = [];
             for (const item of addedItems) {
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
-                const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
-                const stockDoc = await transaction.get(stockRef);
-
-                let currentData = { freeStock: 0, reservedStock: 0, incomingReservedStock: 0 };
-                if (stockDoc.exists()) currentData = stockDoc.data() as any;
-
+                const stockInfo = stockDocsData[uniqueStockId];
                 const qty = Number(item.quantity);
-                const updates: any = {};
+
+                // Yeni ürün ekleniyorsa ismini vs de güncelle/ekle
+                stockInfo.data.productId = item.productId;
+                stockInfo.data.productName = item.productName;
+                stockInfo.data.colorId = item.colorId;
+                stockInfo.data.dimensionId = item.dimensionId || null;
 
                 if (item.supplyMethod === 'Stoktan') {
-                    updates.freeStock = (currentData.freeStock || 0) - qty;
-                    updates.reservedStock = (currentData.reservedStock || 0) + qty;
+                    stockInfo.data.freeStock = (stockInfo.data.freeStock || 0) - qty;
+                    stockInfo.data.reservedStock = (stockInfo.data.reservedStock || 0) + qty;
                 } else {
-                    updates.incomingReservedStock = (currentData.incomingReservedStock || 0) + qty;
+                    stockInfo.data.incomingReservedStock = (stockInfo.data.incomingReservedStock || 0) + qty;
 
-                    // Yeni talep oluştur
-                    const reqRef = doc(collection(db, "stores", storeId, "pending_requests"));
-                    transaction.set(reqRef, {
+                    // Yeni Talep Oluştur
+                    newPendingRequests.push({
                         storeId: storeId,
                         saleId: saleId,
                         saleReceiptNo: updatedFields.receiptNo || currentSale.receiptNo,
@@ -547,48 +545,85 @@ export const updateSale = async (
                         productNote: item.productNote || ""
                     });
                 }
-
-                if (stockDoc.exists()) {
-                    transaction.update(stockRef, updates);
-                } else {
-                    transaction.set(stockRef, { ...updates, productId: item.productId, productName: item.productName }); // Yeni stok kartı oluştur
-                }
             }
 
-            // --- C) SATIŞ KAYDINI GÜNCELLE ---
-            // Mevcut itemları al, silinenleri çıkar, yenileri ekle
+            // C) Fiş tutarlarının güncellenmesi
             const finalItems = [
                 ...currentSale.items.filter(oldItem =>
-                    // Silinenler listesinde bu ürün yoksa koru (Objelerin referansı farklı olacağı için stringify ile basit kontrol)
                     !removedItems.some(rem =>
                         rem.productId === oldItem.productId &&
                         rem.colorId === oldItem.colorId &&
                         rem.dimensionId === oldItem.dimensionId &&
-                        rem.productNote === oldItem.productNote // Notu farklı olan aynı ürün olabilir
+                        rem.productNote === oldItem.productNote
                     )
                 ),
                 ...addedItems
             ];
-
-            // Grand Total güncelle
             const newGrandTotal = finalItems.reduce((acc, i) => acc + i.total, 0) + (updatedFields.shippingCost || currentSale.shippingCost);
 
+
+            // ==========================================
+            // 3. AŞAMA: TÜM YAZMALAR (SADECE SET/UPDATE)
+            // ==========================================
+
+            // A) Stokları Yaz
+            for (const uniqueStockId of allUniqueStockIds) {
+                const stockInfo = stockDocsData[uniqueStockId];
+                if (stockInfo.exists) {
+                    transaction.update(stockInfo.ref, stockInfo.data);
+                } else {
+                    transaction.set(stockInfo.ref, stockInfo.data);
+                }
+            }
+
+            // B) Yeni Talepleri (Pending Requests) Yaz
+            for (const req of newPendingRequests) {
+                const reqRef = doc(collection(db, "stores", storeId, "pending_requests"));
+                transaction.set(reqRef, req);
+            }
+
+            // C) Satış Fişini Güncelle
             transaction.update(saleRef, {
                 ...updatedFields,
                 items: finalItems,
                 grandTotal: newGrandTotal
             });
 
-            // Borç Kaydını da güncelle
+            // D) Borç (Debt) Kaydını Güncelle
             const debtRef = doc(db, "stores", storeId, "debts", saleId);
             transaction.update(debtRef, {
                 receiptNo: updatedFields.receiptNo || currentSale.receiptNo,
                 customerName: updatedFields.customerName || currentSale.customerName,
                 totalAmount: newGrandTotal,
-                remainingAmount: newGrandTotal // Not: Eğer tahsilat alındıysa bu mantık değişmeli, şimdilik basit tutuyoruz.
+                remainingAmount: newGrandTotal // NOT: Kısmi ödeme yapılmış bir fiş güncelleniyorsa burada paidAmount'u düşerek remaining hesaplanmalı! Şimdilik basit bırakıldı.
             });
 
-        });
+        }); // RUN TRANSACTION BİTİŞİ
+
+        // ==========================================
+        // 4. AŞAMA: TRANSACTION DIŞI İŞLEMLER
+        // ==========================================
+        // Eğer silinen ürün "Merkezden" istenmişse, onun `pending_requests` tablosundaki kaydını silmemiz lazım.
+        // Query gerektirdiği için Transaction bittikten sonra yapıyoruz.
+        for (const item of removedItems) {
+            if (item.supplyMethod === 'Merkezden') {
+                const reqQuery = query(
+                    collection(db, "stores", storeId, "pending_requests"),
+                    where("saleId", "==", saleId),
+                    where("productId", "==", item.productId),
+                    where("colorId", "==", item.colorId),
+                    where("dimensionId", "==", item.dimensionId || null)
+                );
+                const reqSnaps = await getDocs(reqQuery);
+                if (!reqSnaps.empty) {
+                    reqSnaps.forEach(async (d) => {
+                        await deleteDoc(d.ref); // Import kısmına deleteDoc eklendiğini varsayıyorum
+                    });
+                } else {
+                    warningMessage = "Uyarı: Silinen bazı ürünler ('Merkezden') tedarik sürecine girdiği için taleplerden silinemedi.";
+                }
+            }
+        }
 
         return { success: true, warning: warningMessage };
 

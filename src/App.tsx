@@ -63,6 +63,8 @@ import PaymentDetail from "./pages/payments/PaymentDetail";
 import PaymentEdit from "./pages/payments/PaymentEdit";
 import DeviceRequests from "./pages/admin/DeviceRequests";
 import RegisteredDevices from "./pages/admin/RegisteredDevices";
+import StoreCashDetail from "./pages/finance/StoreCashDetail";
+import CenterTransferList from "./pages/payments/CenterTransferList";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -285,6 +287,7 @@ function App() {
             <Route path="/stores/add" element={<StoreAdd />} />
             <Route path="/stores/edit/:id" element={<StoreEdit />} />
             <Route path="/finance/cash-registers" element={<StoreCashRegisters />} />
+            <Route path="/finance/cash-registers/:storeId" element={<StoreCashDetail />} />
 
             <Route path="/personnel" element={<PersonnelList />} />
             <Route path="/personnel/add" element={<PersonnelAdd />} />
@@ -300,12 +303,13 @@ function App() {
             <Route path="/sales/add" element={<SaleAdd />} />
             <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
             <Route path="/sales/:storeId/edit/:id" element={<SaleEdit />} />
-            
+
             {/* Payment Methods & Transactions */}
             <Route path="/payments/add" element={<PaymentAdd />} />
             <Route path="/payments/list" element={<PaymentList />} />
             <Route path="/payments/detail/:id" element={<PaymentDetail />} />
             <Route path="/payments/edit/:id" element={<PaymentEdit />} />
+            <Route path="/payments/center-transfers" element={<CenterTransferList />} />
 
             {/* SSH Records */}
             <Route path="/ssh/list" element={<SSHList />} />

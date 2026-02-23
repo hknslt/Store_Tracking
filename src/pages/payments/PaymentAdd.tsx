@@ -11,7 +11,7 @@ import { getPaymentMethods, addPaymentDocument, getNextPaymentReceiptNo } from "
 import type { Store, SystemUser, PaymentItem, PaymentMethod, Debt, TransactionType, Personnel } from "../../types";
 import "../../App.css";
 
-// 🔥 DIŞARIDAN İKON İMPORTLARI (Dosya yollarını kendi projenize göre ayarlayabilirsiniz)
+// 🔥 DIŞARIDAN İKON İMPORTLARI 
 import tahsilatIcon from "../../assets/icons/sack-dollar.svg";
 import masrafIcon from "../../assets/icons/receipt.svg";
 import merkezIcon from "../../assets/icons/bank.svg";
@@ -272,10 +272,9 @@ const PaymentAdd = () => {
                         style={{
                             width: '20px',
                             height: '20px',
-                            // Eğer ikon siyah renkteyse ve renklendirmek istiyorsanız:
                             filter: message.type === 'success'
-                                ? 'invert(31%) sepia(90%) saturate(1001%) hue-rotate(95deg) brightness(97%) contrast(92%)' // Yeşil tonu
-                                : 'invert(19%) sepia(85%) saturate(3015%) hue-rotate(345deg) brightness(85%) contrast(99%)'  // Kırmızı tonu
+                                ? 'invert(31%) sepia(90%) saturate(1001%) hue-rotate(95deg) brightness(97%) contrast(92%)'
+                                : 'invert(19%) sepia(85%) saturate(3015%) hue-rotate(345deg) brightness(85%) contrast(99%)'
                         }}
                     />
                     {message.text}
@@ -339,7 +338,6 @@ const PaymentAdd = () => {
                             style={{
                                 width: '18px',
                                 height: '18px',
-                                // Seçili olanın ikonu beyaz, seçili olmayanın ikonu gri olur
                                 filter: selectedType === type ? 'brightness(0) invert(1)' : 'invert(59%) sepia(10%) saturate(417%) hue-rotate(160deg) brightness(91%) contrast(85%)'
                             }}
                         />
@@ -373,27 +371,36 @@ const PaymentAdd = () => {
                                             </select>
                                         </td>
                                     )}
-                                    <td style={cellStyle}>
+                                    <td style={{ ...cellStyle, verticalAlign: 'top' }}>
                                         <select style={inputStyle} value={item.paymentMethodId} onChange={e => updateItem(index, 'paymentMethodId', e.target.value)}>
                                             <option value="">Seçiniz...</option>
-                                            {paymentMethods.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                            {paymentMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                                         </select>
+
+                                        {/* 🔥 MERKEZE TRANSFER İÇİN KASA BAKİYESİ GÖSTERİMİ */}
+                                        {item.type === 'Merkez' && item.paymentMethodId && headerData.storeId && (
+                                            <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', textAlign: 'center' }}>
+                                                Mevcut Bakiye: <strong style={{ color: '#0ea5e9' }}>
+                                                    {Number((stores.find(s => s.id === headerData.storeId)?.currentBalance as any)?.[item.paymentMethodId]?.[item.currency] || 0).toLocaleString('tr-TR')} {item.currency === 'TL' ? '₺' : item.currency}
+                                                </strong>
+                                            </div>
+                                        )}
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td style={{ ...cellStyle, verticalAlign: 'top' }}>
                                         <select style={{ ...inputStyle, fontWeight: 'bold' }} value={item.currency} onChange={e => updateItem(index, 'currency', e.target.value)}>
                                             <option value="TL">TL ₺</option><option value="USD">USD $</option><option value="EUR">EUR €</option><option value="GBP">GBP £</option>
                                         </select>
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td style={{ ...cellStyle, verticalAlign: 'top' }}>
                                         <input type="number" placeholder="0" style={{ ...inputStyle, textAlign: 'right' }} value={item.originalAmount || ""} onChange={e => updateItem(index, 'originalAmount', e.target.value)} />
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td style={{ ...cellStyle, verticalAlign: 'top' }}>
                                         <input type="number" placeholder="TL Tutarı" disabled={item.currency === 'TL'} style={{ ...inputStyle, textAlign: 'right', backgroundColor: item.currency === 'TL' ? '#e9ecef' : '#fff', fontWeight: 'bold', color: '#2c3e50', border: item.currency !== 'TL' ? '2px solid #3498db' : '1px solid #ddd' }} value={item.amount || ""} onChange={e => updateItem(index, 'amount', e.target.value)} />
                                     </td>
-                                    <td style={cellStyle}>
+                                    <td style={{ ...cellStyle, verticalAlign: 'top' }}>
                                         <input type="text" style={inputStyle} value={item.description} onChange={e => updateItem(index, 'description', e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addRow(); }} />
                                     </td>
-                                    <td style={{ ...cellStyle, textAlign: 'center' }}>
+                                    <td style={{ ...cellStyle, textAlign: 'center', verticalAlign: 'top', paddingTop: '15px' }}>
                                         <button onClick={() => removeRow(index)} style={{ color: '#e74c3c', border: 'none', background: 'none', cursor: 'pointer', fontSize: '18px' }}>×</button>
                                     </td>
                                 </tr>
@@ -414,4 +421,4 @@ const PaymentAdd = () => {
     );
 };
 
-export default PaymentAdd;
+export default PaymentAdd;  

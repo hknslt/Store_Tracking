@@ -1,12 +1,12 @@
 // src/pages/payments/PaymentDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPaymentById } from "../../services/paymentService";
+import { getPaymentById, getPaymentMethods } from "../../services/paymentService"; // 🔥 getPaymentMethods eklendi
 import { getStores } from "../../services/storeService";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import type { PaymentDocument, SystemUser } from "../../types";
+import type { PaymentDocument, SystemUser, PaymentMethod } from "../../types"; // 🔥 PaymentMethod tipi eklendi
 import "../../App.css";
 
 const PaymentDetail = () => {
@@ -16,6 +16,7 @@ const PaymentDetail = () => {
 
     const [payment, setPayment] = useState<PaymentDocument | null>(null);
     const [storeName, setStoreName] = useState("Yükleniyor...");
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]); // 🔥 Ödeme yöntemleri için state
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -27,8 +28,14 @@ const PaymentDetail = () => {
                 if (!pData) { navigate('/payments'); return; }
                 setPayment(pData);
 
-                const stores = await getStores();
-                setStoreName(stores.find(s => s.id === pData.storeId)?.storeName || "Bilinmeyen Mağaza");
+                // 🔥 Mağazaları ve Ödeme Yöntemlerini paralel çekiyoruz
+                const [storesData, methodsData] = await Promise.all([
+                    getStores(),
+                    getPaymentMethods()
+                ]);
+
+                setStoreName(storesData.find(s => s.id === pData.storeId)?.storeName || "Bilinmeyen Mağaza");
+                setPaymentMethods(methodsData);
 
                 // Yetki Kontrolü
                 const userDoc = await getDoc(doc(db, "users", currentUser.uid));
@@ -39,10 +46,20 @@ const PaymentDetail = () => {
                     const pDoc = await getDoc(doc(db, "personnel", currentUser.uid));
                     if (pDoc.exists() && ['admin', 'control'].includes((pDoc.data() as SystemUser).role)) setIsAdmin(true);
                 }
-            } catch (error) { console.error(error); } finally { setLoading(false); }
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(false);
+            }
         };
         loadDetail();
     }, [id, currentUser, navigate]);
+
+    // 🔥 ID'den ödeme yönteminin ismini bulan yardımcı fonksiyon
+    const getMethodName = (methodId: string) => {
+        const method = paymentMethods.find(m => m.id === methodId);
+        return method ? method.name : "Bilinmeyen"; // Eğer eski kayıtlarda isim direkt yazıldıysa onu da görebilmek için methodId de döndürülebilir ama "Bilinmeyen" daha güvenli
+    };
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
     if (!payment) return <div className="page-container">Makbuz bulunamadı.</div>;
@@ -109,7 +126,10 @@ const PaymentDetail = () => {
                                         <div style={{ fontWeight: '600', color: '#334155' }}>{item.customerName || "-"}</div>
                                         <div style={{ fontSize: '12px', color: '#64748b' }}>{item.description} {item.saleReceiptNo && `(Fiş: ${item.saleReceiptNo})`}</div>
                                     </td>
-                                    <td style={{ color: '#475569' }}>{item.paymentMethodId}</td>
+                                    {/* 🔥 ID YERİNE İSİM YAZDIRIYORUZ */}
+                                    <td style={{ color: '#475569', fontWeight: '500' }}>
+                                        {getMethodName(item.paymentMethodId)}
+                                    </td>
                                     <td style={{ textAlign: 'right', fontWeight: '500', color: '#64748b' }}>
                                         {item.currency !== 'TL' ? `${item.originalAmount} ${item.currency}` : '-'}
                                     </td>

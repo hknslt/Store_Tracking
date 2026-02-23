@@ -170,7 +170,7 @@ const PaymentEdit = () => {
                                     <td style={{ padding: '8px' }}>
                                         <select style={inputStyle} value={item.paymentMethodId} onChange={e => updateItem(index, 'paymentMethodId', e.target.value)}>
                                             <option value="">Seçiniz...</option>
-                                            {paymentMethods.map(m => <option key={m.id} value={m.name}>{m.name}</option>)}
+                                            {paymentMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                                         </select>
                                     </td>
                                     <td style={{ padding: '8px' }}>

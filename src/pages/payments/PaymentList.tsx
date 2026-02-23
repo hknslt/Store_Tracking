@@ -45,6 +45,12 @@ const PaymentList = () => {
     const [endDate, setEndDate] = useState(cachedEnd);
     const [searchTerm, setSearchTerm] = useState("");
 
+    // 🔥 SIRALAMA (SORT) STATE'İ
+    const [sortConfig, setSortConfig] = useState<{ key: keyof PaymentDocument; direction: 'asc' | 'desc' }>({
+        key: 'date',
+        direction: 'desc'
+    });
+
     // --- HAFIZAYA KAYDETME (SessionStorage) ---
     useEffect(() => {
         sessionStorage.setItem("paymentList_startDate", startDate);
@@ -104,21 +110,57 @@ const PaymentList = () => {
         }
     }, [selectedStoreId]);
 
-    // --- 1. LİSTE FİLTRESİ ---
-    const filteredPayments = payments.filter(p => {
-        const pDate = new Date(p.date);
-        const start = new Date(`${startDate}T00:00:00`);
-        const end = new Date(`${endDate}T23:59:59`);
+    // --- 1. LİSTE FİLTRESİ VE SIRALAMASI ---
+    const getProcessedPayments = () => {
+        // A. Filtreleme
+        let filtered = payments.filter(p => {
+            const pDate = new Date(p.date);
+            const start = new Date(`${startDate}T00:00:00`);
+            const end = new Date(`${endDate}T23:59:59`);
 
-        const isDateInRange = pDate >= start && pDate <= end;
-        const lowerSearch = searchTerm.toLowerCase();
-        const matchesSearch =
-            p.receiptNo.toLowerCase().includes(lowerSearch) ||
-            p.personnelName.toLowerCase().includes(lowerSearch) ||
-            p.items.some(i => i.description?.toLowerCase().includes(lowerSearch) || i.customerName?.toLowerCase().includes(lowerSearch));
+            const isDateInRange = pDate >= start && pDate <= end;
+            const lowerSearch = searchTerm.toLowerCase();
+            const matchesSearch =
+                p.receiptNo.toLowerCase().includes(lowerSearch) ||
+                p.personnelName.toLowerCase().includes(lowerSearch) ||
+                p.items.some(i => i.description?.toLowerCase().includes(lowerSearch) || i.customerName?.toLowerCase().includes(lowerSearch));
 
-        return isDateInRange && matchesSearch;
-    });
+            return isDateInRange && matchesSearch;
+        });
+
+        // B. Sıralama
+        filtered.sort((a, b) => {
+            let valA: any = a[sortConfig.key];
+            let valB: any = b[sortConfig.key];
+
+            if (sortConfig.key === 'date') {
+                valA = new Date(a.date).getTime();
+                valB = new Date(b.date).getTime();
+            } else if (sortConfig.key === 'receiptNo' || sortConfig.key === 'personnelName') {
+                // Alfabetik / Sayısal String karşılaştırması
+                return sortConfig.direction === 'asc'
+                    ? valA.toString().localeCompare(valB.toString(), undefined, { numeric: true })
+                    : valB.toString().localeCompare(valA.toString(), undefined, { numeric: true });
+            }
+
+            if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
+            if (valA > valB) return sortConfig.direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+
+        return filtered;
+    };
+
+    const processedPayments = getProcessedPayments();
+
+    // Sütun başlıklarına tıklama işlemi
+    const requestSort = (key: keyof PaymentDocument) => {
+        let direction: 'asc' | 'desc' = 'asc';
+        if (sortConfig.key === key && sortConfig.direction === 'asc') {
+            direction = 'desc';
+        }
+        setSortConfig({ key, direction });
+    };
 
     // --- 2. GÜNLÜK ÖZET (Sadece Bugünü Hesaplar) ---
     const calculateDailySummary = () => {
@@ -139,6 +181,24 @@ const PaymentList = () => {
     const dailyStats = calculateDailySummary();
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
 
+    // Sütun başlıkları için yardımcı bileşen
+    const SortableHeader = ({ label, sortKey, align = 'left', width }: { label: string, sortKey: string, align?: string, width?: string }) => (
+        <th
+            onClick={() => requestSort(sortKey as keyof PaymentDocument)}
+            style={{ textAlign: align as any, cursor: 'pointer', userSelect: 'none', width: width }}
+            title="Sıralamak için tıklayın"
+        >
+            <div style={{ display: 'flex', alignItems: 'center', gap: '4px', justifyContent: align === 'center' ? 'center' : align === 'right' ? 'flex-end' : 'flex-start' }}>
+                {label}
+                {sortConfig.key === sortKey && (
+                    <span style={{ fontSize: '10px', color: '#3b82f6', opacity: 0.8 }}>
+                        {sortConfig.direction === 'asc' ? '▲' : '▼'}
+                    </span>
+                )}
+            </div>
+        </th>
+    );
+
     if (loading && payments.length === 0) return <div className="page-container" style={{ textAlign: 'center', paddingTop: '100px' }}>Yükleniyor...</div>;
 
     return (
@@ -149,9 +209,15 @@ const PaymentList = () => {
                     <h2>Kasa Hareketleri</h2>
                     <p style={{ color: '#64748b' }}>Ödeme, Tahsilat ve Masraf Listesi</p>
                 </div>
-                <Link to="/payments/add" className="modern-btn" style={{ backgroundColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
-                    <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem Ekle
-                </Link>
+                {/* 🔥 YENİ BUTON ALANI */}
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    <Link to="/payments/center-transfers" className="modern-btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #cbd5e1' }}>
+                       Merkez Transfer Kontrolü
+                    </Link>
+                    <Link to="/payments/add" className="modern-btn" style={{ backgroundColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
+                        <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem Ekle
+                    </Link>
+                </div>
             </div>
 
             {/* --- ÖZET KARTLARI --- */}
@@ -251,16 +317,19 @@ const PaymentList = () => {
                             <thead>
                                 <tr style={{ backgroundColor: '#f1f5f9' }}>
                                     <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
-                                    <th style={{ width: '15%' }}>Tarih</th>
-                                    <th style={{ width: '20%' }}>Makbuz No</th>
-                                    <th style={{ width: '25%' }}>İşlemi Yapan</th>
+                                    {/* 🔥 Sıralanabilir Başlıklar */}
+                                    <SortableHeader label="Tarih" sortKey="date" width="15%" />
+                                    <SortableHeader label="Makbuz No" sortKey="receiptNo" width="20%" />
+                                    <SortableHeader label="İşlemi Yapan" sortKey="personnelName" width="25%" />
+
                                     <th style={{ width: '15%' }}>Özet</th>
-                                    <th style={{ textAlign: 'right', width: '20%' }}>Toplam Tutar</th>
+
+                                    <SortableHeader label="Toplam Tutar" sortKey="totalAmount" align="right" width="20%" />
                                 </tr>
                             </thead>
                             <tbody>
-                                {filteredPayments.length > 0 ? (
-                                    filteredPayments.map(p => (
+                                {processedPayments.length > 0 ? (
+                                    processedPayments.map(p => (
                                         <tr key={p.id} className="hover-row">
                                             <td style={{ textAlign: 'center' }}>
                                                 <button onClick={() => navigate(`/payments/detail/${p.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer' }}>

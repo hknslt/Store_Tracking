@@ -4,11 +4,12 @@ import { useNavigate } from "react-router-dom";
 import { collection, getDocs } from "firebase/firestore";
 import { db } from "../../firebase";
 import { motion } from "framer-motion";
+import { getPaymentMethods } from "../../services/paymentService";
+import type { PaymentMethod } from "../../types";
 
 // İKONLAR
 import storeIcon from "../../assets/icons/store.svg";
 
-// Veritabanındaki yapıya ve hesaplamaya uygun tipler
 interface CurrencyMap {
     TL: number;
     USD: number;
@@ -16,24 +17,31 @@ interface CurrencyMap {
     GBP: number;
 }
 
+// Yeni yapıya göre StoreCash arayüzü
 interface StoreCash {
     id: string;
     name: string;
-    balances: CurrencyMap;
+    balancesByMethod: Record<string, CurrencyMap>; // { "methodId_Nakit": { TL: 100, USD: 0 }, "methodId_KrediKarti": {...} }
 }
 
 const StoreCashRegisters = () => {
     const navigate = useNavigate();
     const [stores, setStores] = useState<StoreCash[]>([]);
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
     const [loading, setLoading] = useState(true);
 
-    // Sadece TL değil, hepsini tutuyoruz
+    // Tüm mağazaların, tüm ödeme yöntemlerinin döviz bazlı Gelişmiş Toplamı
     const [totalSystemBalances, setTotalSystemBalances] = useState<CurrencyMap>({
         TL: 0, USD: 0, EUR: 0, GBP: 0
     });
 
     useEffect(() => {
-        fetchStoreCashData();
+        const init = async () => {
+            const methods = await getPaymentMethods();
+            setPaymentMethods(methods);
+            await fetchStoreCashData();
+        };
+        init();
     }, []);
 
     const fetchStoreCashData = async () => {
@@ -50,31 +58,38 @@ const StoreCashRegisters = () => {
                 const data = doc.data();
 
                 const storeName = data.storeName || data.name || "İsimsiz Mağaza";
-                const cb = data.currentBalance || {};
+                const currentBalance = data.currentBalance || {}; // Veritabanındaki yeni kasa objesi
 
-                const balances = {
-                    TL: Number(cb.TL || 0),
-                    USD: Number(cb.USD || 0),
-                    EUR: Number(cb.EUR || 0),
-                    GBP: Number(cb.GBP || 0)
-                };
+                const safeBalances: Record<string, CurrencyMap> = {};
 
-                // Her mağazanın bakiyesini genel toplama ekle
-                grandTotals.TL += balances.TL;
-                grandTotals.USD += balances.USD;
-                grandTotals.EUR += balances.EUR;
-                grandTotals.GBP += balances.GBP;
+                // currentBalance objesinin içindeki her bir key'i (paymentMethodId) dolaşıyoruz
+                Object.entries(currentBalance).forEach(([key, val]: any) => {
+                    // Eski sistem kalıntılarını atlamak için value'nun obje olup olmadığını kontrol et
+                    if (typeof val === 'object' && val !== null) {
+                        safeBalances[key] = {
+                            TL: Number(val.TL || 0),
+                            USD: Number(val.USD || 0),
+                            EUR: Number(val.EUR || 0),
+                            GBP: Number(val.GBP || 0)
+                        };
+
+                        // Genel Toplama Ekle
+                        grandTotals.TL += safeBalances[key].TL;
+                        grandTotals.USD += safeBalances[key].USD;
+                        grandTotals.EUR += safeBalances[key].EUR;
+                        grandTotals.GBP += safeBalances[key].GBP;
+                    }
+                });
 
                 storesData.push({
                     id: doc.id,
                     name: storeName,
-                    balances: balances
+                    balancesByMethod: safeBalances
                 });
             });
 
-            // 🔥 A'dan Z'ye İsme Göre Sıralama
+            // İsme Göre Sıralama
             setStores(storesData.sort((a, b) => a.name.localeCompare(b.name, 'tr')));
-
             setTotalSystemBalances(grandTotals);
             setLoading(false);
 
@@ -94,6 +109,11 @@ const StoreCashRegisters = () => {
         return `${amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${suffix}`;
     };
 
+    // Ödeme yöntemi ID'sinden ismini bulan yardımcı fonksiyon
+    const getMethodName = (methodId: string) => {
+        return paymentMethods.find(m => m.id === methodId)?.name || "Diğer/Bilinmeyen";
+    };
+
     if (loading) {
         return <div style={{ display: 'flex', justifyContent: 'center', height: '80vh', alignItems: 'center' }}>Veriler Yükleniyor...</div>;
     }
@@ -105,7 +125,7 @@ const StoreCashRegisters = () => {
             <div style={{ marginBottom: '30px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '20px' }}>
                 <div>
                     <h2 className="page-title">Mağaza Kasaları</h2>
-                    <p className="page-subtitle">Tüm şubelerin anlık nakit durumları</p>
+                    <p className="page-subtitle">Şubelerin ödeme yöntemlerine göre nakit durumları</p>
                 </div>
 
                 {/* TOPLAM NAKİT KARTI */}
@@ -152,8 +172,7 @@ const StoreCashRegisters = () => {
             {/* --- KART LİSTESİ --- */}
             <div style={{
                 display: 'grid',
-                // 🔥 minmax(320px) yerine minmax(250px) yaptık ki satıra 4 tane sığabilsin
-                gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+                gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
                 gap: '20px'
             }}>
                 {stores.map((store, index) => (
@@ -161,11 +180,11 @@ const StoreCashRegisters = () => {
                         key={store.id}
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: index * 0.05 }} // Animasyonu da hızlandırdık
+                        transition={{ delay: index * 0.05 }}
                         style={{
                             background: 'white',
                             borderRadius: '16px',
-                            padding: '15px', // Padding'i biraz daralttık
+                            padding: '20px',
                             border: '1px solid #e2e8f0',
                             cursor: 'pointer',
                             transition: 'all 0.3s',
@@ -173,7 +192,7 @@ const StoreCashRegisters = () => {
                             flexDirection: 'column',
                             boxShadow: '0 2px 5px rgba(0,0,0,0.02)'
                         }}
-                        onClick={() => navigate(`/stores/${store.id}`)}
+                        onClick={() => navigate(`/finance/cash-registers/${store.id}`)}
                         onMouseEnter={(e) => {
                             e.currentTarget.style.transform = 'translateY(-5px)';
                             e.currentTarget.style.boxShadow = '0 15px 30px rgba(0,0,0,0.08)';
@@ -186,43 +205,50 @@ const StoreCashRegisters = () => {
                         }}
                     >
                         {/* Üst Kısım: Mağaza İsmi */}
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '15px', borderBottom: '1px solid #f1f5f9', paddingBottom: '10px' }}>
                             <div style={{
-                                width: '40px', height: '40px', // İkon kutusunu da biraz ufalttık
+                                width: '35px', height: '35px',
                                 background: '#f0fdf4',
                                 borderRadius: '10px',
                                 display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                border: '1px solid #dcfce7',
                                 flexShrink: 0
                             }}>
-                                <img src={storeIcon} alt="" style={{ width: '20px', opacity: 0.8 }} />
+                                <img src={storeIcon} alt="" style={{ width: '18px', opacity: 0.8 }} />
                             </div>
                             <div style={{ overflow: 'hidden' }}>
-                                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                <h3 style={{ fontSize: '15px', fontWeight: '700', color: '#1e293b', margin: 0 }}>
                                     {store.name}
                                 </h3>
-                                <span style={{ fontSize: '11px', color: '#64748b' }}>Şube Kasası</span>
                             </div>
                         </div>
 
-                        {/* Orta Kısım: ÇOKLU BAKİYE LİSTESİ */}
-                        <div style={{
-                            background: '#f8fafc',
-                            borderRadius: '10px',
-                            padding: '12px',
-                            flex: 1
-                        }}>
-                            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: '700', marginBottom: '8px', textTransform: 'uppercase' }}>
-                                MEVCUT BAKİYELER
-                            </div>
+                        {/* Orta Kısım: YENİ SİSTEM YÖNTEM BAZLI BAKİYE LİSTESİ */}
+                        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                            {Object.keys(store.balancesByMethod).length === 0 ? (
+                                <div style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic', textAlign: 'center', padding: '10px 0' }}>
+                                    Kasa hareketi yok.
+                                </div>
+                            ) : (
+                                Object.entries(store.balancesByMethod).map(([methodId, balances]) => {
+                                    // Sadece içinde herhangi bir bakiye barındıran yöntemleri göster
+                                    if (balances.TL === 0 && balances.USD === 0 && balances.EUR === 0 && balances.GBP === 0) return null;
 
-                            <BalanceRow label="TL" amount={store.balances.TL} color={store.balances.TL >= 0 ? '#16a34a' : '#dc2626'} suffix="₺" />
-                            <BalanceRow label="USD" amount={store.balances.USD} color="#0f172a" suffix="$" />
-                            <BalanceRow label="EUR" amount={store.balances.EUR} color="#0f172a" suffix="€" />
-                            <BalanceRow label="GBP" amount={store.balances.GBP} color="#0f172a" suffix="£" />
+                                    return (
+                                        <div key={methodId} style={{ background: '#f8fafc', padding: '10px', borderRadius: '8px' }}>
+                                            <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', marginBottom: '6px', textTransform: 'uppercase' }}>
+                                                {getMethodName(methodId)}
+                                            </div>
+                                            <BalanceRow label="TL" amount={balances.TL} color={balances.TL >= 0 ? '#16a34a' : '#dc2626'} suffix="₺" />
+                                            <BalanceRow label="USD" amount={balances.USD} color="#0f172a" suffix="$" />
+                                            <BalanceRow label="EUR" amount={balances.EUR} color="#0f172a" suffix="€" />
+                                            <BalanceRow label="GBP" amount={balances.GBP} color="#0f172a" suffix="£" />
+                                        </div>
+                                    );
+                                })
+                            )}
                         </div>
 
-                        <div style={{ marginTop: '12px', textAlign: 'right' }}>
+                        <div style={{ marginTop: '15px', textAlign: 'right', borderTop: '1px solid #f1f5f9', paddingTop: '10px' }}>
                             <span style={{ fontSize: '11px', color: '#3b82f6', fontWeight: '600' }}>
                                 Detaylara Git ➜
                             </span>
@@ -235,20 +261,20 @@ const StoreCashRegisters = () => {
     );
 };
 
-// Alt Bileşen: Bakiye Satırı
+// Alt Bileşen: Bakiye Satırı (Eğer bakiye 0 ise ekranda kalabalık yapmasın diye gizlenir)
 const BalanceRow = ({ label, amount, color, suffix }: any) => {
-    const isZero = amount === 0;
+    if (amount === 0) return null;
+
     return (
         <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: '6px',
-            opacity: isZero ? 0.3 : 1
+            marginBottom: '4px'
         }}>
             <span style={{ fontSize: '12px', fontWeight: '600', color: '#64748b' }}>{label}</span>
             <span style={{
-                fontSize: '14px',
+                fontSize: '13px',
                 fontWeight: '700',
                 color: color
             }}>

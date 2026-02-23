@@ -278,12 +278,12 @@ export type Currency = 'TL' | 'USD' | 'EUR' | 'GBP';
 
 
 //Kasa Bakiyesi Yapısı
-export interface StoreBalance {
+export type StoreBalance = Record<string, {
     TL: number;
     USD: number;
     EUR: number;
     GBP: number;
-}
+}>;
 
 
 // --- ÖDEME SATIRI (Excel Satırı) ---
@@ -305,6 +305,7 @@ export interface PaymentItem {
     amount: number;             // TL Karşılığı (Hesaplanan: 3250 TL) - Sistem bunu esas alır
 
     description: string;
+    isCenterChecked?: boolean;
 }
 
 // --- ÖDEME MAKBUZU (Ana Belge) ---

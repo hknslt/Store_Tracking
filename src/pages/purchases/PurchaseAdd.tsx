@@ -112,11 +112,15 @@ const PurchaseAdd = () => {
     // --- MAĞAZA DEĞİŞİNCE YAPILACAKLAR ---
     useEffect(() => {
         if (headerData.storeId) {
+            // Bekleyen talepleri çek (sepetten bağımsız olarak)
             getPendingRequests(headerData.storeId).then(data => {
+                // Burada mevcut eklenenleri ayıklamak için ayrı bir kontrol yapabilirsiniz, 
+                // ama genelde sayfa ilk açıldığında sıfırdan çekmesi yeterlidir.
                 const alreadyAddedIds = addedItems.map(i => i.requestId).filter(Boolean);
                 setPendingRequests(data.filter(req => !alreadyAddedIds.includes(req.id)));
             });
 
+            // SADECE mağaza değiştiğinde/seçildiğinde fiş numarasını OTOMATİK al.
             getNextPurchaseReceiptNo(headerData.storeId).then(nextNo => {
                 setHeaderData(prev => ({ ...prev, receiptNo: nextNo }));
             });
@@ -125,7 +129,10 @@ const PurchaseAdd = () => {
             setPendingRequests([]);
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
         }
-    }, [headerData.storeId, addedItems.length]);
+        // 🔥 DİKKAT: 'addedItems.length' buradan kaldırıldı. Böylece ürün eklenince Fiş No ezilmez.
+        // Sadece headerData.storeId değiştiğinde çalışır.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [headerData.storeId]);
 
     // --- HANDLERS ---
     const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });

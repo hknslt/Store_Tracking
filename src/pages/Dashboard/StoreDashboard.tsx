@@ -9,7 +9,6 @@ import { motion, AnimatePresence } from "framer-motion";
 // FIREBASE & AUTH
 import { auth, db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
-// 👇 Firestore sorgu fonksiyonları
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
 // LOGO
@@ -33,16 +32,20 @@ const StoreDashboard = () => {
 
     useEffect(() => {
         if (id) {
-            // 1. Mağaza Bilgisini Çek
-            getStoreById(id).then(data => {
-                setStore(data);
-                setLoading(false);
-            });
-
-            // 2. BUGÜNÜN Cirosunu Çek
+            const loadData = async () => {
+                try {
+                    // Mağaza Bilgisini Çek
+                    const data = await getStoreById(id);
+                    setStore(data);
+                } catch (error) {
+                    console.error("Veri yükleme hatası:", error);
+                } finally {
+                    setLoading(false);
+                }
+            };
+            
+            loadData();
             fetchDailyTurnover(id);
-
-            // 3. BU AYIN Cirosunu ve HEDEFİNİ Çek
             fetchMonthlyStats(id);
         }
     }, [id]);
@@ -50,7 +53,7 @@ const StoreDashboard = () => {
     const fetchDailyTurnover = async (storeId: string) => {
         try {
             const now = new Date();
-            const todayString = now.toISOString().split('T')[0]; // "2024-05-20"
+            const todayString = now.toISOString().split('T')[0];
 
             const q = query(
                 collection(db, "sales", storeId, "receipts"),
@@ -63,7 +66,6 @@ const StoreDashboard = () => {
 
             snapshot.forEach(doc => {
                 const data = doc.data();
-                // İptal edilmemişleri topla (Opsiyonel: status !== 'İptal' kontrolü eklenebilir)
                 if (data.status !== 'İptal') {
                     totalTurnover += Number(data.grandTotal || 0);
                     totalCount++;
@@ -78,20 +80,16 @@ const StoreDashboard = () => {
 
     const fetchMonthlyStats = async (storeId: string) => {
         try {
-            // A) HEDEFİ ÇEK
             let targetAmount = 0;
             const targetDoc = await getDoc(doc(db, "targets", storeId));
             if (targetDoc.exists()) {
                 targetAmount = Number(targetDoc.data().targetAmount || 0);
             }
 
-            // B) AYLIK CİROYU HESAPLA
             const now = new Date();
             const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
             const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
 
-            // Basitçe o ayın tüm fişlerini çekip toplayalım
-            // (Daha optimize yöntem: range query, ama tarih string olduğu için >= ve <= kullanabiliriz)
             const q = query(
                 collection(db, "sales", storeId, "receipts"),
                 where("date", ">=", startOfMonth),
@@ -129,7 +127,7 @@ const StoreDashboard = () => {
     };
 
     const formatCurrency = (amount: number = 0, currency: string = 'TL', size: 'big' | 'small' = 'small') => {
-        if (!showBalance && viewMode === 'balance') return "••••••"; // Sadece kasa gizlenir, ciro açık kalabilir isteğe bağlı
+        if (!showBalance && viewMode === 'balance') return "••••••"; 
 
         let symbol = "₺";
         if (currency === 'USD') symbol = "$";
@@ -150,7 +148,6 @@ const StoreDashboard = () => {
 
     const BAHCEMO_GREEN = "#1e703a";
 
-    // Hedef Hesaplamaları
     const percent = monthlyStats.target > 0 ? (monthlyStats.totalTurnover / monthlyStats.target) * 100 : 0;
     const remaining = Math.max(0, monthlyStats.target - monthlyStats.totalTurnover);
 
@@ -162,6 +159,33 @@ const StoreDashboard = () => {
         hidden: { y: 10, opacity: 0 },
         visible: { y: 0, opacity: 1 }
     };
+
+    // 🔥 KASA MANTIĞI: Veritabanındaki farklı ödeme yöntemlerinin tüm dövizlerini TEK ÇATI altında topluyoruz
+    const cb = store.currentBalance || {};
+    let totalTL = 0;
+    let totalUSD = 0;
+    let totalEUR = 0;
+    let totalGBP = 0;
+
+    // cb objesindeki tüm key'leri dön. Eğer object ise yeni sistemdir, değilse (direkt TL: 100 yazıyorsa) eski sistemdir.
+    Object.values(cb).forEach((val: any) => {
+        if (typeof val === 'object' && val !== null) {
+            // Yeni Sistem (Örn: "nakit_id_1": { TL: 100, USD: 50 })
+            totalTL += Number(val.TL || 0);
+            totalUSD += Number(val.USD || 0);
+            totalEUR += Number(val.EUR || 0);
+            totalGBP += Number(val.GBP || 0);
+        } else if (typeof val === 'number') {
+             // Eski Sistemin kalıntılarını (TL: 100, USD: 50 vb.) yakalamak için (Hata olmaması adına ama genelde silinir)
+        }
+    });
+
+    // Eğer eski sistem hala varsa ve object değilse (direkt store.currentBalance.TL ise) onu da ekle (Geçiş süreci güvenliği için)
+    if (typeof cb.TL === 'number') totalTL += cb.TL;
+    if (typeof cb.USD === 'number') totalUSD += cb.USD;
+    if (typeof cb.EUR === 'number') totalEUR += cb.EUR;
+    if (typeof cb.GBP === 'number') totalGBP += cb.GBP;
+
 
     return (
         <div className="page-container" style={{ backgroundColor: '#f8fafc', minHeight: '100vh', paddingBottom: '40px' }}>
@@ -249,29 +273,30 @@ const StoreDashboard = () => {
                                 key="balance"
                                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                             >
+                                {/* 🔥 ANA PARA : TÜM TL TOPLAMI */}
                                 <div style={{ fontSize: '42px', fontWeight: '800', letterSpacing: '-1px', marginBottom: '5px' }}>
-                                    {formatCurrency(store.currentBalance?.TL || 0, 'TL', 'big')}
+                                    {formatCurrency(totalTL, 'TL', 'big')}
                                 </div>
-                                <div style={{ fontSize: '13px', opacity: 0.7 }}>Toplam Nakit Varlığı</div>
+                                <div style={{ fontSize: '13px', opacity: 0.7 }}>Toplam Nakit Varlığı (TL)</div>
 
-                                {/* Alt Kısım: Diğer Dövizler */}
+                                {/* 🔥 DİĞER DÖVİZLER */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', paddingTop: '20px', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                     <div>
                                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px' }}>USD</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(store.currentBalance?.USD || 0, 'USD')}</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(totalUSD, 'USD')}</div>
                                     </div>
                                     <div>
                                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px' }}>EUR</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(store.currentBalance?.EUR || 0, 'EUR')}</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(totalEUR, 'EUR')}</div>
                                     </div>
                                     <div>
                                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px' }}>GBP</div>
-                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(store.currentBalance?.GBP || 0, 'GBP')}</div>
+                                        <div style={{ fontSize: '16px', fontWeight: '600' }}>{formatCurrency(totalGBP, 'GBP')}</div>
                                     </div>
                                 </div>
                             </motion.div>
                         ) : (
-                            /* 2. CİRO GÖRÜNÜMÜ (GÜNCELLENDİ) */
+                            /* 2. CİRO GÖRÜNÜMÜ */
                             <motion.div
                                 key="turnover"
                                 initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}

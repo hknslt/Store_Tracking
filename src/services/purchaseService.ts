@@ -1,11 +1,22 @@
 // src/services/purchaseService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch, limit } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch, limit, where } from "firebase/firestore";
 import type { PendingRequest, Purchase, PurchaseItem, PurchaseStatus } from "../types";
 
 // 1. YENİ ALIŞ FİŞİ KAYDETME
 export const addPurchase = async (purchase: Purchase) => {
     try {
+
+
+        const checkQuery = query(
+            collection(db, "purchases", purchase.storeId, "receipts"),
+            where("receiptNo", "==", purchase.receiptNo)
+        );
+        const checkSnap = await getDocs(checkQuery);
+
+        if (!checkSnap.empty) {
+            throw new Error(`Bu fiş numarası (${purchase.receiptNo}) zaten kullanılmış! Lütfen farklı bir numara girin.`);
+        }
         await runTransaction(db, async (transaction) => {
 
             // A) OKUMALAR
@@ -311,7 +322,7 @@ export const updatePurchase = async (
                 // İptal edilmişse işlem yapma
                 if (item.status === 'İptal') continue;
 
-               const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
+                const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                 const stockRef = doc(db, "stores", storeId, "stocks", uniqueStockId);
                 const stockDoc = await transaction.get(stockRef);
 
