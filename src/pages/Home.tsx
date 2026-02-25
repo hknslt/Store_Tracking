@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 
 // DASHBOARD'LAR
 import AdminDashboard from "./Dashboard/AdminDashboard";
-import ControlDashboard from "./Dashboard/ControlDashboard"; // 🔥 EKLENDİ
+import ControlDashboard from "./Dashboard/ControlDashboard"; //   EKLENDİ
 
 const Home = () => {
   const { userRole, userData, loading } = useAuth();

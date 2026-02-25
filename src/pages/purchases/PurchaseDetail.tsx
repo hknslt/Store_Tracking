@@ -16,7 +16,7 @@ const PurchaseDetail = () => {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // 🔥 YETKİLENDİRME
+    //   YETKİLENDİRME
     const { userRole } = useAuth();
     // Admin ve Control düzenleme/silme/iptal/sıfırlama yapabilir
     const canEditDelete = ['admin', 'control'].includes(userRole || '');
@@ -144,7 +144,7 @@ const PurchaseDetail = () => {
                     {/* Sadece Admin ve Kontrolcü butonları görür */}
                     {canEditDelete && (
                         <>
-                            {/* 🔥 DÜZENLE BUTONU: Sadece iptal edilmemişse ve hepsi beklemedeyse görünür */}
+                            {/*   DÜZENLE BUTONU: Sadece iptal edilmemişse ve hepsi beklemedeyse görünür */}
                             {!isCancelled && isAllPending && (
                                 <button
                                     onClick={() => navigate(`/purchases/${storeId}/edit/${purchase.id}`, { state: { purchase } })}

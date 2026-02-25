@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getProducts } from "../../services/productService";
-import { savePriceList, getPriceListById, getPriceLists } from "../../services/priceService"; // 🔥 getPriceLists eklendi
+import { savePriceList, getPriceListById, getPriceLists } from "../../services/priceService"; //   getPriceLists eklendi
 import { getGroups, getCategories, getDimensions } from "../../services/definitionService";
 import { getStores } from "../../services/storeService";
 import type { Product, Group, Category, Dimension, Store, PriceListModel } from "../../types";
@@ -20,7 +20,7 @@ const PriceManager = () => {
     const [dimensions, setDimensions] = useState<Dimension[]>([]);
     const [stores, setStores] = useState<Store[]>([]);
 
-    // 🔥 TÜM FİYAT LİSTELERİ (Çakışma kontrolü için)
+    //   TÜM FİYAT LİSTELERİ (Çakışma kontrolü için)
     const [allLists, setAllLists] = useState<PriceListModel[]>([]);
 
     // --- LİSTE BİLGİLERİ (METADATA) ---
@@ -50,7 +50,7 @@ const PriceManager = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
-                // 🔥 getPriceLists'i de çekiyoruz
+                //   getPriceLists'i de çekiyoruz
                 const [g, c, p, d, s, lists] = await Promise.all([
                     getGroups(), getCategories(), getProducts(), getDimensions(), getStores(), getPriceLists()
                 ]);
@@ -93,7 +93,7 @@ const PriceManager = () => {
         if (!listName.trim()) return setMessage({ type: 'error', text: 'Lütfen liste adını giriniz.' });
         if (selectedStores.length === 0) return setMessage({ type: 'error', text: 'Lütfen en az bir mağaza seçiniz.' });
 
-        // 🔥 ÇAKIŞMA KONTROLÜ (Aynı türden listesi olan mağazaları bul)
+        //   ÇAKIŞMA KONTROLÜ (Aynı türden listesi olan mağazaları bul)
         const conflictingStores: string[] = [];
 
         selectedStores.forEach(storeId => {
@@ -128,10 +128,10 @@ const PriceManager = () => {
                 prices: priceMap
             };
 
-            const savedId = await savePriceList(listData, id); // 🔥 ID'yi alıyoruz
+            const savedId = await savePriceList(listData, id); //   ID'yi alıyoruz
             setMessage({ type: 'success', text: `✅ Fiyat listesi başarıyla kaydedildi!` });
 
-            // 🔥 Kaydettikten sonra Detay sayfasına yönlendir
+            //   Kaydettikten sonra Detay sayfasına yönlendir
             setTimeout(() => navigate(`/prices/detail/${savedId}`), 1000);
 
         } catch (error) {

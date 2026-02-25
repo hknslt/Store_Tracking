@@ -312,11 +312,11 @@ const PurchaseList = () => {
                                 handleStatusClick={handleStatusClick}
                                 getButtonText={getButtonText}
                                 getButtonColor={getButtonColor}
-                                isAdmin={canEditDelete} // 🔥 TS Hatası için eksik olan isAdmin eklendi
+                                isAdmin={canEditDelete} //   TS Hatası için eksik olan isAdmin eklendi
                                 getCatName={getCatName}
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
-                                getDimensionName={getDimensionName} // 🔥 TS Hatası için eksik olan getDimensionName eklendi
+                                getDimensionName={getDimensionName} //   TS Hatası için eksik olan getDimensionName eklendi
                             />
                         )
                     ) : (

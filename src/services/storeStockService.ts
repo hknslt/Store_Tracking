@@ -14,7 +14,7 @@ export const getStoreStocks = async (storeId: string) => {
             ...doc.data()
         })) as StoreStock[];
 
-        // 🔥 FİLTRELEME: Hepsi 0 ise listeye dahil etme
+        //   FİLTRELEME: Hepsi 0 ise listeye dahil etme
         return rawData.filter(stock =>
             (stock.freeStock || 0) !== 0 ||
             (stock.reservedStock || 0) !== 0 ||
@@ -41,7 +41,7 @@ export const updateStoreStock = async (storeId: string, stockId: string, updates
     }
 };
 
-// 🔥 YARDIMCI FONKSİYON: Stok 0 ise veritabanından sil (Temizlik İçin)
+//   YARDIMCI FONKSİYON: Stok 0 ise veritabanından sil (Temizlik İçin)
 // Bunu alış/satış servislerinin sonunda çağırabilirsiniz.
 export const checkAndCleanupStock = async (storeId: string, stockId: string) => {
     const stockRef = doc(db, "stores", storeId, "stocks", stockId);

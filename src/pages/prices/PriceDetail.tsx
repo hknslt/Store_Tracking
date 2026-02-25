@@ -6,7 +6,7 @@ import { getProducts } from "../../services/productService";
 import { getCategories, getDimensions } from "../../services/definitionService";
 import { getStores } from "../../services/storeService";
 import type { PriceListModel, Store } from "../../types";
-import * as XLSX from "xlsx"; // 🔥 Excel kütüphanesi eklendi
+import * as XLSX from "xlsx"; //   Excel kütüphanesi eklendi
 import "../../App.css";
 
 interface FlatPriceRow {
@@ -91,7 +91,7 @@ const PriceDetail = () => {
         row.categoryName.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    // 🔥 EXCEL'E AKTARMA FONKSİYONU
+    //   EXCEL'E AKTARMA FONKSİYONU
     const exportToExcel = () => {
         // Excel için verileri uygun başlıklarla formatlıyoruz
         const excelData = filteredRows.map(row => ({
@@ -173,7 +173,7 @@ const PriceDetail = () => {
                             onChange={e => setSearchTerm(e.target.value)}
                             style={{ width: '250px' }}
                         />
-                        {/* 🔥 EXCEL BUTONU */}
+                        {/*   EXCEL BUTONU */}
                         <button
                             onClick={exportToExcel}
                             className="modern-btn"

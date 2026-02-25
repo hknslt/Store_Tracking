@@ -25,7 +25,7 @@ const PurchaseAdd = () => {
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]); // Filtrelenmiş kategoriler
-    const [allCategories, setAllCategories] = useState<Category[]>([]); // 🔥 TÜM KATEGORİLER (İsimlendirme için)
+    const [allCategories, setAllCategories] = useState<Category[]>([]); //   TÜM KATEGORİLER (İsimlendirme için)
     const [productsInCat, setProductsInCat] = useState<Product[]>([]);
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
@@ -49,7 +49,7 @@ const PurchaseAdd = () => {
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
 
-    // 🔥 DÜZENLEME: Burada 'unitPrice' tutacağız, 'amount' (toplam) hesaplanacak.
+    //   DÜZENLEME: Burada 'unitPrice' tutacağız, 'amount' (toplam) hesaplanacak.
     const [unitPrice, setUnitPrice] = useState<number | string>("");
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "", colorId: "", cushionId: "", dimensionId: null,
@@ -83,12 +83,12 @@ const PurchaseAdd = () => {
     // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
-            // 🔥 'getCategories' ile tüm kategorileri çekiyoruz
+            //   'getCategories' ile tüm kategorileri çekiyoruz
             const [g, c, col, dim, cats] = await Promise.all([
                 getGroups(), getCushions(), getColors(), getDimensions(), getCategories()
             ]);
             setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim);
-            setAllCategories(cats); // 🔥 State'e atıyoruz
+            setAllCategories(cats); //   State'e atıyoruz
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -129,7 +129,7 @@ const PurchaseAdd = () => {
             setPendingRequests([]);
             setHeaderData(prev => ({ ...prev, receiptNo: "" }));
         }
-        // 🔥 DİKKAT: 'addedItems.length' buradan kaldırıldı. Böylece ürün eklenince Fiş No ezilmez.
+        //   DİKKAT: 'addedItems.length' buradan kaldırıldı. Böylece ürün eklenince Fiş No ezilmez.
         // Sadece headerData.storeId değiştiğinde çalışır.
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [headerData.storeId]);
@@ -160,7 +160,7 @@ const PurchaseAdd = () => {
         const qty = Number(lineItem.quantity);
         const uPrice = Number(unitPrice);
 
-        // 🔥 HESAPLAMA: Toplam Tutar = Birim Fiyat * Adet
+        //   HESAPLAMA: Toplam Tutar = Birim Fiyat * Adet
         const totalAmount = uPrice * qty;
 
         const newItem: PurchaseItem = {
@@ -187,7 +187,7 @@ const PurchaseAdd = () => {
         const { req, price } = requestModal;
         if (!req) return;
 
-        // 🔥 HESAPLAMA: Modalda girilen "Birim Fiyat" * Adet
+        //   HESAPLAMA: Modalda girilen "Birim Fiyat" * Adet
         const totalAmount = Number(price) * req.quantity;
 
         const newItem: PurchaseItem & { requestId?: string } = {

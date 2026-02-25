@@ -32,7 +32,7 @@ const InvoiceTracking = () => {
 
     const [stores, setStores] = useState<Store[]>([]);
 
-    const [displayedRows, setDisplayedRows] = useState<TrackingRow[]>([]); // 🔥 Ekrana basılan nihai liste
+    const [displayedRows, setDisplayedRows] = useState<TrackingRow[]>([]); //   Ekrana basılan nihai liste
 
     const [loading, setLoading] = useState(false);
 
@@ -312,7 +312,7 @@ const InvoiceTracking = () => {
 
                 <div>
 
-                    {/* 🔥 BUTTON onClick event'i handleListele'yi çağırıyor */}
+                    {/*   BUTTON onClick event'i handleListele'yi çağırıyor */}
 
                     <button onClick={() => handleListele()} className="btn btn-primary" style={{ height: '38px', padding: '0 25px', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '13px' }}>
 

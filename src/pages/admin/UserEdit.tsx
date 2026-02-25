@@ -58,7 +58,7 @@ const UserEdit = () => {
         load();
     }, [id, navigate]);
 
-    // 🔥 ŞİFRE SIFIRLAMA
+    //   ŞİFRE SIFIRLAMA
     const handlePasswordReset = async () => {
         if (!user?.email) return;
         try {
@@ -155,7 +155,7 @@ const UserEdit = () => {
 
             <div className="card" style={{ maxWidth: '600px' }}>
 
-                {/* 🔥 ŞİFRE BİLGİ KUTUSU */}
+                {/*   ŞİFRE BİLGİ KUTUSU */}
                 <div style={{ backgroundColor: '#fff3cd', color: '#856404', padding: '20px', borderRadius: '8px', marginBottom: '25px', border: '1px solid #ffeeba' }}>
                     <div style={{ marginBottom: '10px' }}>
                         <strong>🔒 Şifre İşlemleri:</strong> Güvenlik nedeniyle şifreler görüntülenemez.

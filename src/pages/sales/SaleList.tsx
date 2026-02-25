@@ -327,7 +327,7 @@ const SaleList = () => {
                 </div>
             </div>
 
-            {/* 🔥 MODERN KONTROL ÇUBUĞU (TEK SATIR & GÜZEL HİZALAMA) */}
+            {/*   MODERN KONTROL ÇUBUĞU (TEK SATIR & GÜZEL HİZALAMA) */}
             <div className="control-bar">
 
                 {/* 1. MAĞAZA SEÇİMİ */}
@@ -412,7 +412,7 @@ const SaleList = () => {
                                 sales={displaySales}
                                 formatDate={formatDate}
                                 goToDetail={goToDetail}
-                                // 🔥 EKSİK OLAN FONKSİYONLAR BURAYA EKLENDİ
+                                //   EKSİK OLAN FONKSİYONLAR BURAYA EKLENDİ
                                 getCatName={getCatName}
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
@@ -422,7 +422,7 @@ const SaleList = () => {
                     ) : (
                         <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8', backgroundColor: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                             <div style={{ marginBottom: '15px', opacity: 0.5 }}>
-                                {/* 🔥 EMOJİ YERİNE IKON */}
+                                {/*   EMOJİ YERİNE IKON */}
                                 <img src={StoreIcon} width="64" alt="Mağaza Seç" style={{ filter: 'grayscale(100%)', opacity: 0.6 }} />
                             </div>
                             <h3 style={{ margin: '0 0 5px 0', color: '#475569' }}>Mağaza Seçimi Yapılmadı</h3>

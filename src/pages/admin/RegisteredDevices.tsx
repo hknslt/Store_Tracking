@@ -149,7 +149,7 @@ const RegisteredDevices = () => {
                                     <tr key={user.id} className="hover-row">
                                         <td>
                                             <div style={{ fontWeight: '700', color: '#1e293b' }}>{user.fullName}</div>
-                                            {/* 🔥 E-POSTA EKLENDİ */}
+                                            {/*   E-POSTA EKLENDİ */}
                                             <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>{user.email || 'Email Yok'}</div>
                                         </td>
                                         <td style={{ color: '#475569', fontWeight: '500' }}>

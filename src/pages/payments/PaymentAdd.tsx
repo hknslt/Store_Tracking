@@ -11,7 +11,7 @@ import { getPaymentMethods, addPaymentDocument, getNextPaymentReceiptNo } from "
 import type { Store, SystemUser, PaymentItem, PaymentMethod, Debt, TransactionType, Personnel } from "../../types";
 import "../../App.css";
 
-// 🔥 DIŞARIDAN İKON İMPORTLARI 
+//   DIŞARIDAN İKON İMPORTLARI 
 import tahsilatIcon from "../../assets/icons/sack-dollar.svg";
 import masrafIcon from "../../assets/icons/receipt.svg";
 import merkezIcon from "../../assets/icons/bank.svg";
@@ -93,7 +93,7 @@ const PaymentAdd = () => {
         init();
     }, [currentUser]);
 
-    // 🔥 OTOMATİK DOLDURMA (DebtList'ten gelindiyse)
+    //   OTOMATİK DOLDURMA (DebtList'ten gelindiyse)
     useEffect(() => {
         if (location.state?.preSelectedDebt && headerData.storeId) {
             const preData = location.state.preSelectedDebt;
@@ -377,7 +377,7 @@ const PaymentAdd = () => {
                                             {paymentMethods.map(m => <option key={m.id} value={m.id}>{m.name}</option>)}
                                         </select>
 
-                                        {/* 🔥 MERKEZE TRANSFER İÇİN KASA BAKİYESİ GÖSTERİMİ */}
+                                        {/*   MERKEZE TRANSFER İÇİN KASA BAKİYESİ GÖSTERİMİ */}
                                         {item.type === 'Merkez' && item.paymentMethodId && headerData.storeId && (
                                             <div style={{ fontSize: '11px', color: '#64748b', marginTop: '6px', textAlign: 'center' }}>
                                                 Mevcut Bakiye: <strong style={{ color: '#0ea5e9' }}>

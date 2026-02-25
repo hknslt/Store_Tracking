@@ -23,7 +23,7 @@ interface Props {
     getCatName: (id?: string) => string;
     getCushionName: (id?: string) => string;
     getColorName: (id?: string) => string;
-    getDimensionName: (id?: string | null) => string; // 🔥 TS Hatası için bu eklendi
+    getDimensionName: (id?: string | null) => string; //   TS Hatası için bu eklendi
 }
 
 const PurchasesGridView: React.FC<Props> = ({
@@ -42,7 +42,7 @@ const PurchasesGridView: React.FC<Props> = ({
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(340px, 1fr))', gap: '20px' }}>
             {purchases.length > 0 ? purchases.map(p => {
                 const isCanceled = p.items.every(i => i.status === 'İptal');
-                // 🔥 Kullanılmayan isCompleted değişkeni silindi.
+                //   Kullanılmayan isCompleted değişkeni silindi.
                 const isExpanded = expandedCards[p.id!] || false;
 
                 return (
@@ -88,7 +88,7 @@ const PurchasesGridView: React.FC<Props> = ({
                                         </thead>
                                         <tbody>
                                             {p.items.map((item, idx) => {
-                                                // 🔥 MAĞAZA İÇİN BUTON KİLİDİ:
+                                                //   MAĞAZA İÇİN BUTON KİLİDİ:
                                                 const isProcessFinished = item.status === 'Tamamlandı' || item.status === 'İptal';
                                                 const isStoreLocked = !isAdmin && item.status !== 'Sevkiyat';
                                                 const isButtonDisabled = isProcessFinished || isStoreLocked;

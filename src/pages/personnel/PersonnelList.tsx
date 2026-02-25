@@ -45,7 +45,7 @@ const PersonnelList = () => {
         loadData();
     }, [currentUser]);
 
-    // 🔥 FİLTRELEME VE SIRALAMA (A-Z)
+    //   FİLTRELEME VE SIRALAMA (A-Z)
     const filteredPersonnel = personnel
         .filter(p => {
             const matchesStore = selectedStoreId ? (p as any).storeId === selectedStoreId : true;

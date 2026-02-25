@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { getStoreById, updateStore, deleteStore } from "../../services/storeService";
 import { motion } from "framer-motion";
-import { iller } from "../../constants/cities"; // 🔥 Şehir verisi import edildi
+import { iller } from "../../constants/cities"; //   Şehir verisi import edildi
 
 const StoreEdit = () => {
     const { id } = useParams();
@@ -36,8 +36,8 @@ const StoreEdit = () => {
                     storeName: data.storeName,
                     storeCode: data.storeCode || "",
                     phone: data.phone || "",
-                    city: data.city || "",       // 🔥 Veritabanından gelen İl
-                    district: data.district || "", // 🔥 Veritabanından gelen İlçe
+                    city: data.city || "",       //   Veritabanından gelen İl
+                    district: data.district || "", //   Veritabanından gelen İlçe
                     address: data.address || ""
                 });
             } else {

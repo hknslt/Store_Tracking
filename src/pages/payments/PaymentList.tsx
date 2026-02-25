@@ -45,7 +45,7 @@ const PaymentList = () => {
     const [endDate, setEndDate] = useState(cachedEnd);
     const [searchTerm, setSearchTerm] = useState("");
 
-    // 🔥 SIRALAMA (SORT) STATE'İ
+    //   SIRALAMA (SORT) STATE'İ
     const [sortConfig, setSortConfig] = useState<{ key: keyof PaymentDocument; direction: 'asc' | 'desc' }>({
         key: 'date',
         direction: 'desc'
@@ -209,7 +209,7 @@ const PaymentList = () => {
                     <h2>Kasa Hareketleri</h2>
                     <p style={{ color: '#64748b' }}>Ödeme, Tahsilat ve Masraf Listesi</p>
                 </div>
-                {/* 🔥 YENİ BUTON ALANI */}
+                {/*   YENİ BUTON ALANI */}
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <Link to="/payments/center-transfers" className="modern-btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #cbd5e1' }}>
                        Merkez Transfer Kontrolü
@@ -317,7 +317,7 @@ const PaymentList = () => {
                             <thead>
                                 <tr style={{ backgroundColor: '#f1f5f9' }}>
                                     <th style={{ width: '80px', textAlign: 'center' }}>İşlem</th>
-                                    {/* 🔥 Sıralanabilir Başlıklar */}
+                                    {/*   Sıralanabilir Başlıklar */}
                                     <SortableHeader label="Tarih" sortKey="date" width="15%" />
                                     <SortableHeader label="Makbuz No" sortKey="receiptNo" width="20%" />
                                     <SortableHeader label="İşlemi Yapan" sortKey="personnelName" width="25%" />

@@ -160,7 +160,7 @@ const StoreDashboard = () => {
         visible: { y: 0, opacity: 1 }
     };
 
-    // 🔥 KASA MANTIĞI: Veritabanındaki farklı ödeme yöntemlerinin tüm dövizlerini TEK ÇATI altında topluyoruz
+    //   KASA MANTIĞI: Veritabanındaki farklı ödeme yöntemlerinin tüm dövizlerini TEK ÇATI altında topluyoruz
     const cb = store.currentBalance || {};
     let totalTL = 0;
     let totalUSD = 0;
@@ -273,13 +273,13 @@ const StoreDashboard = () => {
                                 key="balance"
                                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                             >
-                                {/* 🔥 ANA PARA : TÜM TL TOPLAMI */}
+                                {/*   ANA PARA : TÜM TL TOPLAMI */}
                                 <div style={{ fontSize: '42px', fontWeight: '800', letterSpacing: '-1px', marginBottom: '5px' }}>
                                     {formatCurrency(totalTL, 'TL', 'big')}
                                 </div>
                                 <div style={{ fontSize: '13px', opacity: 0.7 }}>Toplam Nakit Varlığı (TL)</div>
 
-                                {/* 🔥 DİĞER DÖVİZLER */}
+                                {/*   DİĞER DÖVİZLER */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', paddingTop: '20px', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                     <div>
                                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px' }}>USD</div>

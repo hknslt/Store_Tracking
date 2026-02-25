@@ -16,7 +16,7 @@ interface Props {
     sales: Sale[];
     formatDate: (date: string) => string;
     goToDetail: (sale: Sale) => void;
-    // 🔥 YENİ PROPLAR (İsimleri almak için)
+    //   YENİ PROPLAR (İsimleri almak için)
     getCatName: (id?: string) => string;
     getCushionName: (id?: string) => string;
     getColorName: (id?: string) => string;

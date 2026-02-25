@@ -20,7 +20,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     const [userData, setUserData] = useState<SystemUser | null>(null);
     const [loading, setLoading] = useState(true);
 
-    // 🔥 KENDİ MESAJ SİSTEMİMİZ İÇİN STATE
+    //   KENDİ MESAJ SİSTEMİMİZ İÇİN STATE
     const [message, setMessage] = useState<{ type: 'error' | 'success', text: string } | null>(null);
 
     // Mesajı 5 saniye sonra otomatik kapat
@@ -131,7 +131,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return (
         <AuthContext.Provider value={values}>
-            {/* 🔥 ÖZEL MESAJ BİLEŞENİ (Ekranın Üst Ortasında Gösterilir) */}
+            {/*   ÖZEL MESAJ BİLEŞENİ (Ekranın Üst Ortasında Gösterilir) */}
             {message && (
                 <div style={{
                     position: 'fixed', top: '30px', left: '50%', transform: 'translateX(-50%)', zIndex: 99999,

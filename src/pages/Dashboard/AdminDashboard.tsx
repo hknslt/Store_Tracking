@@ -230,7 +230,7 @@ const AdminDashboard = () => {
                         <div style={{ padding: '15px 20px', borderBottom: '1px solid rgba(255,255,255,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <h4 style={{ margin: 0, fontSize: '13px', color: '#fff', fontWeight: '700', opacity: 0.9 }}>GÜNLÜK ÖZET</h4>
                             <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                                {/* 🔥 DÜZELTİLDİ: prevSlide butona bağlandı */}
+                                {/*   DÜZELTİLDİ: prevSlide butona bağlandı */}
                                 <button onClick={prevSlide} style={{ border: 'none', background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>◀</button>
 
                                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -242,7 +242,7 @@ const AdminDashboard = () => {
                                     ))}
                                 </div>
 
-                                {/* 🔥 DÜZELTİLDİ: nextSlide butona bağlandı */}
+                                {/*   DÜZELTİLDİ: nextSlide butona bağlandı */}
                                 <button onClick={nextSlide} style={{ border: 'none', background: 'rgba(255,255,255,0.2)', borderRadius: '50%', width: '24px', height: '24px', cursor: 'pointer', fontSize: '12px', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>▶</button>
                             </div>
                         </div>
@@ -256,7 +256,7 @@ const AdminDashboard = () => {
                             {/* SLIDE 1 */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
                                 <div style={{ fontSize: '12px', color: '#86efac', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <span>💰</span> FİNANSAL HAREKETLER
+                                    FİNANSAL HAREKETLER
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                     <SummaryRowWhite label="Bugünkü Satış" value={`+${data?.stats.todayRevenue.toLocaleString()} ₺`} />
@@ -269,7 +269,7 @@ const AdminDashboard = () => {
                             {/* SLIDE 2 */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
                                 <div style={{ fontSize: '12px', color: '#93c5fd', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <span>🔢</span> İŞLEM ADETLERİ
+                                    İŞLEM ADETLERİ
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                     <SummaryRowWhite label="Satış Fişi" value={`${data?.stats.todaySalesCount} Adet`} />
@@ -282,7 +282,7 @@ const AdminDashboard = () => {
                             {/* SLIDE 3 */}
                             <div style={{ flex: '0 0 100%', scrollSnapAlign: 'start', padding: '20px', boxSizing: 'border-box' }}>
                                 <div style={{ fontSize: '12px', color: '#fca5a5', fontWeight: 'bold', marginBottom: '15px', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                                    <span>🏢</span> GENEL ENVANTER
+                                    GENEL ENVANTER
                                 </div>
                                 <div style={{ display: 'flex', flexDirection: 'column', gap: '15px' }}>
                                     <SummaryRowWhite label="Toplam Şube" value={data?.stats.totalStores} />
@@ -319,7 +319,7 @@ const AdminDashboard = () => {
                                         tick={{ fill: '#94a3b8' }}
                                         dy={10}
                                     />
-                                    {/* 🔥 HATA DÜZELTİLDİ: Value tipini 'any' yaptık */}
+                                    {/*   HATA DÜZELTİLDİ: Value tipini 'any' yaptık */}
                                     <Tooltip
                                         contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px rgba(0,0,0,0.1)' }}
                                         cursor={{ stroke: '#cbd5e1', strokeWidth: 1, strokeDasharray: '4 4' }}

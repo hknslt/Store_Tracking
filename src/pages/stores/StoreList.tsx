@@ -45,7 +45,7 @@ const StoreList = () => {
                                 <td style={{ padding: '12px' }}>{s.storeName}</td>
                                 <td style={{ padding: '12px' }}>{s.phone}</td>
 
-                                {/* 🔥 İl / İlçe Gösterimi */}
+                                {/*   İl / İlçe Gösterimi */}
                                 <td style={{ padding: '12px', fontSize: '13px', color: '#666' }}>
                                     {s.city || s.district ? (
                                         <span style={{ fontWeight: '500', color: '#334155' }}>

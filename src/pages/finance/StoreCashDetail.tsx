@@ -7,7 +7,7 @@ import { getPaymentMethods, getPaymentsByStore } from "../../services/paymentSer
 import type { PaymentMethod, PaymentDocument } from "../../types";
 
 import storeIcon from "../../assets/icons/store.svg";
-import chevronRightIcon from "../../assets/icons/chevron-right.svg"; // 🔥 Sağ ok ikonu eklendi
+import chevronRightIcon from "../../assets/icons/chevron-right.svg"; //   Sağ ok ikonu eklendi
 
 export default function StoreCashDetail() {
     const { storeId } = useParams();
@@ -145,7 +145,7 @@ export default function StoreCashDetail() {
                             <th>İşlem Özeti</th>
                             <th style={{ textAlign: 'right' }}>Döviz Tutarı</th>
                             <th style={{ textAlign: 'right' }}>TL Karşılığı</th>
-                            <th style={{ width: '40px' }}></th> {/* 🔥 Sağ Ok için Sütun */}
+                            <th style={{ width: '40px' }}></th> {/*   Sağ Ok için Sütun */}
                         </tr>
                     </thead>
                     <tbody>
@@ -169,7 +169,7 @@ export default function StoreCashDetail() {
                                         key={payment.id}
                                         style={{ borderBottom: '1px solid #f1f5f9', cursor: 'pointer' }}
                                         className="hover-row"
-                                        onClick={() => navigate(`/payments/detail/${payment.id}`)} // 🔥 YÖNLENDİRME EKLENDİ
+                                        onClick={() => navigate(`/payments/detail/${payment.id}`)} //   YÖNLENDİRME EKLENDİ
                                         title="Makbuz detayını görüntüle"
                                     >
                                         <td style={{ paddingLeft: '20px', color: '#64748b', fontSize: '13px' }}>{new Date(payment.date).toLocaleDateString('tr-TR')}</td>
@@ -198,7 +198,7 @@ export default function StoreCashDetail() {
                                             {formatMoney(payment.totalAmount, 'TL')}
                                         </td>
 
-                                        {/* 🔥 OK İKONU */}
+                                        {/*   OK İKONU */}
                                         <td style={{ textAlign: 'center', paddingRight: '20px' }}>
                                             <img src={chevronRightIcon} alt="Git" style={{ width: '18px', opacity: 0.4 }} />
                                         </td>

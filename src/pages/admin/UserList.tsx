@@ -32,7 +32,7 @@ const UserList = () => {
 
     // Mağaza İsmi Bulma
     const getStoreName = (storeId?: string) => {
-        if (!storeId) return "Merkez"; // 🔥 Boş ise Merkez yazsın
+        if (!storeId) return "Merkez"; //   Boş ise Merkez yazsın
         return stores.find(s => s.id === storeId)?.storeName || "Bilinmiyor";
     };
 

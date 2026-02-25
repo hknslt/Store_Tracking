@@ -135,7 +135,7 @@ const PurchaseEdit = () => {
         setSelectedProductId(""); setSelectedColorId(""); setSelectedDimensionId("");
     };
 
-    // 🔥 SİLME İŞLEMLERİ (MODAL YÖNETİMİ)
+    //   SİLME İŞLEMLERİ (MODAL YÖNETİMİ)
     const removeLineItem = (index: number) => {
         const itemToRemove = currentItems[index];
 
@@ -219,7 +219,7 @@ const PurchaseEdit = () => {
                 </div>
             )}
 
-            {/* 🔥 SİLME ONAY MODALI */}
+            {/*   SİLME ONAY MODALI */}
             {showDeleteModal && (
                 <div style={modalOverlayStyle}>
                     <div style={modalContentStyle}>

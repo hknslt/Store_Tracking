@@ -20,7 +20,7 @@ import { deleteApp, getApp, initializeApp } from "firebase/app";
 
 const STORE_COLLECTION = "stores";
 const PERSONNEL_COLLECTION = "personnel";
-const SSH_COLLECTION = "ssh_records"; // 🔥 SSH Koleksiyonu
+const SSH_COLLECTION = "ssh_records"; //   SSH Koleksiyonu
 
 // --- YARDIMCI FONKSİYON: Toplu Silme (Alt Koleksiyonlar İçin) ---
 const deleteCollection = async (path: string) => {
@@ -75,7 +75,7 @@ export const updateStore = async (id: string, data: any) => {
     await updateDoc(ref, data);
 };
 
-// 🔥 GÜNCELLENMİŞ SİLME FONKSİYONU (SSH Dahil)
+//   GÜNCELLENMİŞ SİLME FONKSİYONU (SSH Dahil)
 export const deleteStore = async (storeId: string) => {
     try {
         console.log(`Mağaza siliniyor: ${storeId}...`);
@@ -88,7 +88,7 @@ export const deleteStore = async (storeId: string) => {
             batch.delete(doc.ref);
         });
 
-        // 2. SSH KAYITLARINI SİL (🔥 YENİ EKLENDİ)
+        // 2. SSH KAYITLARINI SİL (  YENİ EKLENDİ)
         const sshQuery = query(collection(db, SSH_COLLECTION), where("storeId", "==", storeId));
         const sshSnap = await getDocs(sshQuery);
         sshSnap.forEach((doc) => {

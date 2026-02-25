@@ -27,7 +27,7 @@ const PersonnelDetail = () => {
     const [storeName, setStoreName] = useState("-");
     const [loading, setLoading] = useState(true);
 
-    // 🔥 YENİ STATE'LER (İstatistikler)
+    //   YENİ STATE'LER (İstatistikler)
     const [stats, setStats] = useState({
         monthlySales: 0,
         commissionAmount: 0,
@@ -54,7 +54,7 @@ const PersonnelDetail = () => {
                     const s = sData.find(x => x.id === pData.storeId);
                     if (s) setStoreName(s.storeName);
 
-                    // 🔥 EKSTRA VERİLERİ ÇEK (Satış ve Puantaj)
+                    //   EKSTRA VERİLERİ ÇEK (Satış ve Puantaj)
                     fetchExtraData(pData.storeId, pData.id!, (pData as Personnel).commissionRate || 0);
                 }
             } else {
@@ -64,7 +64,7 @@ const PersonnelDetail = () => {
         } catch (error) { console.error(error); } finally { setLoading(false); }
     };
 
-    // 🔥 YENİ FONKSİYON: Ekstra verileri çeker
+    //   YENİ FONKSİYON: Ekstra verileri çeker
     const fetchExtraData = async (storeId: string, personId: string, commissionRate: number) => {
         const now = new Date();
         const year = now.getFullYear();
@@ -286,7 +286,7 @@ const PersonnelDetail = () => {
                         </div>
                     </div>
 
-                    {/* 🔥 2. KART: FİNANSAL & PUANTAJ ÖZETİ */}
+                    {/*   2. KART: FİNANSAL & PUANTAJ ÖZETİ */}
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
 
                         {/* FİNANS KARTI */}

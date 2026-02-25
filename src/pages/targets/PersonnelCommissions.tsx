@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getMonthlySalesByPersonnel, updateStoreCommissionModel, updatePersonnelCommissionRate } from "../../services/commissionService";
 import { getAllTargets, setStoreTarget as saveStoreTargetToDb } from "../../services/targetService";
-import { useNavigate } from "react-router-dom"; // 🔥 Yönlendirme için eklendi
+import { useNavigate } from "react-router-dom"; //   Yönlendirme için eklendi
 import type { Store, Personnel, CommissionResult } from "../../types";
 import "../../App.css";
 
@@ -17,7 +17,7 @@ import CancelIcon from "../../assets/icons/close-circle.svg";
 const PersonnelCommissions = () => {
     const { userRole, userData } = useAuth();
     const isAdmin = userRole === 'admin' || userRole === 'control';
-    const navigate = useNavigate(); // 🔥 Yönlendirme tanımlandı
+    const navigate = useNavigate(); //   Yönlendirme tanımlandı
 
     // Veri Stateleri
     const [stores, setStores] = useState<Store[]>([]);

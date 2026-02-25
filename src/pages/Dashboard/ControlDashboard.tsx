@@ -30,7 +30,7 @@ const ControlDashboard = () => {
     const [purchaseStatuses, setPurchaseStatuses] = useState({ beklemede: 0, onaylandi: 0, uretim: 0, sevkiyat: 0 });
 
     // Mağazalar ve İşlemler
-    const [stores, setStores] = useState<any[]>([]); // 🔥 Eklendi
+    const [stores, setStores] = useState<any[]>([]); //   Eklendi
     const [activePurchases, setActivePurchases] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -57,7 +57,7 @@ const ControlDashboard = () => {
             try {
                 const todayString = today.toISOString().split('T')[0];
 
-                // 🔥 Önce mağazaları çek
+                //   Önce mağazaları çek
                 const storesSnap = await getDocs(collection(db, "stores"));
                 const storesList = storesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setStores(storesList);

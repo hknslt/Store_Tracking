@@ -2,22 +2,22 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { getSSHRecordById, updateSSHRecord, deleteSSHRecord, updateSSHStatus } from "../../services/sshService";
-import { useAuth } from "../../context/AuthContext"; // 🔥 Auth eklendi
-import { db } from "../../firebase"; // 🔥 DB eklendi
-import { doc, getDoc } from "firebase/firestore"; // 🔥 Firestore eklendi
+import { useAuth } from "../../context/AuthContext"; //   Auth eklendi
+import { db } from "../../firebase"; //   DB eklendi
+import { doc, getDoc } from "firebase/firestore"; //   Firestore eklendi
 import type { SSHRecord, SSHItem, SystemUser } from "../../types";
 import "../../App.css";
 
 const SSHDetail = () => {
     const { id } = useParams();
     const navigate = useNavigate();
-    const { currentUser } = useAuth(); // 🔥 Mevcut kullanıcıyı al
+    const { currentUser } = useAuth(); //   Mevcut kullanıcıyı al
 
     const [record, setRecord] = useState<SSHRecord | null>(null);
     const [loading, setLoading] = useState(true);
     const [isEditing, setIsEditing] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isAdmin, setIsAdmin] = useState(false); // 🔥 Yetki State'i
+    const [isAdmin, setIsAdmin] = useState(false); //   Yetki State'i
 
     // Form State
     const [editItems, setEditItems] = useState<SSHItem[]>([]);
@@ -35,7 +35,7 @@ const SSHDetail = () => {
 
     const [toast, setToast] = useState<{ show: boolean, msg: string, type: 'success' | 'error' }>({ show: false, msg: '', type: 'success' });
 
-    // 🔥 KULLANICI YETKİSİNİ KONTROL ET
+    //   KULLANICI YETKİSİNİ KONTROL ET
     useEffect(() => {
         const checkUserRole = async () => {
             if (currentUser) {
@@ -222,7 +222,7 @@ const SSHDetail = () => {
                         <span className="badge badge-success" style={{ fontSize: '14px', padding: '10px 20px' }}>Bu Kayıt Tamamlandı</span>
                     )}
 
-                    {/* 🔥 SİLME BUTONU: Sadece Admin */}
+                    {/*   SİLME BUTONU: Sadece Admin */}
                     {isAdmin && (
                         <button onClick={confirmDelete} className="btn btn-danger">🗑️ Sil</button>
                     )}
@@ -294,7 +294,7 @@ const SSHDetail = () => {
                     <div>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
                             <h4 style={{ margin: 0 }}>Yapılacak İşlemler</h4>
-                            {/* 🔥 DÜZENLEME BUTONU: Sadece Admin ise VE Kayıt Açıksa */}
+                            {/*   DÜZENLEME BUTONU: Sadece Admin ise VE Kayıt Açıksa */}
                             {isAdmin && record.status === 'Açık' && (
                                 <button onClick={() => setIsEditing(true)} className="btn btn-sm btn-secondary">✏️ Düzenle</button>
                             )}

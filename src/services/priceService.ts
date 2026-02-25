@@ -53,7 +53,7 @@ export const savePriceList = async (data: PriceListModel, id?: string): Promise<
                 ...data,
                 createdAt: new Date().toISOString()
             });
-            return docRef.id; // 🔥 Oluşturulan yeni ID'yi döndür
+            return docRef.id; //   Oluşturulan yeni ID'yi döndür
         }
     } catch (error) {
         console.error("Fiyat listesi kaydetme hatası:", error);

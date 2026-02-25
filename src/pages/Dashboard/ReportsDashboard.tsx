@@ -67,7 +67,7 @@ const ReportsDashboard = () => {
                 if (city && initialCityStats[city]) initialCityStats[city].revenue += amount;
             });
 
-            // 🔥 3. PERSONEL SAYISI (KESİN ÇÖZÜM)
+            //   3. PERSONEL SAYISI (KESİN ÇÖZÜM)
             const userSnap = await getDocs(collection(db, "personnel"));
             let storePersonnelCount = 0;
 
@@ -87,7 +87,7 @@ const ReportsDashboard = () => {
                 totalRevenue: totalRev,
                 salesCount: salesCount,
                 stockValue: 850000,
-                personnelCount: storePersonnelCount // 🔥 Sadece mağaza personellerini yazdırır
+                personnelCount: storePersonnelCount //   Sadece mağaza personellerini yazdırır
             });
             setCityData(initialCityStats);
         } catch (error) {

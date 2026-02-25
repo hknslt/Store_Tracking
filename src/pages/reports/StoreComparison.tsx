@@ -93,7 +93,7 @@ const StoreComparison = () => {
         return Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
     };
 
-    // 🔥 GÜNCELLENMİŞ PDF FONKSİYONU (Çoklu Sayfa Desteği)
+    //   GÜNCELLENMİŞ PDF FONKSİYONU (Çoklu Sayfa Desteği)
     const handleDownloadPDF = async () => {
         if (!tableRef.current) return;
 

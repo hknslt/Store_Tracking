@@ -32,7 +32,7 @@ const AttendanceManager = () => {
     const [hasChanges, setHasChanges] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // 🔥 Kendi Mesaj Sistemimiz
+    //   Kendi Mesaj Sistemimiz
     const [message, setMessage] = useState<{ type: 'success' | 'error' | 'warning', text: string } | null>(null);
 
     // Otomatik Mesaj Kapatma

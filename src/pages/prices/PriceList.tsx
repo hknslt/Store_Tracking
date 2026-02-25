@@ -135,7 +135,7 @@ const PriceList = () => {
               {priceLists.length > 0 ? (
                 priceLists.map(list => (
                   <tr key={list.id} className="hover-row">
-                    {/* 🔥 Liste Adı Tıklanabilir Yapıldı */}
+                    {/*   Liste Adı Tıklanabilir Yapıldı */}
                     <td
                       style={{ fontWeight: '700', color: '#3b82f6', cursor: 'pointer' }}
                       onClick={() => navigate(`/prices/detail/${list.id}`)}

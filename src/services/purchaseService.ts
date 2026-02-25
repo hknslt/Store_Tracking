@@ -22,7 +22,7 @@ export const addPurchase = async (purchase: Purchase) => {
             // A) OKUMALAR
             const stockDeltas: Record<string, any> = {};
             for (const item of purchase.items) {
-                // 🔥 DİKKAT: cushionId çıkarıldı. Sadece Ürün + Renk + Ebat
+                //   DİKKAT: cushionId çıkarıldı. Sadece Ürün + Renk + Ebat
                 const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
 
                 if (!stockDeltas[uniqueStockId]) {
@@ -208,7 +208,7 @@ export const getNextPurchaseReceiptNo = async (storeId: string): Promise<string>
     }
 };
 
-// 🔥 4. ALIŞ İPTAL ETME (Stokları Düzeltir)
+//   4. ALIŞ İPTAL ETME (Stokları Düzeltir)
 export const cancelPurchaseComplete = async (storeId: string, purchaseId: string) => {
     try {
         await runTransaction(db, async (transaction) => {
@@ -270,7 +270,7 @@ export const cancelPurchaseComplete = async (storeId: string, purchaseId: string
 };
 
 
-// 🔥 5. ALIŞ SİLME (Güvenli Mod)
+//   5. ALIŞ SİLME (Güvenli Mod)
 export const deletePurchaseComplete = async (storeId: string, purchaseId: string) => {
     try {
         await runTransaction(db, async (transaction) => {

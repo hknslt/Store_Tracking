@@ -44,7 +44,7 @@ const Sidebar = () => {
 
   const userInitial = currentUser?.email ? currentUser.email.charAt(0).toUpperCase() : "U";
 
-  // 🔥 KONTROLCÜ (control) ROLÜ DE EKLENDİ, SIDEBAR GİZLENDİ
+  //   KONTROLCÜ (control) ROLÜ DE EKLENDİ, SIDEBAR GİZLENDİ
   if (userRole === 'store_admin' || userRole === 'staff' || userRole === 'report' || userRole === 'control') return null;
 
   return (

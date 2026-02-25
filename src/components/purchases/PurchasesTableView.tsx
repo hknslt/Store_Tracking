@@ -72,7 +72,7 @@ const PurchasesTableView: React.FC<Props> = ({
                                     <td colSpan={6} style={{ padding: '20px' }}>
                                         <div style={{ textAlign: 'right', marginBottom: '10px', display: 'flex', justifyContent: 'flex-end', gap: '10px' }}>
 
-                                            {/* 🔥 DÜZENLEME BUTONU: Sadece "Beklemede" durumundaysa görünür */}
+                                            {/*   DÜZENLEME BUTONU: Sadece "Beklemede" durumundaysa görünür */}
                                             {isAdmin && isEditable && (
                                                 <button
                                                     onClick={(e) => { e.stopPropagation(); onEdit(p); }}
@@ -104,7 +104,7 @@ const PurchasesTableView: React.FC<Props> = ({
                                             </thead>
                                             <tbody>
                                                 {p.items.map((item, idx) => {
-                                                    // 🔥 MAĞAZA İÇİN BUTON KİLİDİ:
+                                                    //   MAĞAZA İÇİN BUTON KİLİDİ:
                                                     // Kullanıcı Admin/Control DEĞİLSE ve ürün "Sevkiyat" aşamasında DEĞİLSE buton kilitlenir.
                                                     // Ürün zaten "Tamamlandı" veya "İptal" ise buton her türlü kilitlenir.
                                                     const isProcessFinished = item.status === 'Tamamlandı' || item.status === 'İptal';

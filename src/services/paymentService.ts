@@ -13,7 +13,7 @@ import {
     where,
     updateDoc,
     limit,
-    getDoc
+    getDoc,
 } from "firebase/firestore";
 import type { PaymentMethod, PaymentDocument, Debt } from "../types";
 
@@ -62,7 +62,7 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
                 }
             }
 
-            // 🔥 HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla
+            //   HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla
             // Örn: { "methodId1": { TL: 100, USD: 0... }, "methodId2": { TL: -50, USD: 0... } }
             const balanceChanges: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
 
@@ -99,7 +99,7 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
                 transaction.update(readData.ref, { paidAmount: newPaid, remainingAmount: newRemaining, status: newStatus, lastPaymentDate: payment.date });
             }
 
-            // 🔥 KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE (Dot Notation)
+            //   KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE (Dot Notation)
             const storeRef = doc(db, "stores", payment.storeId);
             const updates: any = {};
 
@@ -209,7 +209,7 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
             oldPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) - Number(i.amount); });
             newPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) + Number(i.amount); });
 
-            // 🔥 KASA FARKLARINI ÖDEME YÖNTEMİNE GÖRE HESAPLA
+            //   KASA FARKLARINI ÖDEME YÖNTEMİNE GÖRE HESAPLA
             const balanceDiff: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
             const initMethod = (mId: string) => { if (!balanceDiff[mId]) balanceDiff[mId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 }; };
 
@@ -248,7 +248,7 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
                 }
             }
 
-            // 🔥 GÜNCEL KASAYI YAZ
+            //   GÜNCEL KASAYI YAZ
             const storeRef = doc(db, "stores", newPayment.storeId);
             const updates: any = {};
             for (const mId in balanceDiff) {
@@ -310,21 +310,44 @@ export const getCenterTransfers = async (storeId?: string) => {
     }
 };
 
-// --- MERKEZ ONAY TİKİ GÜNCELLEME ---
-export const toggleCenterTransferCheck = async (paymentId: string, itemIndex: number, currentStatus: boolean) => {
+
+// --- MERKEZ ONAY TİKLERİNİ TOPLU KAYDETME ---
+export const saveBulkCenterTransferChecks = async (changes: { paymentId: string, itemIndex: number, isCenterChecked: boolean }[]) => {
     try {
-        const docRef = doc(db, "payments", paymentId);
-        const snap = await getDoc(docRef);
+        // Aynı paymentId'ye ait birden fazla değişiklik olabilir, o yüzden önce belgeleri gruplayıp okumamız lazım.
+        // Güvenli olması için runTransaction kullanmak daha iyidir çünkü dizi içindeki (items) tek bir elemanı değiştiriyoruz.
+        await runTransaction(db, async (transaction) => {
+            const paymentDocs: Record<string, PaymentDocument> = {};
+            const paymentRefs: Record<string, any> = {};
 
-        if (snap.exists()) {
-            const data = snap.data() as PaymentDocument;
-            data.items[itemIndex].isCenterChecked = !currentStatus; // Durumu tersine çevir
+            // Değişen tüm ödeme belgelerini oku
+            for (const change of changes) {
+                if (!paymentDocs[change.paymentId]) {
+                    const pRef = doc(db, "payments", change.paymentId);
+                    const pSnap = await transaction.get(pRef);
+                    if (pSnap.exists()) {
+                        paymentDocs[change.paymentId] = pSnap.data() as PaymentDocument;
+                        paymentRefs[change.paymentId] = pRef;
+                    }
+                }
+            }
 
-            await updateDoc(docRef, { items: data.items });
-            return !currentStatus;
-        }
+            // Hafızadaki belgeler üzerinde değişiklikleri uygula
+            for (const change of changes) {
+                if (paymentDocs[change.paymentId]) {
+                    paymentDocs[change.paymentId].items[change.itemIndex].isCenterChecked = change.isCenterChecked;
+                }
+            }
+
+            // Güncellenmiş belgeleri veritabanına yaz
+            for (const paymentId in paymentDocs) {
+                transaction.update(paymentRefs[paymentId], { items: paymentDocs[paymentId].items });
+            }
+        });
+
+        return true;
     } catch (error) {
-        console.error("Onay güncellenirken hata:", error);
+        console.error("Toplu onay güncellenirken hata:", error);
         throw error;
     }
 };

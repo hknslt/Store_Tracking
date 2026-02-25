@@ -21,7 +21,7 @@ interface Props {
     isAdmin: boolean;
     openCancelModal: (id: string) => void;
     goToDetail: (sale: Sale) => void;
-    onEdit: (sale: Sale) => void; // 🔥 YENİ EKLENDİ
+    onEdit: (sale: Sale) => void; //   YENİ EKLENDİ
     getCatName: (id?: string) => string;
     getCushionName: (id?: string) => string;
     getColorName: (id?: string) => string;
@@ -107,7 +107,7 @@ const SalesTableView: React.FC<Props> = ({
                                                         {Icons.search} Detay
                                                     </button>
 
-                                                    {/* 🔥 DÜZENLEME BUTONU (Sadece Admin ve Aktif Siparişler) */}
+                                                    {/*   DÜZENLEME BUTONU (Sadece Admin ve Aktif Siparişler) */}
                                                     {isAdmin && !isCanceled && !isAllDelivered && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); onEdit(s); }}

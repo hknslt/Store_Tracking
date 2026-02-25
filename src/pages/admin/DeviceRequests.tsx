@@ -7,7 +7,7 @@ import "../../App.css";
 const DeviceRequests = () => {
     const [requests, setRequests] = useState<DeviceRequest[]>([]);
 
-    // 🔥 Tüm kullanıcıları hem filtreleme hem e-posta eşleştirme için tutuyoruz
+    //   Tüm kullanıcıları hem filtreleme hem e-posta eşleştirme için tutuyoruz
     const [allUsersList, setAllUsersList] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -25,7 +25,7 @@ const DeviceRequests = () => {
     const loadRequests = async () => {
         setLoading(true);
         try {
-            // 🔥 İstekleri ve tüm kullanıcıları eş zamanlı çekiyoruz
+            //   İstekleri ve tüm kullanıcıları eş zamanlı çekiyoruz
             const [data, users] = await Promise.all([
                 getPendingDeviceRequests(),
                 getAllPersonnelForDevice()
@@ -85,7 +85,7 @@ const DeviceRequests = () => {
         }
     };
 
-    // 🔥 MANUEL EKLEME: Sadece Mağaza Adminlerini Filtrele
+    //   MANUEL EKLEME: Sadece Mağaza Adminlerini Filtrele
     const openManualModal = () => {
         setManualModalOpen(true);
         // Zaten loadRequests'te çektiğimiz listeden sadece store_admin olanları seçiyoruz
@@ -121,7 +121,7 @@ const DeviceRequests = () => {
                 </div>
             )}
 
-            {/* 🔥 MANUEL CİHAZ EKLEME MODALI */}
+            {/*   MANUEL CİHAZ EKLEME MODALI */}
             {manualModalOpen && (
                 <div style={modalOverlayStyle}>
                     <div style={{ ...modalContentStyle, textAlign: 'left' }}>
@@ -161,7 +161,7 @@ const DeviceRequests = () => {
                 </div>
             )}
 
-            {/* 🔥 ONAY/RED MODALI */}
+            {/*   ONAY/RED MODALI */}
             {modalConfig.isOpen && modalConfig.request && (
                 <div style={modalOverlayStyle}>
                     <div style={modalContentStyle}>
@@ -241,7 +241,7 @@ const DeviceRequests = () => {
                         <tbody>
                             {requests.length > 0 ? (
                                 requests.map(req => {
-                                    // 🔥 E-posta bilgisini bulmak için tüm kullanıcılar listesinden eşleştiriyoruz
+                                    //   E-posta bilgisini bulmak için tüm kullanıcılar listesinden eşleştiriyoruz
                                     const userEmail = allUsersList.find(u => u.id === req.personnelId)?.email || 'E-Posta Bulunamadı';
 
                                     return (

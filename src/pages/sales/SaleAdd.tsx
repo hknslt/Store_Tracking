@@ -30,11 +30,11 @@ const SaleAdd = () => {
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
 
-    // 🔥 TÜM VERİLER (Filtreleme için hafızada tutuyoruz)
+    //   TÜM VERİLER (Filtreleme için hafızada tutuyoruz)
     const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [allProducts, setAllProducts] = useState<Product[]>([]);
 
-    // 🔥 GÖRÜNEN LİSTELER (Seçime göre değişen)
+    //   GÖRÜNEN LİSTELER (Seçime göre değişen)
     const [filteredCategories, setFilteredCategories] = useState<Category[]>([]);
     const [filteredProducts, setFilteredProducts] = useState<Product[]>([]);
 
@@ -92,7 +92,7 @@ const SaleAdd = () => {
 
     const formatPhone = (value: string) => value.replace(/\D/g, '');
 
-    // 🔥 GÜNCELLENEN FONKSİYON: Türkçe Karakter Duyarlı Baş Harf Büyütme
+    //   GÜNCELLENEN FONKSİYON: Türkçe Karakter Duyarlı Baş Harf Büyütme
     const capitalizeWords = (str: string) => {
         if (!str) return "";
         return str.split(" ").map(word => {
@@ -284,7 +284,7 @@ const SaleAdd = () => {
         }
     };
 
-    // --- 🔥 CANLI ÜRÜN TOPLAMI ---
+    // ---   CANLI ÜRÜN TOPLAMI ---
     const itemsTotal = addedItems.reduce((acc, item) => acc + item.total, 0);
 
     // Stiller
@@ -445,7 +445,7 @@ const SaleAdd = () => {
 
             {/* ÜRÜN GİRİŞİ */}
             <div className="card">
-                {/* 🔥 GÜNCEL KART BAŞLIĞI: Toplam Tutar Eklendi */}
+                {/*   GÜNCEL KART BAŞLIĞI: Toplam Tutar Eklendi */}
                 <div className="card-header" style={{ padding: '15px 20px', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <h3 style={{ margin: 0, fontSize: '16px', color: '#2c3e50' }}>Ürün Girişi</h3>
                     <span style={{ fontSize: '16px', fontWeight: 'bold', color: '#27ae60' }}>

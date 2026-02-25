@@ -3,7 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { addStore } from "../../services/storeService";
 import { motion } from "framer-motion";
-import { iller } from "../../constants/cities"; // 🔥 Şehir verisi import edildi
+import { iller } from "../../constants/cities"; //   Şehir verisi import edildi
 
 const StoreAdd = () => {
     const navigate = useNavigate();

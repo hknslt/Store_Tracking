@@ -12,7 +12,7 @@ export interface TrackingRow {
 export const getInvoiceTrackingData = async (startDate: string, endDate: string, storeId?: string) => {
     try {
         // 1. SATIŞLARI ÇEK (Collection Group ile tüm mağazalar)
-        // 🔥 ÖNEMLİ: Burada "type" filtresini kaldırdık. 
+        //   ÖNEMLİ: Burada "type" filtresini kaldırdık. 
         // İndeks hatası almamak için tüm fişleri çekip aşağıda JS ile eleyeceğiz.
 
         let salesQuery = query(
@@ -35,7 +35,7 @@ export const getInvoiceTrackingData = async (startDate: string, endDate: string,
 
         const salesSnap = await getDocs(salesQuery);
 
-        // 🔥 JS FİLTRESİ: Burada "Satış" olanları VEYA tipi olmayanları (eski kayıtlar) alıyoruz.
+        //   JS FİLTRESİ: Burada "Satış" olanları VEYA tipi olmayanları (eski kayıtlar) alıyoruz.
         // "Alış" (Stok Giriş) olanları eliyoruz.
         const sales = salesSnap.docs
             .map(doc => ({ id: doc.id, ...doc.data() } as any))

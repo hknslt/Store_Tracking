@@ -1,12 +1,12 @@
 // src/pages/payments/PaymentDetail.tsx
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
-import { getPaymentById, getPaymentMethods } from "../../services/paymentService"; // 🔥 getPaymentMethods eklendi
+import { getPaymentById, getPaymentMethods } from "../../services/paymentService"; //   getPaymentMethods eklendi
 import { getStores } from "../../services/storeService";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
 import { doc, getDoc } from "firebase/firestore";
-import type { PaymentDocument, SystemUser, PaymentMethod } from "../../types"; // 🔥 PaymentMethod tipi eklendi
+import type { PaymentDocument, SystemUser, PaymentMethod } from "../../types"; //   PaymentMethod tipi eklendi
 import "../../App.css";
 
 const PaymentDetail = () => {
@@ -16,7 +16,7 @@ const PaymentDetail = () => {
 
     const [payment, setPayment] = useState<PaymentDocument | null>(null);
     const [storeName, setStoreName] = useState("Yükleniyor...");
-    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]); // 🔥 Ödeme yöntemleri için state
+    const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]); //   Ödeme yöntemleri için state
     const [isAdmin, setIsAdmin] = useState(false);
     const [loading, setLoading] = useState(true);
 
@@ -28,7 +28,7 @@ const PaymentDetail = () => {
                 if (!pData) { navigate('/payments'); return; }
                 setPayment(pData);
 
-                // 🔥 Mağazaları ve Ödeme Yöntemlerini paralel çekiyoruz
+                //   Mağazaları ve Ödeme Yöntemlerini paralel çekiyoruz
                 const [storesData, methodsData] = await Promise.all([
                     getStores(),
                     getPaymentMethods()
@@ -55,7 +55,7 @@ const PaymentDetail = () => {
         loadDetail();
     }, [id, currentUser, navigate]);
 
-    // 🔥 ID'den ödeme yönteminin ismini bulan yardımcı fonksiyon
+    //   ID'den ödeme yönteminin ismini bulan yardımcı fonksiyon
     const getMethodName = (methodId: string) => {
         const method = paymentMethods.find(m => m.id === methodId);
         return method ? method.name : "Bilinmeyen"; // Eğer eski kayıtlarda isim direkt yazıldıysa onu da görebilmek için methodId de döndürülebilir ama "Bilinmeyen" daha güvenli
@@ -126,7 +126,7 @@ const PaymentDetail = () => {
                                         <div style={{ fontWeight: '600', color: '#334155' }}>{item.customerName || "-"}</div>
                                         <div style={{ fontSize: '12px', color: '#64748b' }}>{item.description} {item.saleReceiptNo && `(Fiş: ${item.saleReceiptNo})`}</div>
                                     </td>
-                                    {/* 🔥 ID YERİNE İSİM YAZDIRIYORUZ */}
+                                    {/*   ID YERİNE İSİM YAZDIRIYORUZ */}
                                     <td style={{ color: '#475569', fontWeight: '500' }}>
                                         {getMethodName(item.paymentMethodId)}
                                     </td>

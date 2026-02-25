@@ -28,7 +28,7 @@ const ProductList = () => {
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const [editForm, setEditForm] = useState({ productName: "", explanation: "" });
 
-  // 🔥 Modal State (Silme Onayı)
+  //   Modal State (Silme Onayı)
   const [confirmModal, setConfirmModal] = useState<{ show: boolean, id: string | null }>({ show: false, id: null });
 
   // Toast Mesajı Gösterici (Otomatik Kapanır)
@@ -192,7 +192,7 @@ const ProductList = () => {
                 <div style={{ backgroundColor: '#f8f9fa', padding: '15px' }}>
                   <div className="dashboard-grid">
                     {groupCategories.map(category => {
-                      // 🔥 DEĞİŞİKLİK BURADA: Ürünleri filtreleyip A'dan Z'ye sıralıyoruz
+                      //   DEĞİŞİKLİK BURADA: Ürünleri filtreleyip A'dan Z'ye sıralıyoruz
                       const categoryProducts = products
                         .filter(p => p.categoryId === category.id)
                         .sort((a, b) => a.productName.localeCompare(b.productName, 'tr'));

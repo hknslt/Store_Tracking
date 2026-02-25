@@ -260,7 +260,7 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
                             gap: '6px' // İkon ile yazı arasındaki boşluk
                         }}
                     >
-                        {/* 🔥 Emoji yerine dışarıdan gelen ikon eklendi */}
+                        {/*   Emoji yerine dışarıdan gelen ikon eklendi */}
                         <img
                             src={cardIcon}
                             alt="Tahsilat"
