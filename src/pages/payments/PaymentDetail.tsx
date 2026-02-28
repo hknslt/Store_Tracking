@@ -76,7 +76,7 @@ const PaymentDetail = () => {
                     {/* SADECE ADMİNLER DÜZENLEYEBİLİR */}
                     {isAdmin && (
                         <button onClick={() => navigate(`/payments/edit/${payment.id}`)} className="modern-btn btn-primary" style={{ backgroundColor: '#f59e0b' }}>
-                            ✏️ İşlemi Düzenle
+                            İşlemi Düzenle
                         </button>
                     )}
                 </div>

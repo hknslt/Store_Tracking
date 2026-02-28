@@ -13,7 +13,6 @@ import "../../App.css";
 import StoreIcon from "../../assets/icons/store.svg";
 import PaperIcon from "../../assets/icons/paper.svg";
 
-
 const PaymentList = () => {
     const { currentUser } = useAuth();
     const navigate = useNavigate();
@@ -181,6 +180,20 @@ const PaymentList = () => {
     const dailyStats = calculateDailySummary();
     const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
 
+    //   MAKBUZ NET TUTARINI HESAPLAYAN YARDIMCI
+    const getNetBalanceChange = (payment: PaymentDocument) => {
+        let net = 0;
+        payment.items.forEach(item => {
+            const amount = Number(item.amount || 0);
+            if (item.type === 'Tahsilat' || item.type === 'E/F') {
+                net += amount; // Kasaya giren (+)
+            } else {
+                net -= amount; // Kasadan çıkan (-)
+            }
+        });
+        return net;
+    };
+
     // Sütun başlıkları için yardımcı bileşen
     const SortableHeader = ({ label, sortKey, align = 'left', width }: { label: string, sortKey: string, align?: string, width?: string }) => (
         <th
@@ -209,10 +222,10 @@ const PaymentList = () => {
                     <h2>Kasa Hareketleri</h2>
                     <p style={{ color: '#64748b' }}>Ödeme, Tahsilat ve Masraf Listesi</p>
                 </div>
-                {/*   YENİ BUTON ALANI */}
+                {/*   YENİ BUTON ALANI */}
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <Link to="/payments/center-transfers" className="modern-btn btn-secondary" style={{ display: 'flex', alignItems: 'center', gap: '8px', border: '1px solid #cbd5e1' }}>
-                       Merkez Transfer Kontrolü
+                        Merkez Transfer Kontrolü
                     </Link>
                     <Link to="/payments/add" className="modern-btn" style={{ backgroundColor: '#10b981', color: 'white', display: 'flex', alignItems: 'center', gap: '8px', boxShadow: '0 4px 12px rgba(16, 185, 129, 0.2)' }}>
                         <span style={{ fontSize: '18px', fontWeight: 'bold' }}>+</span> Yeni İşlem Ekle
@@ -324,29 +337,41 @@ const PaymentList = () => {
 
                                     <th style={{ width: '15%' }}>Özet</th>
 
-                                    <SortableHeader label="Toplam Tutar" sortKey="totalAmount" align="right" width="20%" />
+                                    <SortableHeader label="Net Tutar" sortKey="totalAmount" align="right" width="20%" />
                                 </tr>
                             </thead>
                             <tbody>
                                 {processedPayments.length > 0 ? (
-                                    processedPayments.map(p => (
-                                        <tr key={p.id} className="hover-row">
-                                            <td style={{ textAlign: 'center' }}>
-                                                <button onClick={() => navigate(`/payments/detail/${p.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer' }}>
-                                                    🔍 Detay
-                                                </button>
-                                            </td>
-                                            <td style={{ color: '#64748b' }}>{formatDate(p.date)}</td>
-                                            <td style={{ fontWeight: '700', color: '#334155' }}>{p.receiptNo}</td>
-                                            <td style={{ color: '#475569' }}>{p.personnelName}</td>
-                                            <td style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
-                                                {p.items.length} adet işlem
-                                            </td>
-                                            <td style={{ textAlign: 'right', fontWeight: '800', color: '#1e293b', fontSize: '15px' }}>
-                                                {p.totalAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-                                            </td>
-                                        </tr>
-                                    ))
+                                    processedPayments.map(p => {
+                                        // Satırın net değerini hesapla
+                                        const netAmount = getNetBalanceChange(p);
+                                        const isPositive = netAmount >= 0;
+
+                                        return (
+                                            <tr key={p.id} className="hover-row">
+                                                <td style={{ textAlign: 'center' }}>
+                                                    <button onClick={() => navigate(`/payments/detail/${p.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer' }}>
+                                                        🔍 Detay
+                                                    </button>
+                                                </td>
+                                                <td style={{ color: '#64748b' }}>{formatDate(p.date)}</td>
+                                                <td style={{ fontWeight: '700', color: '#334155' }}>{p.receiptNo}</td>
+                                                <td style={{ color: '#475569' }}>{p.personnelName}</td>
+                                                <td style={{ fontSize: '12px', color: '#94a3b8', fontStyle: 'italic' }}>
+                                                    {p.items.length} adet işlem
+                                                </td>
+                                                {/*   RENKLENDİRİLMİŞ TUTAR KISMI */}
+                                                <td style={{
+                                                    textAlign: 'right',
+                                                    fontWeight: '800',
+                                                    fontSize: '15px',
+                                                    color: isPositive ? '#16a34a' : '#ef4444' // Yeşil veya Kırmızı
+                                                }}>
+                                                    {isPositive ? '+' : ''}{netAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
+                                                </td>
+                                            </tr>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
                                         <td colSpan={6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>

@@ -15,7 +15,7 @@ import {
     limit,
     getDoc,
 } from "firebase/firestore";
-import type { PaymentMethod, PaymentDocument, Debt } from "../types";
+import type { PaymentMethod, PaymentDocument, Debt, TransactionType } from "../types";
 
 // --- ÖDEME YÖNTEMİ TANIMLARI ---
 export const addPaymentMethod = async (name: string) => {
@@ -135,41 +135,54 @@ export const getPaymentsByStore = async (storeId: string): Promise<PaymentDocume
     }
 };
 
-export const getNextPaymentReceiptNo = async (storeId: string): Promise<string> => {
+export const getNextPaymentReceiptNo = async (storeId: string, transactionType: TransactionType): Promise<string> => {
     try {
-        // Mağazaya ait ödemeleri oluşturulma tarihine göre tersten çek (En yeniler)
+        // Mağazaya ait ödemeleri oluşturulma tarihine göre tersten çek
         const q = query(
             collection(db, "payments"),
             where("storeId", "==", storeId),
-            orderBy("createdAt", "desc"), // En son eklenenleri getir
-            limit(50) // Son 50 işlemi kontrol et (Sıralama hatasını önlemek için havuz)
+            orderBy("createdAt", "desc"),
+            limit(100) // Tipi bulma ihtimalini artırmak için limiti 100 yaptık
         );
 
         const snapshot = await getDocs(q);
 
         if (snapshot.empty) {
-            return "1"; // İlk kayıt
+            return "1"; // Hiç kayıt yoksa 1'den başla
         }
 
-        let maxNumber = 0;
+        let typeMaxNumber = 0;
+        let overallMaxNumber = 0;
 
         snapshot.docs.forEach(doc => {
-            const data = doc.data();
-            // receiptNo alanını sayıya çevirmeyi dene
+            const data = doc.data() as PaymentDocument;
             const receiptNo = Number(data.receiptNo);
 
-            // Eğer geçerli bir sayıysa ve şu anki max'tan büyükse, yeni max o'dur.
-            if (!isNaN(receiptNo) && receiptNo > maxNumber) {
-                maxNumber = receiptNo;
+            if (!isNaN(receiptNo)) {
+                // 1. Genel (Tüm tipler) içindeki en büyük numarayı bul
+                if (receiptNo > overallMaxNumber) {
+                    overallMaxNumber = receiptNo;
+                }
+
+                // 2. Sadece istenen TİP'e ait en büyük numarayı bul
+                // (Fişin içindeki kalemlerden herhangi biri bu tipteyse o fişi bu tipe ait sayarız)
+                const isMatchingType = data.items?.some(item => item.type === transactionType);
+                if (isMatchingType && receiptNo > typeMaxNumber) {
+                    typeMaxNumber = receiptNo;
+                }
             }
         });
 
-        // En büyük sayıyı 1 artır ve string olarak döndür
-        return (maxNumber + 1).toString();
+        // Eğer bu işleme (örneğin Merkez) ait daha önce bir fiş kesilmişse, onun en büyüğünden devam et (+1)
+        if (typeMaxNumber > 0) {
+            return (typeMaxNumber + 1).toString();
+        }
+
+        // Eğer bu işleme (örneğin Masraf) ait HİÇ fiş bulunamadıysa, Gelen fişlerin en büyüğünden devam et
+        return (overallMaxNumber + 1).toString();
 
     } catch (error) {
         console.error("Makbuz no hatası:", error);
-        // Hata durumunda timestamp döndür (Çakışmayı önlemek için)
         return Date.now().toString().slice(-6);
     }
 };

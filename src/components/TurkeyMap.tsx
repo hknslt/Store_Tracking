@@ -18,7 +18,7 @@ interface TurkeyMapProps {
 const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
     const [tooltip, setTooltip] = useState<{ name: string, data: CityData | null, x: number, y: number } | null>(null);
 
-    // 🔥 YENİ: Haritanın kendi boyutlarını ve koordinatlarını referans alıyoruz
+    //   YENİ: Haritanın kendi boyutlarını ve koordinatlarını referans alıyoruz
     const containerRef = useRef<HTMLDivElement>(null);
 
     const formatCurrency = (amount: number) => {
@@ -51,7 +51,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         return key ? cityData[key] : null;
     };
 
-    // 🔥 GÜNCELLENDİ: Farenin sayfa değil, Harita Kutusu içindeki konumunu alıyoruz
+    //   GÜNCELLENDİ: Farenin sayfa değil, Harita Kutusu içindeki konumunu alıyoruz
     const handleMouseMove = (event: React.MouseEvent<SVGPathElement, MouseEvent>, geoName: string) => {
         if (!containerRef.current) return;
 
@@ -84,7 +84,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         if (tooltip.x > rect.width - 220) left = tooltip.x - 210;
 
         return {
-            position: "absolute" as const, // 🔥 DÜZELTİLDİ: fixed yerine absolute
+            position: "absolute" as const, //   DÜZELTİLDİ: fixed yerine absolute
             top: top,
             left: left,
             backgroundColor: "rgba(15, 23, 42, 0.95)",
@@ -131,7 +131,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                         <Geography
                                             geography={geo}
                                             onMouseEnter={(e: any) => handleMouseMove(e, cityName)}
-                                            onMouseMove={(e: any) => handleMouseMove(e, cityName)} // 🔥 EKLENDİ
+                                            onMouseMove={(e: any) => handleMouseMove(e, cityName)} //   EKLENDİ
                                             onMouseLeave={() => setTooltip(null)}
                                             style={{
                                                 default: {
@@ -196,7 +196,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                         <Geography
                                             geography={geo}
                                             onMouseEnter={(e: any) => handleMouseMove(e, displayAndLookupName)}
-                                            onMouseMove={(e: any) => handleMouseMove(e, displayAndLookupName)} // 🔥 EKLENDİ
+                                            onMouseMove={(e: any) => handleMouseMove(e, displayAndLookupName)} //   EKLENDİ
                                             onMouseLeave={() => setTooltip(null)}
                                             style={{
                                                 default: {

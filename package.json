@@ -2,7 +2,7 @@
   "name": "flexy-magaza-desktop",
   "productName": "Bahçemo Magazam",
   "private": true,
-  "version": "1.0.7",
+  "version": "1.0.9",
   "type": "module",
   "main": "main.cjs",
   "description": "Bahçemo Mağaza Yönetim Paneli",
