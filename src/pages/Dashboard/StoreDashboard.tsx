@@ -170,17 +170,14 @@ const StoreDashboard = () => {
     // cb objesindeki tüm key'leri dön. Eğer object ise yeni sistemdir, değilse (direkt TL: 100 yazıyorsa) eski sistemdir.
     Object.values(cb).forEach((val: any) => {
         if (typeof val === 'object' && val !== null) {
-            // Yeni Sistem (Örn: "nakit_id_1": { TL: 100, USD: 50 })
             totalTL += Number(val.TL || 0);
             totalUSD += Number(val.USD || 0);
             totalEUR += Number(val.EUR || 0);
             totalGBP += Number(val.GBP || 0);
         } else if (typeof val === 'number') {
-             // Eski Sistemin kalıntılarını (TL: 100, USD: 50 vb.) yakalamak için (Hata olmaması adına ama genelde silinir)
         }
     });
 
-    // Eğer eski sistem hala varsa ve object değilse (direkt store.currentBalance.TL ise) onu da ekle (Geçiş süreci güvenliği için)
     if (typeof cb.TL === 'number') totalTL += cb.TL;
     if (typeof cb.USD === 'number') totalUSD += cb.USD;
     if (typeof cb.EUR === 'number') totalEUR += cb.EUR;

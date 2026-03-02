@@ -152,13 +152,13 @@ const PriceList = () => {
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <button onClick={() => navigate(`/prices/detail/${list.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer', display: 'inline-block' }}>
-                        🔍 Detay
+                        Detay
                       </button>
                       <button onClick={() => navigate(`/prices/manage/${list.id}`)} className="modern-btn btn-secondary" style={{ padding: '6px 12px', fontSize: '12px', marginRight: '8px', display: 'inline-block' }}>
-                        ✏️ Düzenle
+                        Düzenle
                       </button>
                       <button onClick={() => handleDeleteClick(list.id!)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#fee2e2', color: '#dc2626', border: 'none', cursor: 'pointer' }}>
-                        🗑️ Sil
+                        Sil
                       </button>
                     </td>
                   </tr>

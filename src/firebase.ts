@@ -3,7 +3,6 @@ import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
 
-// Senin yapılandırma bilgilerin
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -14,10 +13,6 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
-
-// Firebase'i başlat
 const app = initializeApp(firebaseConfig);
-
-// Veritabanını başlat ve dışarı aktar (Burası hatayı çözen kısım)
 export const db = getFirestore(app);
 export const auth = getAuth(app);

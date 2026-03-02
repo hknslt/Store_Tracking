@@ -51,7 +51,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         return key ? cityData[key] : null;
     };
 
-    //   GÜNCELLENDİ: Farenin sayfa değil, Harita Kutusu içindeki konumunu alıyoruz
+   
     const handleMouseMove = (event: React.MouseEvent<SVGPathElement, MouseEvent>, geoName: string) => {
         if (!containerRef.current) return;
 

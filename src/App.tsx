@@ -126,7 +126,7 @@ const AdminBackButton = ({ onClick }: { onClick: () => void }) => {
         fontWeight: '600',
         transition: 'all 0.2s',
         boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-        marginBottom: '15px' // Altındaki içerikle mesafe
+        marginBottom: '15px' 
       }}
     >
       <span style={{ fontSize: '16px', lineHeight: 0, marginTop: '-2px' }}>‹</span> Geri Dön
@@ -147,14 +147,9 @@ const ProtectedLayout = () => {
   // Role Checks
   const isStoreAdmin = userRole === 'store_admin';
 
-  // Is the Store Manager currently on their own Dashboard?
   const isAtDashboard = userData?.storeId
     ? location.pathname === `/stores/${userData.storeId}`
     : false;
-
-  // SÜPER ADMIN GERİ BUTONU KONTROLÜ
-  // 1. Mağaza Müdürü değilse
-  // 2. Ana Sayfada (/) değilse
   const showAdminBackButton = !isStoreAdmin && location.pathname !== '/' && location.pathname !== '/reports/dashboard';
 
   return (
@@ -169,7 +164,7 @@ const ProtectedLayout = () => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        minWidth: 0 // Flexbox taşma önleyici
+        minWidth: 0 
       }}>
 
         {/* --- MAĞAZA MÜDÜRÜ İÇİN ÖZEL GERİ BUTONU --- */}
@@ -219,7 +214,7 @@ const ProtectedLayout = () => {
         <div style={{
           flex: 1,
           padding: '20px',
-          overflowY: 'auto', // Scroll happens here
+          overflowY: 'auto', 
           color: '#333'
         }}>
           <Outlet />

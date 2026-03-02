@@ -1,6 +1,6 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const path = require('path');
-const { machineIdSync } = require('node-machine-id'); //   EKLENDİ
+const { machineIdSync } = require('node-machine-id');
 
 const createWindow = () => {
   const win = new BrowserWindow({
@@ -9,23 +9,23 @@ const createWindow = () => {
     title: "Bahçemo Mağazam",
     icon: path.join(__dirname, 'public/icon.ico'),
     webPreferences: {
-      nodeIntegration: false,    //   GÜVENLİK VE UYUM İÇİN FALSE YAPILDI
-      contextIsolation: true,    //   PRELOAD KULLANMAK İÇİN TRUE YAPILDI
-      preload: path.join(__dirname, 'preload.cjs') //   PRELOAD DOSYASI BAĞLANDI
+      nodeIntegration: false,    
+      contextIsolation: true,    
+      preload: path.join(__dirname, 'preload.cjs') 
     }
   });
 
-  //win.webContents.openDevTools();
+
   win.loadURL('http://localhost:5173').catch((e) => {
     console.log('Sunucuya bağlanamadı, dist dosyasına bakılıyor...');
     win.loadFile('dist/index.html');
   });
 };
 
-//   REACT TARA FINDAN GELEN "CİHAZ KİMLİĞİ" İSTEĞİNİ YAKALAYAN KISIM
+
 ipcMain.handle('get-machine-id', async () => {
   try {
-    // original: true format atılsa bile değişmeyen gerçek donanım IDsini verir
+
     const id = machineIdSync({ original: true });
     return id;
   } catch (error) {
