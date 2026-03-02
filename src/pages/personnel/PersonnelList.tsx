@@ -96,7 +96,7 @@ const PersonnelList = () => {
 
                 <input
                     type="text"
-                    placeholder="🔍 İsim veya Telefon ile ara..."
+                    placeholder="İsim veya Telefon ile ara..."
                     className="soft-input"
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}

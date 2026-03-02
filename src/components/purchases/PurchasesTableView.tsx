@@ -87,7 +87,7 @@ const PurchasesTableView: React.FC<Props> = ({
                                                 <button onClick={(e) => { e.stopPropagation(); setCancelModal({ show: true, id: p.id! }); }} className="btn btn-sm btn-warning" style={{ backgroundColor: '#f39c12' }}>İptal Et</button>
                                             )}
 
-                                            <button onClick={(e) => { e.stopPropagation(); goToDetail(p); }} className="btn btn-sm btn-info">🔍 Detay</button>
+                                            <button onClick={(e) => { e.stopPropagation(); goToDetail(p); }} className="btn btn-sm btn-info">Detay</button>
                                         </div>
 
                                         <table className="data-table dense" style={{ border: '1px solid #eee', backgroundColor: 'white' }}>

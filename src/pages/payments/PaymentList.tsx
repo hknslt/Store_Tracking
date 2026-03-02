@@ -351,7 +351,7 @@ const PaymentList = () => {
                                             <tr key={p.id} className="hover-row">
                                                 <td style={{ textAlign: 'center' }}>
                                                     <button onClick={() => navigate(`/payments/detail/${p.id}`)} className="modern-btn" style={{ padding: '6px 12px', fontSize: '12px', background: '#e0f2fe', color: '#0284c7', border: 'none', cursor: 'pointer' }}>
-                                                        🔍 Detay
+                                                        Detay
                                                     </button>
                                                 </td>
                                                 <td style={{ color: '#64748b' }}>{formatDate(p.date)}</td>
