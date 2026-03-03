@@ -1,39 +1,46 @@
 import { db } from "../firebase";
 import { collection, getDocs, query, where, doc, updateDoc } from "firebase/firestore";
-import type { Sale } from "../types";
 
 // 1. Bir Mağazanın Bu Ayki Personel Satışlarını Getir
 export const getMonthlySalesByPersonnel = async (storeId: string) => {
     try {
+        // 1. BULUNULAN AYIN İLK GÜNÜNÜ HESAPLA (Örn: "2024-03-01")
         const now = new Date();
-        // Ayın 1'inden itibaren (YYYY-MM-01)
-        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const firstDayOfMonth = `${year}-${month}-01`;
 
+        // 2. SADECE BU AYIN SATIŞLARINI GETİR
         const q = query(
             collection(db, "sales", storeId, "receipts"),
-            where("date", ">=", firstDay)
+            where("date", ">=", firstDayOfMonth)
         );
 
         const snapshot = await getDocs(q);
-
-        // Personel bazlı toplama
         const salesMap: Record<string, number> = {};
-                                                                                                
-        snapshot.docs.forEach(doc => {
-            const sale = doc.data() as Sale;
-            // İptal edilen satışları dahil etme
-            if ((sale as any).status === 'İptal') return;
 
-            const pid = sale.personnelId;
-            const total = Number(sale.grandTotal || 0);
+        snapshot.forEach(doc => {
+            const data = doc.data();
 
-            salesMap[pid] = (salesMap[pid] || 0) + total;
+            // İptal edilen satışları prime dahil etme
+            if (data.status === 'İptal') return;
+
+            const personnelId = data.personnelId;
+            let amount = Number(data.grandTotal || 0);
+
+            // Eğer grandTotal yoksa ürünlerden hesapla (eski veriler için yedek)
+            if (amount === 0 && data.items) {
+                amount = data.items.reduce((acc: any, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+            }
+
+            if (personnelId) {
+                salesMap[personnelId] = (salesMap[personnelId] || 0) + amount;
+            }
         });
 
         return salesMap;
-
     } catch (error) {
-        console.error("Satış verisi çekme hatası:", error);
+        console.error("Personel satışları çekilirken hata:", error);
         return {};
     }
 };

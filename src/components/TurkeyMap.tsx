@@ -3,8 +3,8 @@ import React, { useState, useRef } from 'react';
 import { ComposableMap, Geographies, Geography, ZoomableGroup, Marker } from "react-simple-maps";
 import { geoCentroid } from "d3-geo";
 
-const TURKEY_TOPO_URL = "/tr-all.topo.json";
-const CYPRUS_TOPO_URL = "/cy-all.topo.json";
+const TURKEY_TOPO_URL = "./tr-all.topo.json";
+const CYPRUS_TOPO_URL = "./cy-all.topo.json";
 
 interface CityData {
     count: number;
