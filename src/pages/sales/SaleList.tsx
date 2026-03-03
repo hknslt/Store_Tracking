@@ -318,6 +318,10 @@ const SaleList = () => {
             <div className="page-header">
                 <div className="page-title"><h2>Satış Listesi</h2><p>Sipariş ve Teslimat Takibi</p></div>
                 <div style={{ display: 'flex', gap: '10px' }}>
+                    <Link to="/sales/locations" className="btn btn-secondary" style={{ backgroundColor: '#8b5cf6', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
+                        Ürün Konumları
+                    </Link>
                     <button onClick={handlePrintPDF} className="btn btn-secondary" style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {Icons.pdf} PDF Çıkar
                     </button>

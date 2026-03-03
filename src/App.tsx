@@ -65,6 +65,7 @@ import DeviceRequests from "./pages/admin/DeviceRequests";
 import RegisteredDevices from "./pages/admin/RegisteredDevices";
 import StoreCashDetail from "./pages/finance/StoreCashDetail";
 import CenterTransferList from "./pages/payments/CenterTransferList";
+import ProductLocations from "./pages/sales/ProductLocations";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -126,7 +127,7 @@ const AdminBackButton = ({ onClick }: { onClick: () => void }) => {
         fontWeight: '600',
         transition: 'all 0.2s',
         boxShadow: '0 2px 4px rgba(0,0,0,0.02)',
-        marginBottom: '15px' 
+        marginBottom: '15px'
       }}
     >
       <span style={{ fontSize: '16px', lineHeight: 0, marginTop: '-2px' }}>‹</span> Geri Dön
@@ -164,7 +165,7 @@ const ProtectedLayout = () => {
         display: 'flex',
         flexDirection: 'column',
         overflow: 'hidden',
-        minWidth: 0 
+        minWidth: 0
       }}>
 
         {/* --- MAĞAZA MÜDÜRÜ İÇİN ÖZEL GERİ BUTONU --- */}
@@ -214,7 +215,7 @@ const ProtectedLayout = () => {
         <div style={{
           flex: 1,
           padding: '20px',
-          overflowY: 'auto', 
+          overflowY: 'auto',
           color: '#333'
         }}>
           <Outlet />
@@ -298,6 +299,7 @@ function App() {
             <Route path="/sales/add" element={<SaleAdd />} />
             <Route path="/sales/:storeId/:saleId" element={<SaleDetail />} />
             <Route path="/sales/:storeId/edit/:id" element={<SaleEdit />} />
+            <Route path="/sales/locations" element={<ProductLocations />} />
 
             {/* Payment Methods & Transactions */}
             <Route path="/payments/add" element={<PaymentAdd />} />

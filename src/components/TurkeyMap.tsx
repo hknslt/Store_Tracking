@@ -51,7 +51,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
         return key ? cityData[key] : null;
     };
 
-   
+
     const handleMouseMove = (event: React.MouseEvent<SVGPathElement, MouseEvent>, geoName: string) => {
         if (!containerRef.current) return;
 
@@ -243,7 +243,7 @@ const TurkeyMap: React.FC<TurkeyMapProps> = ({ cityData }) => {
                                 <strong style={{ color: '#4ade80' }}>{tooltip.data.count}</strong>
                             </div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '15px', alignItems: 'center' }}>
-                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Anlık Kasa</span>
+                                <span style={{ color: '#94a3b8', fontSize: '11px' }}>Aylık Ciro</span>
                                 <strong style={{ color: '#fbbf24' }}>{formatCurrency(tooltip.data.revenue)}</strong>
                             </div>
                         </div>

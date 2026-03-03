@@ -6,15 +6,16 @@ import { motion } from "framer-motion";
 import TurkeyMap from "../../components/TurkeyMap";
 import type { Store } from "../../types";
 
+// 🔥 YENİ EKLENEN İMPORTLAR (Satışları çekmek için)
+import { db } from "../../firebase";
+import { collectionGroup, getDocs } from "firebase/firestore";
+
 // İKONLAR
 import chartIcon from "../../assets/icons/trend-up.svg";
 import walletIcon from "../../assets/icons/wallet.svg";
 import boxIcon from "../../assets/icons/boxes.svg";
 import userIcon from "../../assets/icons/users.svg";
-// Yeni ikon eklenebilir veya mevcut bir ikon kullanılabilir. Örnek: refresh veya benzeri.
-// import compareIcon from "../../assets/icons/refresh.svg"; // Varsa kullanın
 
-// Harita için veri tipi
 interface CityStats {
   count: number;
   revenue: number;
@@ -30,27 +31,62 @@ const ReportsMain = () => {
   useEffect(() => {
     const load = async () => {
       try {
-        const data = await getStores();
-        setStores(data);
+        const storesData = await getStores();
+        setStores(storesData);
 
-        // Hangi şehirde kaç mağaza var ve cirolar ne kadar?
+        // 1. BU AYIN SATIŞLARINI HESAPLAMAK İÇİN TARİH BİLGİSİ
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+
+        // 2. TÜM SATIŞLARI ÇEK
+        const salesSnap = await getDocs(collectionGroup(db, "receipts"));
+        const currentMonthSales: any[] = [];
+
+        salesSnap.docs.forEach(doc => {
+          if (doc.ref.path.includes("sales/")) {
+            const data = doc.data();
+            if (data.status === 'İptal') return; // İptalleri sayma
+
+            const saleDate = new Date(data.date);
+            // Sadece bu ay yapılan satışları diziye at
+            if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
+              currentMonthSales.push({ ...data, storeId: doc.ref.parent.parent?.id });
+            }
+          }
+        });
+
+        // 3. ŞEHİRLERE GÖRE MAĞAZA SAYISI VE AYLIK CİROYU HESAPLA
         const stats: Record<string, CityStats> = {};
+        const storeCityMap: Record<string, string> = {};
 
-        data.forEach(store => {
-          const city = store.city || "Tanımsız";
+        // Kıbrıs ilçelerini tek çatıda toplayalım ki haritada parça parça kaybolmasın
+        const cyprusRegions = ["kıbrıs", "kktc", "lefkoşa", "girne", "gazimağusa", "northern cyprus", "lefkosa", "gazimagusa"];
+
+        // A. Mağazaları döngüye alıp sayıları belirle
+        storesData.forEach(store => {
+          let city = store.city || "Tanımsız";
 
           if (city !== "Tanımsız") {
+            // Eğer şehir Kıbrıs ilçelerinden biriyse adını genel "Kıbrıs" yap
+            if (cyprusRegions.some(r => city.toLowerCase().includes(r))) {
+              city = "Kıbrıs";
+            }
+
             if (!stats[city]) {
               stats[city] = { count: 0, revenue: 0 };
             }
 
-            // Mağaza Sayısını Artır
             stats[city].count += 1;
+            storeCityMap[store.id!] = city; // Satış ile şehri eşleştirmek için hafızaya al
+          }
+        });
 
-            // Ciro Hesabı
-            if (store.currentBalance && store.currentBalance.TL) {
-              stats[city].revenue += Number(store.currentBalance.TL);
-            }
+        // B. Bu ayın satışlarını mağazanın bulunduğu şehre ekle (Aylık Ciro)
+        currentMonthSales.forEach(sale => {
+          const city = storeCityMap[sale.storeId];
+          if (city && stats[city]) {
+            stats[city].revenue += Number(sale.grandTotal || 0);
           }
         });
 
@@ -64,31 +100,29 @@ const ReportsMain = () => {
     load();
   }, []);
 
-  // Rapor Menüleri (5. Buton Eklendi)
   const reportCards = [
     { id: 'sales', title: 'Satış Raporları', desc: 'Ciro, kar/zarar analizi.', icon: chartIcon, path: '/reports/sales', color: '#10b981', bg: '#ecfdf5' },
     { id: 'finance', title: 'Finans & Kasa', desc: 'Nakit akışı ve giderler.', icon: walletIcon, path: '/reports/finance', color: '#3b82f6', bg: '#eff6ff' },
     { id: 'stock', title: 'Stok Analizi', desc: 'Kritik stok ve depo.', icon: boxIcon, path: '/reports/stocks', color: '#8b5cf6', bg: '#f5f3ff' },
     { id: 'personnel', title: 'Personel Performans', desc: 'Hedef ve primler.', icon: userIcon, path: '/reports/personnel', color: '#f59e0b', bg: '#fffbeb' },
-    { id: 'compare', title: 'Mağaza Karşılaştırma', desc: 'Şubeleri kıyaslayın.', icon: chartIcon, path: '/reports/compare', color: '#ef4444', bg: '#fef2f2' }, // 5. Buton (Kırmızı tonu)
+    { id: 'compare', title: 'Mağaza Karşılaştırma', desc: 'Şubeleri kıyaslayın.', icon: chartIcon, path: '/reports/compare', color: '#ef4444', bg: '#fef2f2' },
   ];
 
   if (loading) return <div className="page-container">Yükleniyor...</div>;
 
   return (
-    <div className="page-container" style={{ maxWidth: '1400px', margin: '0 auto' }}> {/* Genişlik artırıldı */}
+    <div className="page-container" style={{ maxWidth: '1400px', margin: '0 auto' }}>
 
       <div style={{ marginBottom: '30px' }}>
         <h2 className="page-title" style={{ fontSize: '28px' }}>Raporlar Merkezi</h2>
         <p className="page-subtitle">Toplam {stores.length} mağaza ve bölgesel dağılım analizi.</p>
       </div>
 
-      {/* 1. ÜST BÖLÜM: RAPOR BUTONLARI (Daha Dar ve Üstte) */}
       <div style={{
         display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', // Kart genişliği azaltıldı
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
         gap: '15px',
-        marginBottom: '30px' // Harita ile mesafe
+        marginBottom: '30px'
       }}>
         {reportCards.map((report, index) => (
           <motion.div
@@ -102,13 +136,13 @@ const ReportsMain = () => {
             style={{
               backgroundColor: 'white',
               borderRadius: '16px',
-              padding: '20px', // Dolgu azaltıldı
+              padding: '20px',
               border: '1px solid #f1f5f9',
               cursor: 'pointer',
               display: 'flex',
               flexDirection: 'column',
               justifyContent: 'space-between',
-              height: '140px', // Yükseklik azaltıldı (Daha dar)
+              height: '140px',
               position: 'relative',
               overflow: 'hidden'
             }}
@@ -136,21 +170,19 @@ const ReportsMain = () => {
         ))}
       </div>
 
-      {/* 2. ALT BÖLÜM: HARİTA KARTI */}
       <div className="card" style={{ padding: '0', overflow: 'hidden', height: '550px', border: '1px solid #e2e8f0', boxShadow: '0 10px 30px -10px rgba(0,0,0,0.1)' }}>
 
-        {/* HARİTA BİLEŞENİ */}
         <TurkeyMap cityData={cityData} />
 
-        {/* Harita Üzeri Bilgi Kartı (Sol Alt) */}
         <div style={{
           position: 'absolute', bottom: '20px', left: '20px',
           backgroundColor: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)',
           padding: '15px', borderRadius: '12px', border: '1px solid #cbd5e1',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)', maxWidth: '260px'
         }}>
+          {/* 🔥 BURADAKİ YAZI DEĞİŞTİRİLDİ */}
           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', marginBottom: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>
-            🏆 En Yüksek Bakiyeli İller
+            🏆 En Yüksek Aylık Ciro
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             {Object.entries(cityData)

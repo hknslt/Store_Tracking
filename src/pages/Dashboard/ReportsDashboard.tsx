@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { signOut } from "firebase/auth";
 import { auth, db } from "../../firebase";
-import { collectionGroup, getDocs, query, where, collection } from "firebase/firestore";
+import { collectionGroup, getDocs, collection } from "firebase/firestore";
 import { getStores } from "../../services/storeService";
 
 // İKONLAR
@@ -20,7 +20,7 @@ interface CityStats { count: number; revenue: number; }
 
 const ReportsDashboard = () => {
     const navigate = useNavigate();
-    const {userData } = useAuth();
+    const { userData } = useAuth();
     const [loading, setLoading] = useState(true);
 
     // State'ler
@@ -34,68 +34,100 @@ const ReportsDashboard = () => {
     const fetchReportData = async () => {
         try {
             setLoading(true);
+
+            // 1. Mağazaları Çek
             const stores = await getStores();
             const storeCityMap: Record<string, string> = {};
+            const cyprusRegions = ["kıbrıs", "kktc", "lefkoşa", "girne", "gazimağusa", "northern cyprus", "lefkosa", "gazimagusa"];
+
+            // Harita için şehir sayacı hazırlığı
             const initialCityStats: Record<string, CityStats> = {};
 
             stores.forEach(store => {
                 if (store.id && store.city) {
-                    storeCityMap[store.id] = store.city;
-                    const city = store.city;
+                    let city = store.city;
+
+                    // Kıbrıs ilçelerini birleştir
+                    if (cyprusRegions.some(r => city.toLowerCase().includes(r))) {
+                        city = "Kıbrıs";
+                    }
+
+                    storeCityMap[store.id] = city;
                     if (!initialCityStats[city]) initialCityStats[city] = { count: 0, revenue: 0 };
                     initialCityStats[city].count += 1;
                 }
             });
 
+            // 2. Satışları Çek (Bu Ayın Verileri İçin - ReportsMain ile tamamen aynı mantık)
             const now = new Date();
-            const firstDay = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const salesQuery = query(collectionGroup(db, "receipts"), where("date", ">=", firstDay));
-            const salesSnap = await getDocs(salesQuery);
+            const currentMonth = now.getMonth();
+            const currentYear = now.getFullYear();
+
+            // Veritabanındaki "receipts" yazan HER ŞEYİ çekiyoruz
+            const salesSnap = await getDocs(collectionGroup(db, "receipts"));
 
             let totalRev = 0;
             let salesCount = 0;
 
-            salesSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.type === 'Alış') return;
-                let amount = Number(data.grandTotal || 0);
-                if (amount === 0 && data.items) amount = data.items.reduce((acc: any, i: any) => acc + (i.price * i.quantity), 0);
+            salesSnap.docs.forEach(doc => {
+                // Sadece Satış kayıtlarını dahil et (Alışları filtrele)
+                if (doc.ref.path.includes("sales/")) {
+                    const data = doc.data();
 
-                totalRev += amount;
-                salesCount++;
-                const city = storeCityMap[data.storeId];
-                if (city && initialCityStats[city]) initialCityStats[city].revenue += amount;
+                    // İptalleri dahil etme
+                    if (data.status === 'İptal') return;
+
+                    // Tarih kontrolünü Javascript ile yapıyoruz (Firestore string sıralaması hatalarına karşı)
+                    const saleDate = new Date(data.date);
+
+                    if (saleDate.getMonth() === currentMonth && saleDate.getFullYear() === currentYear) {
+                        let amount = Number(data.grandTotal || 0);
+
+                        // Eğer grandTotal kayıtlı değilse içindeki ürünleri hesapla (Eski kayıtlar için yedek)
+                        if (amount === 0 && data.items) amount = data.items.reduce((acc: any, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+
+                        totalRev += amount;
+                        salesCount++;
+
+                        // İlgili şehrin gelirine ekle (Ref'in parent'ından Store ID bul)
+                        const storeId = doc.ref.parent.parent?.id;
+                        if (storeId) {
+                            const city = storeCityMap[storeId];
+                            if (city && initialCityStats[city]) {
+                                initialCityStats[city].revenue += amount;
+                            }
+                        }
+                    }
+                }
             });
 
-            //   3. PERSONEL SAYISI (KESİN ÇÖZÜM)
+            // 3. PERSONEL SAYISI
             const userSnap = await getDocs(collection(db, "personnel"));
             let storePersonnelCount = 0;
 
             userSnap.forEach(doc => {
                 const data = doc.data();
-                // Eğer personelin bir mağaza ID'si (storeId) varsa o mağaza çalışanıdır.
-                // Admin, Control veya Report yetkililerinin storeId'si boştur.
                 if (data.storeId && data.storeId.trim() !== "") {
                     storePersonnelCount++;
                 }
             });
 
-            // Eğer istersen F12 Konsolundan emin olmak için şu satıra bakabilirsin:
-            // console.log(`Toplam Personel Verisi: ${userSnap.size}, Mağaza Çalışanı: ${storePersonnelCount}`);
-
             setStats({
                 totalRevenue: totalRev,
                 salesCount: salesCount,
-                stockValue: 850000,
-                personnelCount: storePersonnelCount //   Sadece mağaza personellerini yazdırır
+                stockValue: 850000, // TODO: Dinamik hale getirilecek
+                personnelCount: storePersonnelCount
             });
+
             setCityData(initialCityStats);
+
         } catch (error) {
             console.error(error);
         } finally {
             setLoading(false);
         }
     };
+
     const handleLogout = async () => { await signOut(auth); navigate("/login"); };
 
     if (loading) return (
