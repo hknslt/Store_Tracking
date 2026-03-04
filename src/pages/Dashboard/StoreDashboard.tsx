@@ -43,7 +43,7 @@ const StoreDashboard = () => {
                     setLoading(false);
                 }
             };
-            
+
             loadData();
             fetchDailyTurnover(id);
             fetchMonthlyStats(id);
@@ -87,13 +87,14 @@ const StoreDashboard = () => {
             }
 
             const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-            const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+            // 🔥 DEĞİŞİKLİK: Sadece "Bu Ayın" ilk gününü (01.Ay.Yıl) formatlı string olarak alıyoruz
+            const year = now.getFullYear();
+            const month = String(now.getMonth() + 1).padStart(2, '0');
+            const firstDayOfMonth = `${year}-${month}-01`;
 
             const q = query(
                 collection(db, "sales", storeId, "receipts"),
-                where("date", ">=", startOfMonth),
-                where("date", "<=", endOfMonth)
+                where("date", ">=", firstDayOfMonth) // 🔥 DEĞİŞİKLİK: Ayın ilk gününden büyük/eşit olanları getir (Sonrasına gerek yok çünkü gelecekten kayıt giremez)
             );
 
             const snapshot = await getDocs(q);
@@ -127,7 +128,7 @@ const StoreDashboard = () => {
     };
 
     const formatCurrency = (amount: number = 0, currency: string = 'TL', size: 'big' | 'small' = 'small') => {
-        if (!showBalance && viewMode === 'balance') return "••••••"; 
+        if (!showBalance && viewMode === 'balance') return "••••••";
 
         let symbol = "₺";
         if (currency === 'USD') symbol = "$";
