@@ -33,6 +33,7 @@ const PurchaseAdd = () => {
 
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // --- BEKLEYEN TALEPLER ---
     const [pendingRequests, setPendingRequests] = useState<PendingRequest[]>([]);
@@ -226,9 +227,13 @@ const PurchaseAdd = () => {
     };
 
     const saveReceipt = async () => {
+        if (isSaving) return;
+
         if (!headerData.storeId) return showToast('error', "Mağaza seçimi zorunludur!");
         if (addedItems.length === 0) return showToast('error', "Ürün ekleyiniz.");
         if (!headerData.receiptNo.trim()) return showToast('error', "Lütfen Fiş No giriniz!");
+
+        setIsSaving(true);
 
         const purchaseData: Purchase = {
             storeId: headerData.storeId,
@@ -253,6 +258,7 @@ const PurchaseAdd = () => {
             setTimeout(() => navigate('/purchases'), 1000);
         } catch (error: any) {
             showToast('error', error.message);
+            setIsSaving(false);
         }
     };
 
@@ -311,8 +317,13 @@ const PurchaseAdd = () => {
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <Link to="/purchases" className="modern-btn btn-secondary">İptal</Link>
                     {addedItems.length > 0 &&
-                        <button onClick={saveReceipt} className="modern-btn btn-primary">
-                            KAYDET ({addedItems.reduce((a, b) => a + Number(b.amount), 0).toFixed(2)} ₺)
+                        <button
+                            onClick={saveReceipt}
+                            className="modern-btn btn-primary"
+                            disabled={isSaving} 
+                            style={{ opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                        >
+                            {isSaving ? 'KAYDEDİLİYOR...' : `KAYDET (${addedItems.reduce((a, b) => a + Number(b.amount), 0).toFixed(2)} ₺)`}
                         </button>
                     }
                 </div>

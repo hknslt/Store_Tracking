@@ -32,6 +32,7 @@ const PaymentAdd = () => {
 
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Mesaj Durumu
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
@@ -209,6 +210,8 @@ const PaymentAdd = () => {
     };
 
     const handleSave = async () => {
+        if (isSaving) return;
+
         setMessage(null);
 
         if (!headerData.receiptNo) { setMessage({ type: 'error', text: "Lütfen Makbuz No giriniz." }); return; }
@@ -222,6 +225,8 @@ const PaymentAdd = () => {
             const missingSale = validItems.find(i => !i.saleId);
             if (missingSale) { setMessage({ type: 'error', text: "Tahsilat işlemlerinde Fiş/Müşteri seçimi zorunludur." }); return; }
         }
+
+        setIsSaving(true);
 
         try {
             await addPaymentDocument({
@@ -244,9 +249,9 @@ const PaymentAdd = () => {
         } catch (error: any) {
             console.error(error);
             setMessage({ type: 'error', text: "Hata oluştu: " + error.message });
+            setIsSaving(false);
         }
     };
-
     // --- CSS ---
     const cellStyle = { padding: '8px' };
     const inputStyle = { width: '100%', padding: '8px', border: '1px solid #ddd', borderRadius: '6px' };
@@ -259,7 +264,14 @@ const PaymentAdd = () => {
                     <h2>Finansal İşlemler</h2>
                     <p>Tahsilat, Ödeme ve Para Transferleri</p>
                 </div>
-                <button onClick={handleSave} className="btn btn-success" style={{ padding: '10px 30px', fontSize: '16px' }}>KAYDET</button>
+                <button
+                    onClick={handleSave}
+                    className="btn btn-success"
+                    style={{ padding: '10px 30px', fontSize: '16px', opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                    disabled={isSaving}
+                >
+                    {isSaving ? 'KAYDEDİLİYOR...' : 'KAYDET'}
+                </button>
             </div>
 
             {message && (

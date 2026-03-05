@@ -48,6 +48,7 @@ const SaleAdd = () => {
 
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     // Header State
     const [headerData, setHeaderData] = useState({
@@ -256,10 +257,13 @@ const SaleAdd = () => {
     };
 
     const saveSale = async () => {
+        if (isSaving) return;
+
         if (!headerData.storeId || !headerData.customerName) { setMessage({ type: 'error', text: 'Mağaza ve Müşteri bilgileri zorunludur.' }); return; }
         if (!headerData.personnelId) { setMessage({ type: 'error', text: 'Lütfen Satış Personeli seçiniz.' }); return; }
         if (addedItems.length === 0) { setMessage({ type: 'error', text: 'Ürün ekleyiniz.' }); return; }
         if (!headerData.receiptNo.trim()) { setMessage({ type: 'error', text: 'Lütfen Fiş No giriniz.' }); return; }
+        setIsSaving(true);
 
         const grandTotal = addedItems.reduce((acc, item) => acc + item.total, 0) + Number(headerData.shippingCost);
         const combinedPhone = `${phoneCode} ${headerData.phone}`;
@@ -281,6 +285,7 @@ const SaleAdd = () => {
             setTimeout(() => navigate('/sales'), 1000);
         } catch (error: any) {
             setMessage({ type: 'error', text: error.message });
+            setIsSaving(false);
         }
     };
 
@@ -305,7 +310,16 @@ const SaleAdd = () => {
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
                     <button onClick={() => navigate('/sales')} className="modern-btn btn-secondary">İptal</button>
-                    {addedItems.length > 0 && (<button onClick={saveSale} className="modern-btn btn-success">SİPARİŞİ TAMAMLA ({itemsTotal + Number(headerData.shippingCost)} ₺)</button>)}
+                    {addedItems.length > 0 && (
+                        <button
+                            onClick={saveSale}
+                            className="modern-btn btn-success"
+                            disabled={isSaving}
+                            style={{ opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
+                        >
+                            {isSaving ? 'KAYDEDİLİYOR...' : `SİPARİŞİ TAMAMLA (${itemsTotal + Number(headerData.shippingCost)} ₺)`}
+                        </button>
+                    )}
                 </div>
             </div>
 
