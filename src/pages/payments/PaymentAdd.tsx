@@ -125,7 +125,8 @@ const PaymentAdd = () => {
     useEffect(() => {
         if (headerData.storeId) {
             getDebtsByStore(headerData.storeId).then(data => {
-                const sortedDebts = data.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo, undefined, { numeric: true }));
+                const activeDebts = data.filter(d => d.remainingAmount > 0);
+                const sortedDebts = activeDebts.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo, undefined, { numeric: true }));
                 setDebts(sortedDebts);
             });
             const fetchPersonnel = async () => {
