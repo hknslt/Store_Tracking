@@ -364,3 +364,43 @@ export const saveBulkCenterTransferChecks = async (changes: { paymentId: string,
         throw error;
     }
 };
+
+export const getPaymentsBySaleId = async (storeId: string, saleId: string) => {
+    try {
+        const q = query(collection(db, "payments"), where("storeId", "==", storeId));
+        const snapshot = await getDocs(q);
+
+        const relatedPayments: any[] = [];
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data() as PaymentDocument;
+
+            // Fişin içindeki kalemleri (items) kontrol et
+            if (data.items) {
+                data.items.forEach(item => {
+                    // Eğer bu ödeme kalemi, aradığımız satışa aitse listeye ekle
+                    if (item.saleId === saleId && item.type === 'Tahsilat') {
+                        relatedPayments.push({
+                            paymentId: doc.id,
+                            date: data.date,
+                            receiptNo: data.receiptNo,
+                            personnelName: data.personnelName,
+                            amount: item.amount,
+                            currency: item.currency,
+                            paymentMethodId: item.paymentMethodId,
+                            description: item.description
+                        });
+                    }
+                });
+            }
+        });
+
+        // Tarihe göre yeniden eskiye sırala
+        relatedPayments.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        return relatedPayments;
+    } catch (error) {
+        console.error("Ödeme geçmişi çekilirken hata:", error);
+        return [];
+    }
+};

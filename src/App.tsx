@@ -66,6 +66,7 @@ import RegisteredDevices from "./pages/admin/RegisteredDevices";
 import StoreCashDetail from "./pages/finance/StoreCashDetail";
 import CenterTransferList from "./pages/payments/CenterTransferList";
 import ProductLocations from "./pages/sales/ProductLocations";
+import DebtDetail from "./pages/debts/DebtDetail";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -315,6 +316,7 @@ function App() {
 
             {/* Borç / Cari Takip */}
             <Route path="/debts" element={<DebtList />} />
+            <Route path="/debts/:storeId/:saleId" element={<DebtDetail />} />
 
             {/* RAPORLAR */}
             <Route path="/reports" element={<ReportsMain />} />

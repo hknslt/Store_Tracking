@@ -22,7 +22,7 @@ const DebtList = () => {
     const [loading, setLoading] = useState(true);
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<'Hepsi' | 'Ödenmedi' | 'Kısmi Ödeme' | 'Ödendi'>('Hepsi');
-    
+
     // 🔥 SIRALAMA STATE'İ (Varsayılan İsime göre A-Z)
     const [sortBy, setSortBy] = useState<SortOption>('name_asc');
 
@@ -136,7 +136,7 @@ const DebtList = () => {
             {/* FİLTRE, ARAMA VE SIRALAMA */}
             <div className="card" style={{ padding: '15px', marginBottom: '20px' }}>
                 <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between' }}>
-                    
+
                     {/* Sol Kısım: Arama ve Durum */}
                     <div style={{ display: 'flex', gap: '15px', flexWrap: 'wrap', flex: 1 }}>
                         <input
@@ -173,8 +173,8 @@ const DebtList = () => {
                     {/* Sağ Kısım: Sıralama */}
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                         <label style={{ fontSize: '13px', fontWeight: 'bold', color: '#64748b', whiteSpace: 'nowrap' }}>Sırala:</label>
-                        <select 
-                            value={sortBy} 
+                        <select
+                            value={sortBy}
                             onChange={(e) => setSortBy(e.target.value as SortOption)}
                             style={{ padding: '10px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', fontWeight: '600', color: '#1e293b', outline: 'none' }}
                         >
@@ -231,7 +231,16 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             className="card"
-            style={{ padding: '20px', position: 'relative', overflow: 'hidden' }}
+            onClick={() => navigate(`/debts/${debt.storeId}/${debt.saleId}`)}
+            style={{
+                padding: '20px',
+                position: 'relative',
+                overflow: 'hidden',
+                cursor: 'pointer', 
+                transition: 'box-shadow 0.2s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 8px 15px rgba(0,0,0,0.1)'}
+            onMouseLeave={(e) => e.currentTarget.style.boxShadow = '0 2px 5px rgba(0,0,0,0.05)'}
         >
             {/* Üst Kısım */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '15px' }}>
@@ -282,17 +291,21 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
 
                 {debt.remainingAmount > 0.5 && (
                     <button
-                        onClick={() => navigate('/payments/add', {
-                            state: {
-                                preSelectedDebt: {
-                                    saleId: debt.saleId,
-                                    storeId: debt.storeId,
-                                    customerName: debt.customerName,
-                                    receiptNo: debt.receiptNo,
-                                    remainingAmount: debt.remainingAmount
+                        
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/payments/add', {
+                                state: {
+                                    preSelectedDebt: {
+                                        saleId: debt.saleId,
+                                        storeId: debt.storeId,
+                                        customerName: debt.customerName,
+                                        receiptNo: debt.receiptNo,
+                                        remainingAmount: debt.remainingAmount
+                                    }
                                 }
-                            }
-                        })}
+                            });
+                        }}
                         style={{
                             backgroundColor: '#3498db',
                             color: 'white',
