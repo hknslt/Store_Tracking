@@ -40,7 +40,6 @@ export const updatePaymentMethod = async (id: string, name: string) => {
 // --- ÖDEME FİŞİ KAYDETME ---
 export const addPaymentDocument = async (payment: PaymentDocument) => {
     try {
-
         const checkQuery = query(
             collection(db, "payments"),
             where("storeId", "==", payment.storeId),
@@ -51,19 +50,35 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
         if (!checkSnap.empty) {
             throw new Error(`Bu makbuz numarası (${payment.receiptNo}) zaten kullanılmış! Lütfen farklı bir numara girin.`);
         }
+
         await runTransaction(db, async (transaction) => {
-            // 1. Borç Okumaları
-            const debtReads: { ref: any, doc: any, amount: number }[] = [];
+
+            // AYNI FİŞ İÇİNDEKİ AYNI MÜŞTERİ (SALE_ID) ÖDEMELERİNİ GRUPLA VE TOPLA
+            const debtReductions: Record<string, number> = {};
+
             for (const item of payment.items) {
                 if (item.type === 'Tahsilat' && item.saleId) {
-                    const debtRef = doc(db, "stores", payment.storeId, "debts", item.saleId);
-                    const debtDoc = await transaction.get(debtRef);
-                    if (debtDoc.exists()) debtReads.push({ ref: debtRef, doc: debtDoc, amount: Number(item.amount) });
+                    debtReductions[item.saleId] = (debtReductions[item.saleId] || 0) + Number(item.amount);
                 }
             }
 
-            //   HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla
-            // Örn: { "methodId1": { TL: 100, USD: 0... }, "methodId2": { TL: -50, USD: 0... } }
+            //SADECE GRUPLANAN BORÇLARI 1 KERE OKU VE GÜNCELLE
+            const debtReads: { ref: any, doc: any, totalDeduction: number }[] = [];
+
+            for (const saleId in debtReductions) {
+                const debtRef = doc(db, "stores", payment.storeId, "debts", saleId);
+                const debtDoc = await transaction.get(debtRef);
+
+                if (debtDoc.exists()) {
+                    debtReads.push({
+                        ref: debtRef,
+                        doc: debtDoc,
+                        totalDeduction: debtReductions[saleId]
+                    });
+                }
+            }
+
+            //HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla (Kasalar için)
             const balanceChanges: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
 
             for (const item of payment.items) {
@@ -84,22 +99,31 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
                 }
             }
 
-            // 2. YAZMA İŞLEMLERİ
+            //YAZMA İŞLEMLERİ (WRITES)
             const paymentRef = doc(collection(db, "payments"));
             transaction.set(paymentRef, payment);
 
             // Borçları Güncelle
             for (const readData of debtReads) {
                 const debt = readData.doc.data() as Debt;
-                const newPaid = (debt.paidAmount || 0) + readData.amount;
+
+                // 🔥 Burada artık satır satır değil, gruplanmış toplam ödeme miktarını (totalDeduction) düşüyoruz.
+                const newPaid = (debt.paidAmount || 0) + readData.totalDeduction;
                 const newRemaining = debt.totalAmount - newPaid;
+
                 let newStatus: Debt['status'] = 'Kısmi Ödeme';
                 if (newRemaining <= 0.5) newStatus = 'Ödendi';
                 if (newPaid === 0) newStatus = 'Ödenmedi';
-                transaction.update(readData.ref, { paidAmount: newPaid, remainingAmount: newRemaining, status: newStatus, lastPaymentDate: payment.date });
+
+                transaction.update(readData.ref, {
+                    paidAmount: newPaid,
+                    remainingAmount: newRemaining,
+                    status: newStatus,
+                    lastPaymentDate: payment.date
+                });
             }
 
-            //   KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE (Dot Notation)
+            //KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE
             const storeRef = doc(db, "stores", payment.storeId);
             const updates: any = {};
 
@@ -119,7 +143,6 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
         throw error;
     }
 };
-
 export const getPaymentsByStore = async (storeId: string): Promise<PaymentDocument[]> => {
     try {
         const q = query(

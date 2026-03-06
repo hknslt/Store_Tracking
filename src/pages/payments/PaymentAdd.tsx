@@ -124,8 +124,10 @@ const PaymentAdd = () => {
     // Mağaza değişince
     useEffect(() => {
         if (headerData.storeId) {
-            getDebtsByStore(headerData.storeId).then(setDebts);
-
+            getDebtsByStore(headerData.storeId).then(data => {
+                const sortedDebts = data.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo, undefined, { numeric: true }));
+                setDebts(sortedDebts);
+            });
             const fetchPersonnel = async () => {
                 const q = query(collection(db, "personnel"), where("storeId", "==", headerData.storeId));
                 const snap = await getDocs(q);
@@ -439,3 +441,4 @@ const PaymentAdd = () => {
 };
 
 export default PaymentAdd;  
+

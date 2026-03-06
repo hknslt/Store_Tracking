@@ -122,17 +122,19 @@ const SaleAdd = () => {
     };
 
     // --- 1. VERİLERİ YÜKLE ---
-    useEffect(() => {
+   useEffect(() => {
         const initData = async () => {
             const [g, c, col, dim, cats, prods] = await Promise.all([
                 getGroups(), getCushions(), getColors(), getDimensions(), getCategories(), getProducts()
             ]);
-            setGroups(g);
-            setCushions(c);
-            setAllColors(col);
-            setAllDimensions(dim);
-            setAllCategories(cats);
-            setAllProducts(prods);
+            
+            setGroups(g.sort((a, b) => a.groupName.localeCompare(b.groupName, 'tr')));
+            setAllCategories(cats.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'tr')));
+            setAllProducts(prods.sort((a, b) => a.productName.localeCompare(b.productName, 'tr')));
+            
+            setCushions(c.sort((a, b) => a.cushionName.localeCompare(b.cushionName, 'tr')));
+            setAllColors(col.sort((a, b) => a.colorName.localeCompare(b.colorName, 'tr')));
+            setAllDimensions(dim.sort((a, b) => a.dimensionName.localeCompare(b.dimensionName, 'tr')));
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));

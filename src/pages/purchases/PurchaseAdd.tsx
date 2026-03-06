@@ -82,14 +82,17 @@ const PurchaseAdd = () => {
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
 
     // --- BAŞLANGIÇ ---
+    // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {
-            //   'getCategories' ile tüm kategorileri çekiyoruz
             const [g, c, col, dim, cats] = await Promise.all([
                 getGroups(), getCushions(), getColors(), getDimensions(), getCategories()
             ]);
-            setGroups(g); setCushions(c); setAllColors(col); setAllDimensions(dim);
-            setAllCategories(cats); //   State'e atıyoruz
+            setGroups(g.sort((a, b) => a.groupName.localeCompare(b.groupName, 'tr')));
+            setCushions(c.sort((a, b) => a.cushionName.localeCompare(b.cushionName, 'tr')));
+            setAllColors(col.sort((a, b) => a.colorName.localeCompare(b.colorName, 'tr')));
+            setAllDimensions(dim.sort((a, b) => a.dimensionName.localeCompare(b.dimensionName, 'tr')));
+            setAllCategories(cats.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'tr')));
 
             if (currentUser) {
                 const userDoc = await getDoc(doc(db, "personnel", currentUser.uid));
@@ -139,8 +142,28 @@ const PurchaseAdd = () => {
     const handleHeaderChange = (e: any) => setHeaderData({ ...headerData, [e.target.name]: e.target.value });
     const handleLineChange = (e: any) => setLineItem({ ...lineItem, [e.target.name]: e.target.value });
 
-    const handleGroupChange = async (groupId: string) => { setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" })); setSelectedProductId(""); setProductsInCat([]); if (groupId) setCategories(await getCategoriesByGroupId(groupId)); else setCategories([]); };
-    const handleCategoryChange = async (categoryId: string) => { setLineItem(prev => ({ ...prev, categoryId, productId: "" })); setSelectedProductId(""); if (categoryId) setProductsInCat(await getProductsByCategoryId(categoryId)); else setProductsInCat([]); };
+    const handleGroupChange = async (groupId: string) => {
+        setLineItem(prev => ({ ...prev, groupId, categoryId: "", productId: "" }));
+        setSelectedProductId("");
+        setProductsInCat([]);
+        if (groupId) {
+            const fetchedCats = await getCategoriesByGroupId(groupId);
+            setCategories(fetchedCats.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'tr')));
+        } else {
+            setCategories([]);
+        }
+    };
+
+    const handleCategoryChange = async (categoryId: string) => {
+        setLineItem(prev => ({ ...prev, categoryId, productId: "" }));
+        setSelectedProductId("");
+        if (categoryId) {
+            const fetchedProds = await getProductsByCategoryId(categoryId);
+            setProductsInCat(fetchedProds.sort((a, b) => a.productName.localeCompare(b.productName, 'tr')));
+        } else {
+            setProductsInCat([]);
+        }
+    };
     const handleProductChange = (pid: string) => { setSelectedProductId(pid); updateItemName(pid, selectedColorId, selectedDimensionId); };
     const handleColorChange = (cid: string) => { setSelectedColorId(cid); updateItemName(selectedProductId, cid, selectedDimensionId); };
     const handleDimensionChange = (did: string) => { setSelectedDimensionId(did); updateItemName(selectedProductId, selectedColorId, did); if (did) setTimeout(() => quantityInputRef.current?.focus(), 100); };
@@ -320,7 +343,7 @@ const PurchaseAdd = () => {
                         <button
                             onClick={saveReceipt}
                             className="modern-btn btn-primary"
-                            disabled={isSaving} 
+                            disabled={isSaving}
                             style={{ opacity: isSaving ? 0.7 : 1, cursor: isSaving ? 'not-allowed' : 'pointer' }}
                         >
                             {isSaving ? 'KAYDEDİLİYOR...' : `KAYDET (${addedItems.reduce((a, b) => a + Number(b.amount), 0).toFixed(2)} ₺)`}
