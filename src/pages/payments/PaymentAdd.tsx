@@ -143,7 +143,7 @@ const PaymentAdd = () => {
         }
     }, [headerData.storeId]);
 
-    //   2. YENİ EKLENEN: Mağaza VEYA Seçili İşlem Tipi değiştiğinde Fiş Numarasını Güncelle
+    //Mağaza VEYA Seçili İşlem Tipi değiştiğinde Fiş Numarasını Güncelle
     useEffect(() => {
         if (headerData.storeId && selectedType) {
             getNextPaymentReceiptNo(headerData.storeId, selectedType).then(nextNo => {

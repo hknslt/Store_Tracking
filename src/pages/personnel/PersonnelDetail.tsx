@@ -2,10 +2,11 @@
 import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { db } from "../../firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { getStores, deletePersonnel, updatePersonnel } from "../../services/storeService";
-import { getMonthlySalesByPersonnel } from "../../services/commissionService"; 
-import { getMonthlyAttendance } from "../../services/attendanceService"; 
+import { getMonthlySalesByPersonnel } from "../../services/commissionService";
+import { getAllTargets } from "../../services/targetService";
+import { getMonthlyAttendance } from "../../services/attendanceService";
 import type { Personnel, SystemUser } from "../../types";
 import "../../App.css";
 
@@ -31,7 +32,9 @@ const PersonnelDetail = () => {
     const [stats, setStats] = useState({
         monthlySales: 0,
         commissionAmount: 0,
-        attendance: { geldi: 0, izin: 0, rapor: 0, ucretsiz: 0 }
+        attendance: { geldi: 0, izin: 0, rapor: 0, ucretsiz: 0 },
+        isTargetBased: false, // Model hedef odaklı mı?
+        isTargetReached: true // Hedef tuttu mu?
     });
 
     // Modallar
@@ -69,14 +72,48 @@ const PersonnelDetail = () => {
         const now = new Date();
         const year = now.getFullYear();
         const month = now.getMonth() + 1;
+        const monthString = String(month).padStart(2, '0');
+        const firstDayOfMonth = `${year}-${monthString}-01`;
 
         try {
-            // 1. Satış Verisi (Bu Ay)
-            const salesMap = await getMonthlySalesByPersonnel(storeId); // Servis tüm mağazayı döndürürse personeli seçiyoruz
-            const mySales = salesMap[personId] || 0;
-            const myCommission = (mySales * commissionRate) / 100;
+            // 1. Mağazanın Prim Modelini Öğren
+            const storesList = await getStores();
+            const currentStore = storesList.find(s => s.id === storeId);
+            const commissionModel = currentStore?.commissionModel || 'flat_rate';
 
-            // 2. Puantaj Verisi (Bu Ay)
+            // 2. Mağazanın Hedefini Öğren
+            const targetsData = await getAllTargets();
+            const storeTarget = targetsData.find(t => t.storeId === storeId)?.targetAmount || 0;
+
+            // 3. Mağazanın GERÇEK TOPLAM CİROSUNU Hesapla (Hedefin tutup tutmadığını anlamak için)
+            const q = query(collection(db, "sales", storeId, "receipts"), where("date", ">=", firstDayOfMonth));
+            const snap = await getDocs(q);
+
+            let realStoreTotal = 0;
+            snap.forEach(doc => {
+                const d = doc.data();
+                if (d.status !== 'İptal') {
+                    let amount = Number(d.grandTotal || 0);
+                    if (amount === 0 && d.items) amount = d.items.reduce((acc: any, i: any) => acc + (Number(i.price) * Number(i.quantity)), 0);
+                    realStoreTotal += amount;
+                }
+            });
+
+            const isTargetReached = realStoreTotal >= storeTarget;
+
+            // 4. Personelin Bireysel Satışını Getir
+            const salesMap = await getMonthlySalesByPersonnel(storeId);
+            const mySales = salesMap[personId] || 0;
+
+            // 5. Primi Hesapla (Hedefli modelse ve hedef tutmadıysa 0 olur)
+            let myCommission = 0;
+            if (commissionModel === 'target_based' && !isTargetReached) {
+                myCommission = 0;
+            } else {
+                myCommission = (mySales * commissionRate) / 100;
+            }
+
+            // 6. Puantaj Verisi (Bu Ay)
             const attData = await getMonthlyAttendance(storeId, year, month);
             const attendanceSummary = { geldi: 0, izin: 0, rapor: 0, ucretsiz: 0 };
 
@@ -94,7 +131,9 @@ const PersonnelDetail = () => {
             setStats({
                 monthlySales: mySales,
                 commissionAmount: myCommission,
-                attendance: attendanceSummary
+                attendance: attendanceSummary,
+                isTargetBased: commissionModel === 'target_based',
+                isTargetReached: isTargetReached
             });
 
         } catch (error) {
@@ -306,8 +345,15 @@ const PersonnelDetail = () => {
                                     <span style={{ fontWeight: 'bold', color: '#334155' }}>%{(person as Personnel).commissionRate || 0}</span>
                                 </div>
                                 <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <span style={{ color: '#64748b', fontSize: '13px', fontWeight: '600' }}>Tahmini Hakediş:</span>
-                                    <span style={{ fontWeight: 'bold', color: '#10b981', fontSize: '18px' }}>
+                                    <span style={{ color: '#64748b', fontSize: '13px', fontWeight: '600' }}>
+                                        Tahmini Hakediş:
+                                        {stats.isTargetBased && (
+                                            <div style={{ fontSize: '10px', color: stats.isTargetReached ? '#10b981' : '#ef4444', fontWeight: 'normal' }}>
+                                                {stats.isTargetReached ? '(Mağaza hedefi tuttu)' : '(Mağaza hedefi tutmadı)'}
+                                            </div>
+                                        )}
+                                    </span>
+                                    <span style={{ fontWeight: 'bold', color: (stats.isTargetBased && !stats.isTargetReached) ? '#ef4444' : '#10b981', fontSize: '18px' }}>
                                         {stats.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
                                     </span>
                                 </div>
