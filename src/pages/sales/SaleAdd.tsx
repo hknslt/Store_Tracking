@@ -48,7 +48,11 @@ const SaleAdd = () => {
 
     const [currentUserData, setCurrentUserData] = useState<SystemUser | null>(null);
     const [isAdmin, setIsAdmin] = useState(false);
+    const [isStoreAdmin, setIsStoreAdmin] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
+
+    const todayStr = new Date().toISOString().split('T')[0];
+    const minDateStr = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
 
     // Header State
     const [headerData, setHeaderData] = useState({
@@ -122,16 +126,16 @@ const SaleAdd = () => {
     };
 
     // --- 1. VERİLERİ YÜKLE ---
-   useEffect(() => {
+    useEffect(() => {
         const initData = async () => {
             const [g, c, col, dim, cats, prods] = await Promise.all([
                 getGroups(), getCushions(), getColors(), getDimensions(), getCategories(), getProducts()
             ]);
-            
+
             setGroups(g.sort((a, b) => a.groupName.localeCompare(b.groupName, 'tr')));
             setAllCategories(cats.sort((a, b) => a.categoryName.localeCompare(b.categoryName, 'tr')));
             setAllProducts(prods.sort((a, b) => a.productName.localeCompare(b.productName, 'tr')));
-            
+
             setCushions(c.sort((a, b) => a.cushionName.localeCompare(b.cushionName, 'tr')));
             setAllColors(col.sort((a, b) => a.colorName.localeCompare(b.colorName, 'tr')));
             setAllDimensions(dim.sort((a, b) => a.dimensionName.localeCompare(b.dimensionName, 'tr')));
@@ -144,9 +148,15 @@ const SaleAdd = () => {
 
                     if (u.role === 'admin' || u.role === 'control') {
                         setIsAdmin(true);
+                        setIsStoreAdmin(false);
                         getStores().then(setStores);
+                    } else if (u.role === 'store_admin') {
+                        setIsAdmin(false);
+                        setIsStoreAdmin(true);
+                        if (u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! }));
                     } else {
                         setIsAdmin(false);
+                        setIsStoreAdmin(false);
                         if (u.storeId) setHeaderData(p => ({ ...p, storeId: u.storeId! }));
                     }
                 }
@@ -178,6 +188,13 @@ const SaleAdd = () => {
     // HEADER CHANGE
     const handleHeaderChange = (e: any) => {
         const { name, value } = e.target;
+
+        if (name === 'date' && isStoreAdmin) {
+            if (value < minDateStr || value > todayStr) {
+                setMessage({ type: 'error', text: 'Mağaza yetkilisi sadece son 3 güne işlem girebilir!' });
+                return;
+            }
+        }
 
         if (name === 'personnelId') {
             const p = storePersonnel.find(per => per.id === value);
@@ -330,15 +347,21 @@ const SaleAdd = () => {
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '15px', marginBottom: '15px' }}>
 
                     <div>
-                        <label className="form-label">Tarih {isAdmin && <span style={{ fontSize: '10px', color: 'green' }}>(Admin)</span>}</label>
+                        <label className="form-label">
+                            Tarih
+                            {isAdmin && <span style={{ fontSize: '10px', color: 'green', marginLeft: '5px' }}>(Admin)</span>}
+                            {isStoreAdmin && <span style={{ fontSize: '10px', color: '#f59e0b', marginLeft: '5px' }}>(Maks 3 Gün)</span>}
+                        </label>
                         <input
                             type="date"
                             name="date"
                             value={headerData.date}
                             onChange={handleHeaderChange}
                             className="form-input"
-                            disabled={!isAdmin}
-                            style={{ backgroundColor: !isAdmin ? '#f1f5f9' : 'white' }}
+                            disabled={!isAdmin && !isStoreAdmin}
+                            min={isStoreAdmin ? minDateStr : undefined}
+                            max={isStoreAdmin ? todayStr : undefined}
+                            style={{ backgroundColor: (!isAdmin && !isStoreAdmin) ? '#f1f5f9' : 'white' }}
                         />
                     </div>
 
