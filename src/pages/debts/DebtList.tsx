@@ -6,7 +6,7 @@ import { getDebtsByStore } from "../../services/debtService";
 import { getStores } from "../../services/storeService";
 import type { Debt, Store } from "../../types";
 import { motion } from "framer-motion";
-
+import { exportDebtsToExcel } from "../../utils/excelExport";
 import cardIcon from "../../assets/icons/credit-card.svg";
 
 type SortOption = 'name_asc' | 'date_desc' | 'receipt_asc' | 'amount_desc' | 'remaining_desc';
@@ -99,6 +99,7 @@ const DebtList = () => {
     };
 
     const BAHCEMO_GREEN = "#1e703a";
+    const currentStoreName = stores.find(s => s.id === selectedStoreId)?.storeName || "Mağaza";
 
     return (
         <div className="page-container" style={{ backgroundColor: '#f4f7f6', minHeight: '100vh' }}>
@@ -121,9 +122,21 @@ const DebtList = () => {
                     </select>
                 )}
 
-                <button onClick={() => navigate(userRole === 'store_admin' ? `/stores/${userData?.storeId}` : '/')} className="btn btn-secondary">
-                    ← Geri Dön
-                </button>
+
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {/*EXCEL BUTONU */}
+                    <button
+                        onClick={() => exportDebtsToExcel(processedDebts, currentStoreName)}
+                        className="btn"
+                        style={{ backgroundColor: '#27ae60', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}
+                    >
+                        Excel İndir
+                    </button>
+
+                    <button onClick={() => navigate(userRole === 'store_admin' ? `/stores/${userData?.storeId}` : '/')} className="btn btn-secondary">
+                        ← Geri Dön
+                    </button>
+                </div>
             </div>
 
             {/* ÖZET KARTLARI */}
@@ -236,7 +249,7 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
                 padding: '20px',
                 position: 'relative',
                 overflow: 'hidden',
-                cursor: 'pointer', 
+                cursor: 'pointer',
                 transition: 'box-shadow 0.2s'
             }}
             onMouseEnter={(e) => e.currentTarget.style.boxShadow = '0 8px 15px rgba(0,0,0,0.1)'}
@@ -291,7 +304,7 @@ const DebtCard = ({ debt, formatMoney, navigate }: { debt: Debt, formatMoney: an
 
                 {debt.remainingAmount > 0.5 && (
                     <button
-                        
+
                         onClick={(e) => {
                             e.stopPropagation();
                             navigate('/payments/add', {
