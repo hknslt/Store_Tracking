@@ -9,7 +9,9 @@ import { doc, getDoc } from "firebase/firestore";
 import { cancelSaleComplete, getSalesByStore, updateSaleItemStatus, updateShippingCost } from "../../services/saleService";
 import { getStores } from "../../services/storeService";
 import { getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
-import { generateSalesPDF } from "../../services/pdfService";
+
+//    YENİ EKLENEN IMPORT
+import { exportSalesToExcel } from "../../utils/excelExport";
 
 // Bileşenler
 import SalesTableView from "../../components/sales/SalesTableView";
@@ -21,7 +23,6 @@ import StoreIcon from "../../assets/icons/store.svg";
 
 // İKONLAR (SVG)
 const Icons = {
-    pdf: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>,
     plus: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>,
     list: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>,
     grid: <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>,
@@ -154,9 +155,11 @@ const SaleList = () => {
     const goToDetail = (sale: Sale) => { if (sale.id && selectedStoreId) navigate(`/sales/${selectedStoreId}/${sale.id}`, { state: { sale } }); };
 
     // --- İŞLEMLER ---
-    const handlePrintPDF = () => {
+
+    //    PDF YERİNE EXCEL ÇIKTISI
+    const handleExportExcel = () => {
         const storeName = stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza";
-        generateSalesPDF(displaySales, storeName, categories, cushions, colors, dimensions);
+        exportSalesToExcel(displaySales, storeName, categories, cushions, colors, dimensions);
     };
 
     const confirmCancelSale = async () => {
@@ -322,16 +325,19 @@ const SaleList = () => {
                         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                         Ürün Konumları
                     </Link>
-                    <button onClick={handlePrintPDF} className="btn btn-secondary" style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {Icons.pdf} PDF Çıkar
+
+                    {/*    EXCEL BUTONU */}
+                    <button onClick={handleExportExcel} className="btn btn-secondary" style={{ backgroundColor: '#27ae60', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                            Excel İndir
                     </button>
+
                     <Link to="/sales/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                         {Icons.plus} Yeni Satış
                     </Link>
                 </div>
             </div>
 
-            {/*   MODERN KONTROL ÇUBUĞU (TEK SATIR & GÜZEL HİZALAMA) */}
+            {/* MODERN KONTROL ÇUBUĞU (TEK SATIR & GÜZEL HİZALAMA) */}
             <div className="control-bar">
 
                 {/* 1. MAĞAZA SEÇİMİ */}
@@ -416,7 +422,6 @@ const SaleList = () => {
                                 sales={displaySales}
                                 formatDate={formatDate}
                                 goToDetail={goToDetail}
-                                //   EKSİK OLAN FONKSİYONLAR BURAYA EKLENDİ
                                 getCatName={getCatName}
                                 getCushionName={getCushionName}
                                 getColorName={getColorName}
@@ -426,7 +431,6 @@ const SaleList = () => {
                     ) : (
                         <div style={{ textAlign: 'center', padding: '60px', color: '#94a3b8', backgroundColor: 'white', borderRadius: '12px', border: '1px dashed #cbd5e1' }}>
                             <div style={{ marginBottom: '15px', opacity: 0.5 }}>
-                                {/*   EMOJİ YERİNE IKON */}
                                 <img src={StoreIcon} width="64" alt="Mağaza Seç" style={{ filter: 'grayscale(100%)', opacity: 0.6 }} />
                             </div>
                             <h3 style={{ margin: '0 0 5px 0', color: '#475569' }}>Mağaza Seçimi Yapılmadı</h3>

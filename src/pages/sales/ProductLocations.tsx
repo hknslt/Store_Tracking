@@ -93,7 +93,7 @@ const ProductLocations = () => {
                     const snap = await getDocs(q);
 
                     snap.docs.forEach(d => {
-                        // 🔥 KRİTİK DÜZELTME: collectionGroup "receipts" ismindeki Alış (purchases) fişlerini de getirir.
+                        //    KRİTİK DÜZELTME: collectionGroup "receipts" ismindeki Alış (purchases) fişlerini de getirir.
                         // Sadece yolu "sales/" içerenleri (yani satışları) listeye dahil ediyoruz.
                         if (d.ref.path.includes("sales/")) {
                             salesData.push({ id: d.id, ...d.data() } as Sale);
@@ -179,7 +179,7 @@ const ProductLocations = () => {
         let filtered = items.filter(item => {
             const searchStr = searchTerm.toLowerCase();
 
-            // 🔥 GÜVENLİK KONTROLÜ: Veri yoksa boş string kabul et, hata vermesin
+            //    GÜVENLİK KONTROLÜ: Veri yoksa boş string kabul et, hata vermesin
             const cName = (item.customerName || "").toLowerCase();
             const rNo = (item.receiptNo || "").toLowerCase();
             const pName = (item.productName || "").toLowerCase();
@@ -198,7 +198,7 @@ const ProductLocations = () => {
                 valA = new Date(valA || 0).getTime();
                 valB = new Date(valB || 0).getTime();
             } else if (sortConfig.key === 'customerName' || sortConfig.key === 'productName' || sortConfig.key === 'receiptNo') {
-                // 🔥 GÜVENLİK KONTROLÜ: Boş alanları sıralarken çökmemesi için toString() öncesi garantiye alıyoruz
+                //    GÜVENLİK KONTROLÜ: Boş alanları sıralarken çökmemesi için toString() öncesi garantiye alıyoruz
                 const strA = (valA || "").toString();
                 const strB = (valB || "").toString();
 

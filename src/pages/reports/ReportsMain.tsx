@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import TurkeyMap from "../../components/TurkeyMap";
 import type { Store } from "../../types";
 
-// 🔥 YENİ EKLENEN İMPORTLAR (Satışları çekmek için)
+//    YENİ EKLENEN İMPORTLAR (Satışları çekmek için)
 import { db } from "../../firebase";
 import { collectionGroup, getDocs } from "firebase/firestore";
 
@@ -180,7 +180,7 @@ const ReportsMain = () => {
           padding: '15px', borderRadius: '12px', border: '1px solid #cbd5e1',
           boxShadow: '0 4px 20px rgba(0,0,0,0.08)', maxWidth: '260px'
         }}>
-          {/* 🔥 BURADAKİ YAZI DEĞİŞTİRİLDİ */}
+          {/*    BURADAKİ YAZI DEĞİŞTİRİLDİ */}
           <div style={{ fontSize: '11px', color: '#64748b', fontWeight: '700', textTransform: 'uppercase', marginBottom: '10px', borderBottom: '1px solid #e2e8f0', paddingBottom: '5px' }}>
             🏆 En Yüksek Aylık Ciro
           </div>

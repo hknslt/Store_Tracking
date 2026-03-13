@@ -7,7 +7,6 @@ import { useAuth } from "../../context/AuthContext";
 import { getPurchasesByStore, updatePurchaseItemStatus, cancelPurchaseComplete } from "../../services/purchaseService";
 import { getStores } from "../../services/storeService";
 import { getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
-import { generatePurchasePDF } from "../../services/pdfService";
 
 // Bileşenler
 import PurchasesTableView from "../../components/purchases/PurchasesTableView";
@@ -16,6 +15,7 @@ import PurchasesGridView from "../../components/purchases/PurchasesGridView";
 import type { Purchase, Store, Category, Cushion, Color, Dimension, PurchaseStatus } from "../../types";
 import "../../App.css";
 import StoreIcon from "../../assets/icons/store.svg";
+import { exportPurchasesToExcel } from "../../utils/excelExport";
 
 // İKONLAR
 const Icons = {
@@ -154,10 +154,10 @@ const PurchaseList = () => {
     const handleStatusClick = async (purchaseId: string, itemIndex: number, currentStatus: PurchaseStatus) => { const nextStatus = getNextStatus(currentStatus); if (!nextStatus) return; try { await updatePurchaseItemStatus(selectedStoreId, purchaseId, itemIndex, nextStatus); await refreshPurchases(); } catch (error) { console.error(error); alert("Durum güncellenemedi!"); } };
     const confirmCancel = async () => { if (!cancelModal.id) return; try { setLoading(true); await cancelPurchaseComplete(selectedStoreId, cancelModal.id); setMessage({ type: 'success', text: "Alış fişi iptal edildi." }); await refreshPurchases(); } catch (error) { setMessage({ type: 'error', text: "İptal edilemedi." }); } finally { setLoading(false); setCancelModal({ show: false, id: null }); } };
 
-    // PDF ÇIKTISI
-    const handlePrintPDF = () => {
+
+    const handleExportExcel = () => {
         const storeName = stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza";
-        generatePurchasePDF(displayPurchases, storeName, categories, cushions, colors, dimensions);
+        exportPurchasesToExcel(displayPurchases, storeName, categories, cushions, colors, dimensions);
     };
 
     if (loading) return <div className="page-container">Yükleniyor...</div>;
@@ -215,11 +215,12 @@ const PurchaseList = () => {
                 </div>
             )}
 
+            {/* HEADER */}
             <div className="page-header">
                 <div className="page-title"><h2>Alış İşlemleri</h2><p>Depo Stok Girişleri ve Sipariş Tedarikleri</p></div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    <button onClick={handlePrintPDF} className="btn btn-secondary" style={{ backgroundColor: '#e74c3c', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        {Icons.pdf} PDF Çıkar
+                    <button onClick={handleExportExcel} className="btn btn-secondary" style={{ backgroundColor: '#27ae60', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                       Excel İndir
                     </button>
                     {userRole !== 'report' && (
                         <Link to="/purchases/add" className="btn btn-primary" style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>

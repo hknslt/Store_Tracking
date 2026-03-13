@@ -107,7 +107,7 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
             for (const readData of debtReads) {
                 const debt = readData.doc.data() as Debt;
 
-                // 🔥 Burada artık satır satır değil, gruplanmış toplam ödeme miktarını (totalDeduction) düşüyoruz.
+                //    Burada artık satır satır değil, gruplanmış toplam ödeme miktarını (totalDeduction) düşüyoruz.
                 const newPaid = (debt.paidAmount || 0) + readData.totalDeduction;
                 const newRemaining = debt.totalAmount - newPaid;
 

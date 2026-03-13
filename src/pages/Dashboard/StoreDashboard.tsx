@@ -87,14 +87,14 @@ const StoreDashboard = () => {
             }
 
             const now = new Date();
-            // 🔥 DEĞİŞİKLİK: Sadece "Bu Ayın" ilk gününü (01.Ay.Yıl) formatlı string olarak alıyoruz
+            //    DEĞİŞİKLİK: Sadece "Bu Ayın" ilk gününü (01.Ay.Yıl) formatlı string olarak alıyoruz
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const firstDayOfMonth = `${year}-${month}-01`;
 
             const q = query(
                 collection(db, "sales", storeId, "receipts"),
-                where("date", ">=", firstDayOfMonth) // 🔥 DEĞİŞİKLİK: Ayın ilk gününden büyük/eşit olanları getir (Sonrasına gerek yok çünkü gelecekten kayıt giremez)
+                where("date", ">=", firstDayOfMonth) //    DEĞİŞİKLİK: Ayın ilk gününden büyük/eşit olanları getir (Sonrasına gerek yok çünkü gelecekten kayıt giremez)
             );
 
             const snapshot = await getDocs(q);

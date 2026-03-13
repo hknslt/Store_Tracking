@@ -23,7 +23,7 @@ const DebtList = () => {
     const [searchTerm, setSearchTerm] = useState("");
     const [filterStatus, setFilterStatus] = useState<'Hepsi' | 'Ödenmedi' | 'Kısmi Ödeme' | 'Ödendi'>('Hepsi');
 
-    // 🔥 SIRALAMA STATE'İ (Varsayılan İsime göre A-Z)
+    //    SIRALAMA STATE'İ (Varsayılan İsime göre A-Z)
     const [sortBy, setSortBy] = useState<SortOption>('name_asc');
 
     // --- BAŞLANGIÇ AYARLARI ---
