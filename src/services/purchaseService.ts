@@ -1,6 +1,6 @@
 // src/services/purchaseService.ts
 import { db } from "../firebase";
-import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch, limit, where } from "firebase/firestore";
+import { collection, getDocs, orderBy, query, doc, runTransaction, writeBatch, limit, where, collectionGroup } from "firebase/firestore";
 import type { PendingRequest, Purchase, PurchaseItem, PurchaseStatus } from "../types";
 
 // 1. YENİ ALIŞ FİŞİ KAYDETME
@@ -441,5 +441,34 @@ export const resetPurchaseToPending = async (storeId: string, purchaseId: string
     } catch (error) {
         console.error("Sıfırlama hatası:", error);
         throw error;
+    }
+};
+
+// --- KONTROLCÜ İÇİN: TÜM MAĞAZALARIN ALIŞLARINI GETİR ---
+export const getAllPurchases = async (): Promise<Purchase[]> => {
+    try {
+        // collectionGroup ile tüm mağazaların altındaki 'receipts' koleksiyonlarını tek seferde tarıyoruz
+        const q = query(collectionGroup(db, "receipts"));
+        const snapshot = await getDocs(q);
+
+        const purchases: Purchase[] = [];
+
+        snapshot.docs.forEach(doc => {
+            const data = doc.data();
+            // Hem satış hem alış 'receipts' içinde tutulduğu için sadece 'Alış' olanları filtreliyoruz
+            if (data.type === 'Alış') {
+                purchases.push({
+                    id: doc.id,
+                    ...data,
+                    createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : new Date().toISOString()
+                } as Purchase);
+            }
+        });
+
+        // Tarihe göre yeniden eskiye sırala
+        return purchases.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    } catch (error) {
+        console.error("Tüm alışlar çekilirken hata:", error);
+        return [];
     }
 };

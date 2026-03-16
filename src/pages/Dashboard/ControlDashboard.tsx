@@ -8,7 +8,7 @@ import { collectionGroup, getDocs, query, collection } from "firebase/firestore"
 import { motion } from "framer-motion";
 import "../../App.css";
 
-// YENİ OLUŞTURDUĞUNUZ ALT BİLEŞENLER
+// ALT BİLEŞENLER
 import MiniCalendar from "./components/control/MiniCalendar";
 import QuickMenu from "./components/control/QuickMenu";
 
@@ -25,12 +25,12 @@ const ControlDashboard = () => {
     const { userData } = useAuth();
     const navigate = useNavigate();
 
-    // Veri State'leri
-    const [todayStats, setTodayStats] = useState({ salesCount: 0, purchasesCount: 0 });
+    // Veri State'leri (Satış kaldırıldı, sadece alış tutuluyor)
+    const [todayStats, setTodayStats] = useState({ purchasesCount: 0 });
     const [purchaseStatuses, setPurchaseStatuses] = useState({ beklemede: 0, onaylandi: 0, uretim: 0, sevkiyat: 0 });
 
     // Mağazalar ve İşlemler
-    const [stores, setStores] = useState<any[]>([]); //   Eklendi
+    const [stores, setStores] = useState<any[]>([]);
     const [activePurchases, setActivePurchases] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -45,49 +45,40 @@ const ControlDashboard = () => {
         }
     };
 
-    // Mağaza Adı Bulucu
     const getStoreName = (storeId: string) => {
         const store = stores.find(s => s.id === storeId);
         return store ? store.storeName : "Bilinmeyen Mağaza";
     };
 
-    // Verileri Çek
     useEffect(() => {
         const fetchDashboardData = async () => {
             try {
                 const todayString = today.toISOString().split('T')[0];
 
-                //   Önce mağazaları çek
                 const storesSnap = await getDocs(collection(db, "stores"));
                 const storesList = storesSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 setStores(storesList);
 
-                // Sonra İşlemleri Çek
                 const receiptsQuery = query(collectionGroup(db, "receipts"));
                 const receiptsSnap = await getDocs(receiptsQuery);
 
-                let sCount = 0; let pCount = 0;
+                let pCount = 0;
                 let sBeklemede = 0; let sOnaylandi = 0; let sUretim = 0; let sSevkiyat = 0;
 
-                // Devam eden işlemleri tutacağımız dizi
                 const activeList: any[] = [];
 
                 receiptsSnap.forEach(doc => {
                     const data = doc.data();
                     const isPurchase = data.type === 'Alış';
 
-                    // Bugünün adedi
-                    if (data.date === todayString) {
-                        if (isPurchase) pCount++;
-                        else sCount++;
+                    // Bugünün adedi (Sadece Alış)
+                    if (data.date === todayString && isPurchase) {
+                        pCount++;
                     }
 
-                    // Sadece Alış Fişlerini İncele
                     if (isPurchase && data.items && Array.isArray(data.items)) {
-
                         let hasActiveItem = false;
 
-                        // Ürünlerin durumunu say
                         data.items.forEach((item: any) => {
                             if (item.status === 'Beklemede') { sBeklemede++; hasActiveItem = true; }
                             if (item.status === 'Onaylandı') { sOnaylandi++; hasActiveItem = true; }
@@ -95,7 +86,6 @@ const ControlDashboard = () => {
                             if (item.status === 'Sevkiyat') { sSevkiyat++; hasActiveItem = true; }
                         });
 
-                        // Eğer fişin içinde en az 1 tane aktif (tamamlanmamış) ürün varsa tabloya ekle
                         if (hasActiveItem) {
                             activeList.push({
                                 id: doc.id,
@@ -109,11 +99,10 @@ const ControlDashboard = () => {
                     }
                 });
 
-                // Aktif alışları tarihe göre sırala (En yeni en üstte) ve ilk 5'i al
                 activeList.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
                 setActivePurchases(activeList.slice(0, 5));
 
-                setTodayStats({ salesCount: sCount, purchasesCount: pCount });
+                setTodayStats({ purchasesCount: pCount });
                 setPurchaseStatuses({ beklemede: sBeklemede, onaylandi: sOnaylandi, uretim: sUretim, sevkiyat: sSevkiyat });
 
             } catch (error) {
@@ -126,7 +115,6 @@ const ControlDashboard = () => {
         fetchDashboardData();
     }, []);
 
-    // Fiş satırına tıklanınca detaya yönlendir
     const goToPurchaseDetail = (purchase: any) => {
         if (purchase.storeId && purchase.id) {
             navigate(`/purchases/${purchase.storeId}/${purchase.id}`, { state: { purchase } });
@@ -170,35 +158,12 @@ const ControlDashboard = () => {
                 {/* === SOL SÜTUN === */}
                 <motion.div variants={containerVariants} initial="hidden" animate="visible" style={{ display: 'flex', flexDirection: 'column', gap: '25px' }}>
 
-                    {/* BUGÜNKÜ İŞLEM ÖZETİ (Yan Yana 2 Kart) */}
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '20px' }}>
+                    {/* BUGÜNKÜ İŞLEM ÖZETİ (Tek Kart - Alış) */}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '20px' }}>
 
-                        {/* SATIŞ KARTI */}
                         <motion.div
                             variants={itemVariants}
-                            onClick={() => navigate('/sales')}
-                            style={{
-                                background: 'linear-gradient(135deg, #1e293b 0%, #0f172a 100%)', color: 'white', padding: '25px',
-                                borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                                boxShadow: '0 10px 20px rgba(15, 23, 42, 0.2)', cursor: 'pointer', transition: 'transform 0.2s'
-                            }}
-                            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
-                            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                            title="Satış listesine git"
-                        >
-                            <div>
-                                <div style={{ fontSize: '12px', opacity: 0.7, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px' }}>Bugün Kesilen Satış</div>
-                                <div style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1' }}>{todayStats.salesCount} <span style={{ fontSize: '14px', fontWeight: '500', opacity: 0.8 }}>Adet</span></div>
-                            </div>
-                            <div style={{ background: 'rgba(255,255,255,0.1)', padding: '12px', borderRadius: '50%' }}>
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                            </div>
-                        </motion.div>
-
-                        {/* ALIŞ KARTI */}
-                        <motion.div
-                            variants={itemVariants}
-                            onClick={() => navigate('/purchases')}
+                            onClick={() => navigate('/purchases/control/purchases')}
                             style={{
                                 background: 'linear-gradient(135deg, #0d8a43 0%, #145a32 100%)', color: 'white', padding: '25px',
                                 borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -206,10 +171,10 @@ const ControlDashboard = () => {
                             }}
                             onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-3px)'}
                             onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
-                            title="Alış (Tedarik) listesine git"
+                            title="Tedarik listesine git"
                         >
                             <div>
-                                <div style={{ fontSize: '12px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px' }}>Bugün İşlenen Alış</div>
+                                <div style={{ fontSize: '12px', opacity: 0.8, textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '5px' }}>Bugün İşlenen Alış / Tedarik</div>
                                 <div style={{ fontSize: '32px', fontWeight: '800', lineHeight: '1' }}>{todayStats.purchasesCount} <span style={{ fontSize: '14px', fontWeight: '500', opacity: 0.8 }}>Adet</span></div>
                             </div>
                             <div style={{ background: 'rgba(255,255,255,0.15)', padding: '12px', borderRadius: '50%' }}>
@@ -250,7 +215,7 @@ const ControlDashboard = () => {
                                 </div>
                                 Devam Eden Alış Fişleri
                             </h3>
-                            <button onClick={() => navigate('/purchases')} className="text-btn" style={{ color: '#3b82f6', fontWeight: '600' }}>Tümünü Gör →</button>
+                            <button onClick={() => navigate('/purchases/control/purchases')} className="text-btn" style={{ color: '#3b82f6', fontWeight: '600' }}>Tümünü Gör →</button>
                         </div>
                         <div className="card-body" style={{ padding: 0 }}>
                             <table className="modern-table">
@@ -274,17 +239,16 @@ const ControlDashboard = () => {
                                             <td style={{ padding: '12px 20px', color: '#64748b', fontSize: '13px' }}>{formatDate(pur.date)}</td>
                                             <td>
                                                 <div style={{ fontWeight: '600', color: '#1e293b' }}>{pur.receiptNo}</div>
-                                            
                                             </td>
                                             <td><div style={{ fontSize: '13px', color: '#1e293b', marginTop: '2px' }}>
-                                                    {getStoreName(pur.storeId)}
-                                                </div></td>
+                                                {getStoreName(pur.storeId)}
+                                            </div></td>
                                             <td style={{ textAlign: 'right', paddingRight: '20px' }}>
                                                 <span style={{ fontSize: '12px', color: '#3b82f6', fontWeight: 'bold' }}>Detay Gör ➜</span>
                                             </td>
                                         </tr>
                                     ))}
-                                    {activePurchases.length === 0 && <tr><td colSpan={3} className="empty-cell" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>Devam eden aktif fiş bulunamadı.</td></tr>}
+                                    {activePurchases.length === 0 && <tr><td colSpan={4} className="empty-cell" style={{ padding: '30px', textAlign: 'center', color: '#94a3b8' }}>Devam eden aktif fiş bulunamadı.</td></tr>}
                                 </tbody>
                             </table>
                         </div>

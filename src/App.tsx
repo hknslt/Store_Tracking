@@ -67,6 +67,7 @@ import StoreCashDetail from "./pages/finance/StoreCashDetail";
 import CenterTransferList from "./pages/payments/CenterTransferList";
 import ProductLocations from "./pages/sales/ProductLocations";
 import DebtDetail from "./pages/debts/DebtDetail";
+import ControlPurchaseList from "./pages/purchases/ControlPurchaseList";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -278,6 +279,8 @@ function App() {
             <Route path="/purchases/add" element={<PurchaseAdd />} />
             <Route path="/purchases/:storeId/:id" element={<PurchaseDetail />} />
             <Route path="/purchases/:storeId/edit/:id" element={<PurchaseEdit />} />
+            <Route path="/purchases/control/purchases" element={<ControlPurchaseList />} />
+            
 
             {/* Management */}
             <Route path="/stores" element={<StoreList />} />

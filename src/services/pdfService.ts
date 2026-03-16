@@ -95,8 +95,6 @@ export const generateSalesPDF = (
                 normalizeText(item.productNote || '-')
             ]);
         });
-
-        // 4. AYIRAÇ (Boşluk)
         // Siparişler birbirine yapışmasın diye araya boş, kenarlıksız satır ekliyoruz
         tableData.push([{ content: '', colSpan: 5, styles: { minCellHeight: 10, fillColor: [255, 255, 255], lineWidth: 0 } }]);
     });
