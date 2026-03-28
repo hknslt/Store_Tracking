@@ -105,6 +105,7 @@ const ReportsMain = () => {
     { id: 'finance', title: 'Finans & Kasa', desc: 'Nakit akışı ve giderler.', icon: walletIcon, path: '/reports/finance', color: '#3b82f6', bg: '#eff6ff' },
     { id: 'stock', title: 'Stok Analizi', desc: 'Kritik stok ve depo.', icon: boxIcon, path: '/reports/stocks', color: '#8b5cf6', bg: '#f5f3ff' },
     { id: 'personnel', title: 'Personel Performans', desc: 'Hedef ve primler.', icon: userIcon, path: '/reports/personnel', color: '#f59e0b', bg: '#fffbeb' },
+    { id: 'debt_analysis', title: 'Borç & Teslimat Analizi', desc: 'Müşteri bakiyeleri ve teslimat durumları.', icon: walletIcon, path: '/reports/debts-analysis', color: '#f97316', bg: '#fff7ed' },
     { id: 'compare', title: 'Mağaza Karşılaştırma', desc: 'Şubeleri kıyaslayın.', icon: chartIcon, path: '/reports/compare', color: '#ef4444', bg: '#fef2f2' },
   ];
 

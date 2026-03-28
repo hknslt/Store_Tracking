@@ -11,6 +11,9 @@ import { auth, db } from "../../firebase";
 import { useAuth } from "../../context/AuthContext";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 
+// SÜRÜM BİLGİSİ
+import packageJson from "../../../package.json";
+
 // LOGO
 import logo from "../../assets/logo/Bahçemo_green.png";
 
@@ -25,6 +28,10 @@ const StoreDashboard = () => {
     // GÖRÜNÜM MODLARI
     const [showBalance, setShowBalance] = useState(false);
     const [viewMode, setViewMode] = useState<'balance' | 'turnover'>('balance');
+
+    // SÜRÜM TOOLTIP STATE'İ
+    const [showVersion, setShowVersion] = useState(false);
+    const appVersion = packageJson.version || "1.0.0";
 
     // İSTATİSTİKLER
     const [dailyStats, setDailyStats] = useState({ turnover: 0, count: 0 });
@@ -87,14 +94,14 @@ const StoreDashboard = () => {
             }
 
             const now = new Date();
-            //    DEĞİŞİKLİK: Sadece "Bu Ayın" ilk gününü (01.Ay.Yıl) formatlı string olarak alıyoruz
+            //     DEĞİŞİKLİK: Sadece "Bu Ayın" ilk gününü (01.Ay.Yıl) formatlı string olarak alıyoruz
             const year = now.getFullYear();
             const month = String(now.getMonth() + 1).padStart(2, '0');
             const firstDayOfMonth = `${year}-${month}-01`;
 
             const q = query(
                 collection(db, "sales", storeId, "receipts"),
-                where("date", ">=", firstDayOfMonth) //    DEĞİŞİKLİK: Ayın ilk gününden büyük/eşit olanları getir (Sonrasına gerek yok çünkü gelecekten kayıt giremez)
+                where("date", ">=", firstDayOfMonth) //     DEĞİŞİKLİK: Ayın ilk gününden büyük/eşit olanları getir (Sonrasına gerek yok çünkü gelecekten kayıt giremez)
             );
 
             const snapshot = await getDocs(q);
@@ -191,7 +198,55 @@ const StoreDashboard = () => {
             {/* --- 1. HEADER --- */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '25px', backgroundColor: 'white', padding: '15px 25px', borderRadius: '16px', boxShadow: '0 2px 10px rgba(0,0,0,0.02)' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '20px' }}>
-                    <img src={logo} alt="Bahçemo" style={{ height: '45px', objectFit: 'contain' }} />
+
+                    {/* SÜRÜM BİLGİSİ İÇİN GÜNCELLENEN LOGO ALANI */}
+                    <div
+                        style={{ position: 'relative', display: 'flex', alignItems: 'center' }}
+                        onMouseEnter={() => setShowVersion(true)}
+                        onMouseLeave={() => setShowVersion(false)}
+                    >
+                        <img src={logo} alt="Bahçemo" style={{ height: '45px', objectFit: 'contain', cursor: '' }} />
+                        <AnimatePresence>
+                            {showVersion && (
+                                <motion.div
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: 5 }}
+                                    transition={{ duration: 0.15 }}
+                                    style={{
+                                        position: 'absolute',
+                                        top: '55px', // Logonun hemen altında
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        backgroundColor: '#1e293b',
+                                        color: '#f8fafc',
+                                        padding: '6px 12px',
+                                        borderRadius: '8px',
+                                        fontSize: '11px',
+                                        fontWeight: '600',
+                                        whiteSpace: 'nowrap',
+                                        zIndex: 50,
+                                        boxShadow: '0 4px 10px rgba(0,0,0,0.1)'
+                                    }}
+                                >
+                                    Sürüm {appVersion}
+                                    {/* Yukarı bakan küçük ok */}
+                                    <div style={{
+                                        position: 'absolute',
+                                        top: '-4px',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        width: 0,
+                                        height: 0,
+                                        borderLeft: '5px solid transparent',
+                                        borderRight: '5px solid transparent',
+                                        borderBottom: '5px solid #1e293b'
+                                    }}></div>
+                                </motion.div>
+                            )}
+                        </AnimatePresence>
+                    </div>
+
                     <div style={{ borderLeft: '1px solid #eee', paddingLeft: '20px' }}>
                         <h2 style={{ margin: 0, color: '#1e293b', fontSize: '18px', fontWeight: '700' }}>
                             {store.storeName}
@@ -271,13 +326,13 @@ const StoreDashboard = () => {
                                 key="balance"
                                 initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }}
                             >
-                                {/*   ANA PARA : TÜM TL TOPLAMI */}
+                                {/* ANA PARA : TÜM TL TOPLAMI */}
                                 <div style={{ fontSize: '42px', fontWeight: '800', letterSpacing: '-1px', marginBottom: '5px' }}>
                                     {formatCurrency(totalTL, 'TL', 'big')}
                                 </div>
                                 <div style={{ fontSize: '13px', opacity: 0.7 }}>Toplam Nakit Varlığı (TL)</div>
 
-                                {/*   DİĞER DÖVİZLER */}
+                                {/* DİĞER DÖVİZLER */}
                                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '10px', paddingTop: '20px', marginTop: '20px', borderTop: '1px solid rgba(255,255,255,0.1)' }}>
                                     <div>
                                         <div style={{ fontSize: '11px', opacity: 0.6, marginBottom: '2px' }}>USD</div>

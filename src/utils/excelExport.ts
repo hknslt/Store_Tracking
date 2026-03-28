@@ -239,3 +239,51 @@ export const exportProductLocationsToExcel = (
     XLSX.utils.book_append_sheet(wb, ws, "Konumlar");
     XLSX.writeFile(wb, `${storeName}_Urun_Konumlari_${dateStr}.xlsx`);
 };
+
+
+
+export const exportDebtAnalysisToExcel = (data: any[], storeName: string) => {
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+
+    const wsData = [
+        [`${storeName} - Borç ve Teslimat Analizi`, '', '', '', '', '', 'Tarih:', dateStr],
+        [],
+        ['Tarih', 'Mağaza', 'Fiş No', 'Müşteri Adı', 'Sipariş Adedi', 'Teslim Edilen', 'Toplam Tutar (₺)', 'Ödenen (₺)', 'Kalan Borç (₺)', 'Borç Durumu']
+    ];
+
+    data.forEach(item => {
+        const date = item.saleDate ? new Date(item.saleDate).toLocaleDateString('tr-TR') : "-";
+
+        wsData.push([
+            date,
+            item.storeName,
+            item.receiptNo,
+            item.customerName,
+            item.totalItems,
+            item.deliveredItems,
+            item.totalAmount,
+            item.paidAmount,
+            item.remainingAmount,
+            item.status
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!cols'] = [
+        { wch: 12 }, // Tarih
+        { wch: 15 }, // Mağaza
+        { wch: 12 }, // Fiş
+        { wch: 25 }, // Müşteri
+        { wch: 15 }, // Sipariş Adet
+        { wch: 15 }, // Teslim
+        { wch: 15 }, // Toplam Tutar
+        { wch: 15 }, // Ödenen
+        { wch: 15 }, // Kalan
+        { wch: 15 }  // Durum
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Borç_Analizi");
+    XLSX.writeFile(wb, `${storeName}_Borc_Analiz_Raporu_${dateStr}.xlsx`);
+};

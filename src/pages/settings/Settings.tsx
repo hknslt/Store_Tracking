@@ -1,11 +1,15 @@
 // src/pages/settings/Settings.tsx
 import { useNavigate } from "react-router-dom";
 import "../../App.css";
+
+// Package.json'dan sürüm bilgisini otomatik çekiyoruz
+import packageJson from "../../../package.json";
+
 import userIcon from "../../assets/icons/users.svg";
 import addIcon from "../../assets/icons/user-add.svg";
-import deviceIcon from "../../assets/icons/laptop.svg"; // Cihazlar için
-import shieldIcon from "../../assets/icons/shield.svg"; // Güvenlik başlığı için
-import listIcon from "../../assets/icons/square.svg";   // Sistem başlığı için
+import deviceIcon from "../../assets/icons/laptop.svg";
+import shieldIcon from "../../assets/icons/shield.svg";
+import listIcon from "../../assets/icons/square.svg";
 import folderIcon from "../../assets/icons/folder.svg";
 import paletteIcon from "../../assets/icons/palette.svg";
 import rulerIcon from "../../assets/icons/ruler.svg";
@@ -14,8 +18,9 @@ import cardIcon from "../../assets/icons/credit-card.svg";
 
 const Settings = () => {
   const navigate = useNavigate();
+  const appVersion = packageJson.version || "1.0.0"; // Sürümü al, bulamazsa 1.0.0 yaz
 
-  // Menü Kartları İçin Veri Yapısı (Emojiler SVG değişkenleri ile değiştirildi)
+  // Menü Kartları İçin Veri Yapısı
   const settingModules = [
     {
       category: "Kullanıcı & Güvenlik",
@@ -48,7 +53,7 @@ const Settings = () => {
         </div>
       </div>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px' }}>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '40px', minHeight: '65vh' }}>
 
         {/* KATEGORİZE EDİLMİŞ AYAR KARTLARI */}
         {settingModules.map((module, mIndex) => (
@@ -85,7 +90,6 @@ const Settings = () => {
                       style={{
                         width: '28px',
                         height: '28px',
-                        /* SVG'yi item.color rengine boyamak için CSS filter tekniği (İsteğe bağlı, siyah da kalabilir) */
                         opacity: 0.8
                       }}
                     />
@@ -101,6 +105,29 @@ const Settings = () => {
           </div>
         ))}
       </div>
+
+      {/* 🔥 SÜRÜM BİLGİSİ EKLENDİ */}
+      <div style={{
+        marginTop: '50px',
+        padding: '20px 0',
+        borderTop: '1px solid #e2e8f0',
+        textAlign: 'center',
+        color: '#94a3b8',
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        gap: '5px'
+      }}>
+        <div style={{ fontSize: '14px', fontWeight: '600', color: '#64748b', letterSpacing: '0.5px' }}>
+          SALT
+        </div>
+        <div style={{ fontSize: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <span>Sürüm {appVersion}</span>
+          <span style={{ fontSize: '10px', opacity: 0.5 }}>•</span>
+          <span>© {new Date().getFullYear()} Tüm Hakları Saklıdır</span>
+        </div>
+      </div>
+
     </div>
   );
 };

@@ -68,6 +68,7 @@ import CenterTransferList from "./pages/payments/CenterTransferList";
 import ProductLocations from "./pages/sales/ProductLocations";
 import DebtDetail from "./pages/debts/DebtDetail";
 import ControlPurchaseList from "./pages/purchases/ControlPurchaseList";
+import DebtReport from "./pages/reports/DebtReport";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -327,7 +328,8 @@ function App() {
             <Route path="/reports/finance" element={<FinanceReport />} />
             <Route path="/reports/stocks" element={<StockReport />} />
             <Route path="/reports/personnel" element={<PersonnelReport />} />
-            <Route path="/reports/compare" element={<StoreComparison />} /> {/* Rota */}
+            <Route path="/reports/debts-analysis" element={<DebtReport />} />
+            <Route path="/reports/compare" element={<StoreComparison />} />
 
             {/* Ayarlar */}
             <Route path="/settings" element={<Settings />} />

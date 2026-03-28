@@ -1,5 +1,5 @@
 // src/pages/sales/ProductLocations.tsx
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
 import { db } from "../../firebase";
@@ -8,7 +8,7 @@ import { doc, getDoc, collectionGroup, getDocs, collection, query, orderBy } fro
 import { getStores } from "../../services/storeService";
 import { getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
 
-//     YENİ EKLENEN EXCEL FONKSİYONU
+// EXCEL FONKSİYONU
 import { exportProductLocationsToExcel } from "../../utils/excelExport";
 
 import type { Store, SystemUser, Category, Cushion, Color, Dimension, Sale, SaleItem } from "../../types";
@@ -46,6 +46,9 @@ const ProductLocations = () => {
         key: 'deadline',
         direction: 'asc'
     });
+
+    // DEĞİŞİKLİK: Çoklu satır açma/kapatma (Manuel kapanma) için state
+    const [expandedRowIds, setExpandedRowIds] = useState<number[]>([]);
 
     useEffect(() => {
         const init = async () => {
@@ -86,12 +89,10 @@ const ProductLocations = () => {
                 const salesData: Sale[] = [];
 
                 if (selectedStoreId) {
-                    // Sadece seçili mağazanın SATIŞLARI
                     const q = query(collection(db, "sales", selectedStoreId, "receipts"), orderBy("date", "desc"));
                     const snap = await getDocs(q);
                     salesData.push(...snap.docs.map(d => ({ id: d.id, ...d.data() } as Sale)));
                 } else if (isAdmin) {
-                    // Tüm mağazalar (Admin)
                     const q = query(collectionGroup(db, "receipts"), orderBy("date", "desc"));
                     const snap = await getDocs(q);
 
@@ -172,6 +173,13 @@ const ProductLocations = () => {
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
     const formatDate = (dateString: string) => (!dateString ? "-" : new Date(dateString).toLocaleDateString('tr-TR'));
 
+    // Satır Aç/Kapat Fonksiyonu
+    const toggleRow = (index: number) => {
+        setExpandedRowIds(prev =>
+            prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+        );
+    };
+
     const getProcessedItems = () => {
         let filtered = items.filter(item => {
             const searchStr = searchTerm.toLowerCase();
@@ -219,7 +227,7 @@ const ProductLocations = () => {
 
     const processedItems = getProcessedItems();
 
-    // EXCEL İNDİRME ÇAĞRISI
+    // EXCEL İNDİRME
     const handleExportExcel = () => {
         const storeName = selectedStoreId ? (stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza") : "Tum_Magazalar";
         exportProductLocationsToExcel(processedItems, storeName, categories, cushions, colors, dimensions);
@@ -236,7 +244,6 @@ const ProductLocations = () => {
                     <p style={{ color: '#64748b' }}>Bekleyen siparişlerin ürün bazlı fiziki durumları</p>
                 </div>
                 <div style={{ display: 'flex', gap: '10px' }}>
-                    {/* YENİ EXCEL BUTONU EKLENDİ */}
                     <button onClick={handleExportExcel} className="modern-btn btn-secondary" style={{ backgroundColor: '#16a34a', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
                         Excel İndir
                     </button>
@@ -274,6 +281,7 @@ const ProductLocations = () => {
                         <table className="modern-table">
                             <thead>
                                 <tr style={{ backgroundColor: '#f1f5f9' }}>
+                                    <th style={{ width: '40px' }}></th>
                                     {isAdmin && <th>Mağaza</th>}
                                     <SortableHeader label="Ürün Bilgisi" sortKey="productName" />
                                     <th>Renk / Minder</th>
@@ -285,61 +293,146 @@ const ProductLocations = () => {
                             </thead>
                             <tbody>
                                 {processedItems.length > 0 ? (
-                                    processedItems.map((item, idx) => (
-                                        <tr
-                                            key={idx}
-                                            onClick={() => navigate(`/sales/${item.storeId}/${item.saleId}`, { state: { sale: item.originalSale } })}
-                                            style={{ borderBottom: '1px solid #e2e8f0', cursor: 'pointer', transition: 'background 0.2s' }}
-                                            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
-                                            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-                                            title="Sipariş detayına gitmek için tıklayın"
-                                        >
-                                            {isAdmin && <td style={{ fontWeight: '600', color: '#334155' }}>{getName(stores, item.storeId, 'storeName')}</td>}
+                                    processedItems.map((item, idx) => {
+                                        const isExpanded = expandedRowIds.includes(idx);
 
-                                            <td>
-                                                <div style={{ fontWeight: 'bold', color: '#1e293b' }}>
-                                                    {item.productName.split('-')[0].trim()}
-                                                    {item.dimensionId && <span style={{ color: '#d35400', marginLeft: '5px' }}>{getName(dimensions, item.dimensionId, 'dimensionName')}</span>}
-                                                </div>
-                                                <div style={{ fontSize: '11px', color: '#64748b' }}>({getName(categories, item.categoryId, 'categoryName')})</div>
-                                            </td>
+                                        return (
+                                            <React.Fragment key={idx}>
+                                                {/* ANA SATIR */}
+                                                <tr
+                                                    onClick={() => toggleRow(idx)}
+                                                    style={{ backgroundColor: isExpanded ? '#f8fafc' : 'white', borderBottom: '1px solid #e2e8f0', cursor: 'pointer', transition: 'background 0.2s' }}
+                                                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f8fafc'}
+                                                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = isExpanded ? '#f8fafc' : 'transparent'}
+                                                    title="Sipariş detayını görmek için tıklayın"
+                                                >
+                                                    <td style={{ textAlign: 'center', color: '#94a3b8', fontSize: '18px' }}>{isExpanded ? '▾' : '▸'}</td>
 
-                                            <td style={{ fontSize: '13px', color: '#475569' }}>
-                                                <div>{getName(colors, item.colorId, 'colorName')}</div>
-                                                {item.cushionId && <div>{getName(cushions, item.cushionId, 'cushionName')}</div>}
-                                            </td>
+                                                    {isAdmin && <td style={{ fontWeight: '600', color: '#334155' }}>{getName(stores, item.storeId, 'storeName')}</td>}
 
-                                            <td>
-                                                <div style={{ fontWeight: '600', color: '#0f172a' }}>{item.customerName}</div>
-                                                <div style={{ fontSize: '12px', color: '#64748b' }}>Fiş: {item.receiptNo}</div>
-                                            </td>
+                                                    <td>
+                                                        <div style={{ fontWeight: 'bold', color: '#1e293b' }}>
+                                                            {item.productName.split('-')[0].trim()}
+                                                            {item.dimensionId && <span style={{ color: '#d35400', marginLeft: '5px' }}>{getName(dimensions, item.dimensionId, 'dimensionName')}</span>}
+                                                        </div>
+                                                        <div style={{ fontSize: '11px', color: '#64748b' }}>({getName(categories, item.categoryId, 'categoryName')})</div>
+                                                    </td>
 
-                                            <td style={{ fontWeight: '600', color: '#ea580c' }}>
-                                                {formatDate(item.deadline)}
-                                            </td>
+                                                    <td style={{ fontSize: '13px', color: '#475569' }}>
+                                                        <div>{getName(colors, item.colorId, 'colorName')}</div>
+                                                        {item.cushionId && <div>{getName(cushions, item.cushionId, 'cushionName')}</div>}
+                                                    </td>
 
-                                            <td style={{ color: '#64748b', fontSize: '13px' }}>
-                                                {formatDate(item.saleDate)}
-                                            </td>
+                                                    <td>
+                                                        <div style={{ fontWeight: '600', color: '#0f172a' }}>{item.customerName}</div>
+                                                        <div style={{ fontSize: '12px', color: '#64748b' }}>Fiş: {item.receiptNo}</div>
+                                                    </td>
 
-                                            <td>
-                                                <span style={{
-                                                    backgroundColor: item.locationStatus.bg,
-                                                    color: item.locationStatus.color,
-                                                    padding: '6px 12px',
-                                                    borderRadius: '20px',
-                                                    fontSize: '12px',
-                                                    fontWeight: 'bold',
-                                                    display: 'inline-block'
-                                                }}>
-                                                    {item.locationStatus.text}
-                                                </span>
-                                            </td>
-                                        </tr>
-                                    ))
+                                                    <td style={{ fontWeight: '600', color: '#ea580c' }}>
+                                                        {formatDate(item.deadline)}
+                                                    </td>
+
+                                                    <td style={{ color: '#64748b', fontSize: '13px' }}>
+                                                        {formatDate(item.saleDate)}
+                                                    </td>
+
+                                                    <td>
+                                                        <span style={{
+                                                            backgroundColor: item.locationStatus.bg,
+                                                            color: item.locationStatus.color,
+                                                            padding: '6px 12px',
+                                                            borderRadius: '20px',
+                                                            fontSize: '12px',
+                                                            fontWeight: 'bold',
+                                                            display: 'inline-block'
+                                                        }}>
+                                                            {item.locationStatus.text}
+                                                        </span>
+                                                    </td>
+                                                </tr>
+
+                                                {/*  AÇILAN DETAY SATIRI */}
+                                                {isExpanded && (
+                                                    <tr>
+                                                        <td colSpan={isAdmin ? 8 : 7} style={{ padding: '0', backgroundColor: '#f8fafc', borderBottom: '2px solid #cbd5e1' }}>
+                                                            <div style={{ padding: '20px 40px', display: 'flex', gap: '20px', flexWrap: 'wrap' }}>
+
+                                                                {/* SOL KISIM: TÜM SİPARİŞ İÇERİĞİ (TABLO) */}
+                                                                <div style={{ flex: '1 1 500px' }}>
+                                                                    <h4 style={{ margin: '0 0 10px 0', color: '#334155', fontSize: '14px', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                                                                        Sipariş İçeriği (Tüm Ürünler)
+                                                                    </h4>
+                                                                    <table style={{ width: '100%', borderCollapse: 'collapse', backgroundColor: 'white', borderRadius: '8px', overflow: 'hidden', boxShadow: '0 1px 3px rgba(0,0,0,0.05)' }}>
+                                                                        <thead style={{ backgroundColor: '#e2e8f0', color: '#334155', fontSize: '12px', textAlign: 'left' }}>
+                                                                            <tr>
+                                                                                <th style={{ padding: '10px' }}>Ürün Adı</th>
+                                                                                <th style={{ padding: '10px' }}>Renk/Ebat</th>
+                                                                                <th style={{ padding: '10px', textAlign: 'center' }}>Adet</th>
+                                                                                <th style={{ padding: '10px' }}>Teslimat Durumu</th>
+                                                                            </tr>
+                                                                        </thead>
+                                                                        <tbody>
+                                                                            {item.originalSale.items.map((saleItem, iIdx) => (
+                                                                                <tr key={iIdx} style={{ borderBottom: '1px solid #f1f5f9', fontSize: '13px' }}>
+                                                                                    <td style={{ padding: '10px', fontWeight: '500', color: '#1e293b' }}>
+                                                                                        {saleItem.productName.split('-')[0]}
+                                                                                        {saleItem.productNote && (
+                                                                                            <div style={{ color: '#ef4444', fontStyle: 'italic', fontSize: '11px', marginTop: '2px' }}>
+                                                                                                ↳ {saleItem.productNote}
+                                                                                            </div>
+                                                                                        )}
+                                                                                    </td>
+                                                                                    <td style={{ padding: '10px', color: '#475569' }}>
+                                                                                        {getName(colors, saleItem.colorId, 'colorName')}
+                                                                                    </td>
+                                                                                    <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>{saleItem.quantity}</td>
+                                                                                    <td style={{ padding: '10px' }}>
+                                                                                        <span className={`status-badge ${saleItem.deliveryStatus === 'Teslim Edildi' ? 'success' : saleItem.deliveryStatus === 'İptal' ? 'danger' : 'primary'}`} style={{ fontSize: '10px' }}>
+                                                                                            {saleItem.deliveryStatus}
+                                                                                        </span>
+                                                                                    </td>
+                                                                                </tr>
+                                                                            ))}
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+
+                                                                {/* SAĞ KISIM: MÜŞTERİ BİLGİSİ VE BUTON */}
+                                                                <div style={{ flex: '1 1 250px', backgroundColor: 'white', padding: '20px', borderRadius: '12px', border: '1px solid #e2e8f0', boxShadow: '0 2px 5px rgba(0,0,0,0.02)', display: 'flex', flexDirection: 'column' }}>
+                                                                    <h4 style={{ margin: '0 0 15px 0', color: '#334155', fontSize: '14px', borderBottom: '1px solid #f1f5f9', paddingBottom: '8px' }}>
+                                                                        👤 Müşteri & Teslimat Bilgisi
+                                                                    </h4>
+                                                                    <div style={{ marginBottom: '10px', fontSize: '13px', color: '#475569' }}>
+                                                                        <strong>Telefon:</strong> <br />
+                                                                        <span style={{ color: '#1e293b' }}>{item.originalSale.phone || 'Belirtilmedi'}</span>
+                                                                    </div>
+                                                                    <div style={{ marginBottom: '20px', fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
+                                                                        <strong>Teslimat Adresi:</strong> <br />
+                                                                        <span style={{ color: '#1e293b' }}>{item.originalSale.address || 'Adres Girilmedi'}</span>
+                                                                        {item.originalSale.district && item.originalSale.city && (
+                                                                            <div>{item.originalSale.district} / {item.originalSale.city}</div>
+                                                                        )}
+                                                                    </div>
+
+                                                                    <button
+                                                                        onClick={() => navigate(`/sales/${item.storeId}/${item.saleId}`, { state: { sale: item.originalSale } })}
+                                                                        className="btn btn-primary"
+                                                                        style={{ marginTop: 'auto', width: '100%', display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '5px' }}
+                                                                    >
+                                                                        Satış Detayına Git ➜
+                                                                    </button>
+                                                                </div>
+
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </React.Fragment>
+                                        );
+                                    })
                                 ) : (
                                     <tr>
-                                        <td colSpan={isAdmin ? 7 : 6} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
+                                        <td colSpan={isAdmin ? 8 : 7} style={{ textAlign: 'center', padding: '40px', color: '#94a3b8' }}>
                                             Bekleyen ürün bulunamadı.
                                         </td>
                                     </tr>
