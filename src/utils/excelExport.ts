@@ -177,3 +177,65 @@ export const exportPurchasesToExcel = (
     XLSX.utils.book_append_sheet(wb, ws, "Alışlar");
     XLSX.writeFile(wb, `${storeName}_Alis_Listesi_${dateStr}.xlsx`);
 };
+
+export const exportProductLocationsToExcel = (
+    items: any[],
+    storeName: string,
+    categories: any[],
+    cushions: any[],
+    colors: any[],
+    dimensions: any[]
+) => {
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+
+    // Başlıklar
+    const wsData = [
+        [`${storeName} - Ürün Konumları ve Teslimat Takibi`, '', '', '', '', 'Tarih:', dateStr],
+        [],
+        ['Sipariş Tarihi', 'Termin Tarihi', 'Fiş No', 'Müşteri Adı', 'Kategori', 'Ürün Adı', 'Renk', 'Ebat', 'Minder', 'Adet', 'Ürün Konumu']
+    ];
+
+    // Yardımcı: ID'den İsim Bulma
+    const getName = (list: any[], id: string, key: string) => list.find(x => x.id === id)?.[key] || "-";
+
+    // Verileri Düzleştirerek Ekleme
+    items.forEach(item => {
+        const saleDate = item.saleDate ? new Date(item.saleDate).toLocaleDateString('tr-TR') : "-";
+        const deadlineDate = item.deadline ? new Date(item.deadline).toLocaleDateString('tr-TR') : "-";
+
+        wsData.push([
+            saleDate,
+            deadlineDate,
+            item.receiptNo,
+            item.customerName,
+            getName(categories, item.categoryId, 'categoryName'),
+            item.productName.split('-')[0].trim(),
+            getName(colors, item.colorId, 'colorName'),
+            getName(dimensions, item.dimensionId, 'dimensionName'),
+            getName(cushions, item.cushionId, 'cushionName'),
+            item.quantity,
+            item.locationStatus.text // 'Stokta', 'Merkezde' vb.
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Sütun Genişlikleri
+    ws['!cols'] = [
+        { wch: 15 }, // Sipariş Tarihi
+        { wch: 15 }, // Termin Tarihi
+        { wch: 15 }, // Fiş No
+        { wch: 25 }, // Müşteri
+        { wch: 15 }, // Kategori
+        { wch: 25 }, // Ürün Adı
+        { wch: 15 }, // Renk
+        { wch: 10 }, // Ebat
+        { wch: 15 }, // Minder
+        { wch: 8 },  // Adet
+        { wch: 25 }  // Ürün Konumu
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Konumlar");
+    XLSX.writeFile(wb, `${storeName}_Urun_Konumlari_${dateStr}.xlsx`);
+};

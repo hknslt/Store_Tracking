@@ -233,7 +233,7 @@ const ControlPurchaseList = () => {
                                                                 <th style={{ padding: '10px' }}>Ürün Adı</th>
                                                                 <th style={{ padding: '10px' }}>Renk / Ebat</th>
                                                                 <th style={{ padding: '10px', textAlign: 'center' }}>Adet</th>
-                                                                {/* 🔥 AÇIKLAMA SÜTUNU EKLENDİ */}
+                                                                {/*     AÇIKLAMA SÜTUNU EKLENDİ */}
                                                                 <th style={{ padding: '10px' }}>Açıklama / Not</th>
                                                                 <th style={{ padding: '10px' }}>Mevcut Durum</th>
                                                                 <th style={{ padding: '10px', textAlign: 'right' }}>Hızlı İşlem</th>
@@ -250,7 +250,7 @@ const ControlPurchaseList = () => {
                                                                     </td>
                                                                     <td style={{ padding: '10px', textAlign: 'center', fontWeight: 'bold' }}>{item.quantity}</td>
 
-                                                                    {/* 🔥 AÇIKLAMA VERİSİ EKLENDİ */}
+                                                                    {/*     AÇIKLAMA VERİSİ EKLENDİ */}
                                                                     <td style={{ padding: '10px', fontSize: '12px', color: '#dc2626', fontStyle: 'italic', maxWidth: '200px' }}>
                                                                         {item.explanation || (item as any).productNote || "-"}
                                                                     </td>

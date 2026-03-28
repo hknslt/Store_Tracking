@@ -24,8 +24,8 @@ const PurchaseAdd = () => {
     // --- LİSTELER ---
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]); // Filtrelenmiş kategoriler
-    const [allCategories, setAllCategories] = useState<Category[]>([]); //   TÜM KATEGORİLER (İsimlendirme için)
+    const [categories, setCategories] = useState<Category[]>([]);
+    const [allCategories, setAllCategories] = useState<Category[]>([]); 
     const [productsInCat, setProductsInCat] = useState<Product[]>([]);
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
@@ -50,7 +50,6 @@ const PurchaseAdd = () => {
     const [selectedColorId, setSelectedColorId] = useState("");
     const [selectedDimensionId, setSelectedDimensionId] = useState("");
 
-    //   DÜZENLEME: Burada 'unitPrice' tutacağız, 'amount' (toplam) hesaplanacak.
     const [unitPrice, setUnitPrice] = useState<number | string>("");
     const [lineItem, setLineItem] = useState<Partial<PurchaseItem>>({
         groupId: "", categoryId: "", productId: "", productName: "", colorId: "", cushionId: "", dimensionId: null,
@@ -81,7 +80,6 @@ const PurchaseAdd = () => {
     // --- YARDIMCILAR ---
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
 
-    // --- BAŞLANGIÇ ---
     // --- BAŞLANGIÇ ---
     useEffect(() => {
         const init = async () => {

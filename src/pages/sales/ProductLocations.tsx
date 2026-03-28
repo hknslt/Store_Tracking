@@ -8,6 +8,9 @@ import { doc, getDoc, collectionGroup, getDocs, collection, query, orderBy } fro
 import { getStores } from "../../services/storeService";
 import { getCategories, getCushions, getColors, getDimensions } from "../../services/definitionService";
 
+//     YENİ EKLENEN EXCEL FONKSİYONU
+import { exportProductLocationsToExcel } from "../../utils/excelExport";
+
 import type { Store, SystemUser, Category, Cushion, Color, Dimension, Sale, SaleItem } from "../../types";
 import "../../App.css";
 
@@ -93,8 +96,6 @@ const ProductLocations = () => {
                     const snap = await getDocs(q);
 
                     snap.docs.forEach(d => {
-                        //    KRİTİK DÜZELTME: collectionGroup "receipts" ismindeki Alış (purchases) fişlerini de getirir.
-                        // Sadece yolu "sales/" içerenleri (yani satışları) listeye dahil ediyoruz.
                         if (d.ref.path.includes("sales/")) {
                             salesData.push({ id: d.id, ...d.data() } as Sale);
                         }
@@ -105,7 +106,7 @@ const ProductLocations = () => {
                     return;
                 }
 
-                // 2. Stokları Çek (Merkezden gelenlerin ulaşıp ulaşmadığını bilmek için)
+                // 2. Stokları Çek
                 const stocksMap: Record<string, any> = {};
                 if (selectedStoreId) {
                     const stockSnap = await getDocs(collection(db, "stores", selectedStoreId, "stocks"));
@@ -118,29 +119,27 @@ const ProductLocations = () => {
                     });
                 }
 
-                // 3. Veriyi Düzleştir ve Konum Hesapla
+                // 3. Veriyi Düzleştir
                 const flattened: FlattenedItem[] = [];
 
                 salesData.forEach(sale => {
-                    if ((sale as any).status === 'İptal') return; // İptal edilen fişleri atla
+                    if ((sale as any).status === 'İptal') return;
 
                     sale.items.forEach(item => {
-                        if (item.status === 'İptal' || item.deliveryStatus === 'Teslim Edildi') return; // Teslim edilenleri ve iptalleri atla
+                        if (item.status === 'İptal' || item.deliveryStatus === 'Teslim Edildi') return;
 
-                        // KONUM HESAPLAMA MANTIĞI
                         let locationStatus = { text: 'Bilinmiyor', bg: '#f1f5f9', color: '#64748b' };
 
                         if (item.supplyMethod === 'Stoktan') {
-                            locationStatus = { text: 'Stokta (Depo)', bg: '#dcfce7', color: '#16a34a' }; // Yeşil
+                            locationStatus = { text: 'Stokta (Depo)', bg: '#dcfce7', color: '#16a34a' };
                         } else {
                             const uniqueStockId = `${item.productId}_${item.colorId}_${item.dimensionId || 'null'}`;
                             const stockData = stocksMap[`${sale.storeId}_${uniqueStockId}`];
 
-                            // Merkezden istendi ve rezerve stoğa girdiyse (yani mağazaya ulaştıysa)
                             if (stockData && stockData.reservedStock >= item.quantity) {
-                                locationStatus = { text: 'Stokta (Merkezden Geldi)', bg: '#dcfce7', color: '#16a34a' }; // Yeşil
+                                locationStatus = { text: 'Stokta (Merkezden Geldi)', bg: '#dcfce7', color: '#16a34a' };
                             } else {
-                                locationStatus = { text: 'Merkezde (Bekleniyor)', bg: '#fee2e2', color: '#dc2626' }; // Kırmızı
+                                locationStatus = { text: 'Merkezde (Bekleniyor)', bg: '#fee2e2', color: '#dc2626' };
                             }
                         }
 
@@ -167,26 +166,19 @@ const ProductLocations = () => {
             }
         };
 
-        if (isAdmin !== null) fetchData(); // Yetki belli olduktan sonra çalışsın
+        if (isAdmin !== null) fetchData();
     }, [selectedStoreId, isAdmin]);
 
-    // --- YARDIMCILAR ---
     const getName = (list: any[], id: string | null | undefined, key: string) => list.find(x => x.id === id)?.[key] || "-";
     const formatDate = (dateString: string) => (!dateString ? "-" : new Date(dateString).toLocaleDateString('tr-TR'));
 
-    // --- FİLTRELEME VE SIRALAMA ---
     const getProcessedItems = () => {
         let filtered = items.filter(item => {
             const searchStr = searchTerm.toLowerCase();
-
-            //    GÜVENLİK KONTROLÜ: Veri yoksa boş string kabul et, hata vermesin
             const cName = (item.customerName || "").toLowerCase();
             const rNo = (item.receiptNo || "").toLowerCase();
             const pName = (item.productName || "").toLowerCase();
-
-            return cName.includes(searchStr) ||
-                rNo.includes(searchStr) ||
-                pName.includes(searchStr);
+            return cName.includes(searchStr) || rNo.includes(searchStr) || pName.includes(searchStr);
         });
 
         filtered.sort((a, b) => {
@@ -194,17 +186,12 @@ const ProductLocations = () => {
             let valB: any = b[sortConfig.key];
 
             if (sortConfig.key === 'deadline' || sortConfig.key === 'saleDate') {
-                // Tarihler boş gelirse diye güvenlik önlemi
                 valA = new Date(valA || 0).getTime();
                 valB = new Date(valB || 0).getTime();
             } else if (sortConfig.key === 'customerName' || sortConfig.key === 'productName' || sortConfig.key === 'receiptNo') {
-                //    GÜVENLİK KONTROLÜ: Boş alanları sıralarken çökmemesi için toString() öncesi garantiye alıyoruz
                 const strA = (valA || "").toString();
                 const strB = (valB || "").toString();
-
-                return sortConfig.direction === 'asc'
-                    ? strA.localeCompare(strB, 'tr', { numeric: true })
-                    : strB.localeCompare(strA, 'tr', { numeric: true });
+                return sortConfig.direction === 'asc' ? strA.localeCompare(strB, 'tr', { numeric: true }) : strB.localeCompare(strA, 'tr', { numeric: true });
             }
 
             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -232,6 +219,12 @@ const ProductLocations = () => {
 
     const processedItems = getProcessedItems();
 
+    // EXCEL İNDİRME ÇAĞRISI
+    const handleExportExcel = () => {
+        const storeName = selectedStoreId ? (stores.find(s => s.id === selectedStoreId)?.storeName || "Magaza") : "Tum_Magazalar";
+        exportProductLocationsToExcel(processedItems, storeName, categories, cushions, colors, dimensions);
+    };
+
     return (
         <div className="page-container">
             <div className="modern-header" style={{ marginBottom: '20px' }}>
@@ -242,9 +235,15 @@ const ProductLocations = () => {
                     </h2>
                     <p style={{ color: '#64748b' }}>Bekleyen siparişlerin ürün bazlı fiziki durumları</p>
                 </div>
-                <button onClick={() => navigate('/sales')} className="modern-btn btn-secondary">
-                    ← Satış Listesine Dön
-                </button>
+                <div style={{ display: 'flex', gap: '10px' }}>
+                    {/* YENİ EXCEL BUTONU EKLENDİ */}
+                    <button onClick={handleExportExcel} className="modern-btn btn-secondary" style={{ backgroundColor: '#16a34a', color: 'white', border: 'none', display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 'bold' }}>
+                        Excel İndir
+                    </button>
+                    <button onClick={() => navigate('/sales')} className="modern-btn btn-secondary">
+                        ← Satış Listesine Dön
+                    </button>
+                </div>
             </div>
 
             {/* FİLTRELER */}
