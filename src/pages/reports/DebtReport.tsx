@@ -102,24 +102,33 @@ const DebtReport = () => {
                     }
                 });
 
-                // 4. Verileri Birleştir
-                const mergedData: DebtAnalysisItem[] = debts.map(debt => ({
-                    id: debt.id,
-                    saleId: debt.saleId,
-                    storeId: debt.storeId,
-                    storeName: storesMap[debt.storeId] || 'Bilinmiyor',
-                    receiptNo: debt.receiptNo,
-                    customerName: debt.customerName,
-                    saleDate: debt.saleDate,
-                    totalAmount: debt.totalAmount || 0,
-                    paidAmount: debt.paidAmount || 0,
-                    remainingAmount: debt.remainingAmount || 0,
-                    status: debt.status || 'Ödenmedi',
-                    totalItems: salesItemsMap[debt.saleId]?.total || 0,
-                    deliveredItems: salesItemsMap[debt.saleId]?.delivered || 0,
-                    items: salesItemsMap[debt.saleId]?.items || [],
-                    originalSale: salesItemsMap[debt.saleId]?.originalSale || null
-                }));
+                // 4. Verileri Birleştir ve 🔥 DİNAMİK HESAPLA
+                const mergedData: DebtAnalysisItem[] = debts.map(debt => {
+                    const total = Number(debt.totalAmount) || 0;
+                    const paid = Number(debt.paidAmount) || 0;
+                    const remaining = total - paid;
+
+                    let currentStatus = 'Ödenmedi';
+                    if (paid > 0) currentStatus = remaining <= 0.5 ? 'Ödendi' : 'Kısmi Ödeme';
+
+                    return {
+                        id: debt.id,
+                        saleId: debt.saleId,
+                        storeId: debt.storeId,
+                        storeName: storesMap[debt.storeId] || 'Bilinmiyor',
+                        receiptNo: debt.receiptNo,
+                        customerName: debt.customerName,
+                        saleDate: debt.saleDate,
+                        totalAmount: total,
+                        paidAmount: paid,
+                        remainingAmount: remaining, // Veritabanını eziyoruz, canlı hesaplıyoruz
+                        status: currentStatus,      // Veritabanını eziyoruz, canlı hesaplıyoruz
+                        totalItems: salesItemsMap[debt.saleId]?.total || 0,
+                        deliveredItems: salesItemsMap[debt.saleId]?.delivered || 0,
+                        items: salesItemsMap[debt.saleId]?.items || [],
+                        originalSale: salesItemsMap[debt.saleId]?.originalSale || null
+                    };
+                });
 
                 // Tarihe göre yeniden eskiye sırala
                 mergedData.sort((a, b) => new Date(b.saleDate).getTime() - new Date(a.saleDate).getTime());
@@ -142,8 +151,8 @@ const DebtReport = () => {
 
         // Durum
         if (statusFilter !== "all") {
-            if (statusFilter === "Borçlu" && item.remainingAmount <= 0) return false;
-            if (statusFilter === "Borcu Yok" && item.remainingAmount > 0) return false;
+            if (statusFilter === "Borçlu" && item.remainingAmount <= 0.5) return false;
+            if (statusFilter === "Borcu Yok" && item.remainingAmount > 0.5) return false;
             if (statusFilter === "Eksik Teslimat" && item.deliveredItems >= item.totalItems) return false;
         }
 
@@ -243,7 +252,7 @@ const DebtReport = () => {
                     </thead>
                     <tbody>
                         {processedData.map((item) => {
-                            const isFullyPaid = item.remainingAmount <= 0;
+                            const isFullyPaid = item.remainingAmount <= 0.5;
                             const isFullyDelivered = item.deliveredItems >= item.totalItems && item.totalItems > 0;
                             const isExpanded = expandedRowIds.includes(item.id);
 
@@ -334,13 +343,12 @@ const DebtReport = () => {
                                                         </div>
                                                         <div style={{ marginBottom: '20px', fontSize: '13px', color: '#475569', lineHeight: '1.4' }}>
                                                             <strong>Teslimat Adresi:</strong> <br />
-                                                            <span style={{ color: '#1e293b' }}>{item.originalSale?.address || 'Adres Girilmedi'}</span>
+                                                            <span style={{ color: '#1e293b' }}>{item.originalSale?.address || 'Mağazadan Teslim / Adres Girilmedi'}</span>
                                                             {item.originalSale?.district && item.originalSale?.city && (
                                                                 <div>{item.originalSale.district} / {item.originalSale.city}</div>
                                                             )}
                                                         </div>
 
-                                                        {/* Yönlendirme Hatası Giderildi: Güvenli Şekilde URL'den Gider, state ile veriyi aktarır */}
                                                         <button
                                                             onClick={(e) => {
                                                                 e.stopPropagation();
