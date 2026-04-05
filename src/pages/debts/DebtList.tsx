@@ -47,12 +47,23 @@ const DebtList = () => {
         if (selectedStoreId) {
             setLoading(true);
             getDebtsByStore(selectedStoreId).then(data => {
-                setDebts(data);
+                // 🔥 DİNAMİK HESAPLAMA: Veritabanındaki hatayı anında eziyoruz.
+                const correctedDebts = data.map(d => {
+                    const total = Number(d.totalAmount) || 0;
+                    const paid = Number(d.paidAmount) || 0;
+                    const remaining = total - paid;
+                    let status: any = 'Ödenmedi';
+                    if (paid > 0) {
+                        status = remaining <= 0.5 ? 'Ödendi' : 'Kısmi Ödeme';
+                    }
+                    return { ...d, totalAmount: total, paidAmount: paid, remainingAmount: remaining, status };
+                });
+
+                setDebts(correctedDebts);
                 setLoading(false);
             });
         }
     }, [selectedStoreId]);
-
     // --- FİLTRELEME VE SIRALAMA (Tek bir fonksiyonda) ---
     const getProcessedDebts = () => {
         // 1. Önce Filtrele

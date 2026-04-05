@@ -15,7 +15,7 @@ import {
     limit,
     getDoc,
 } from "firebase/firestore";
-import type { PaymentMethod, PaymentDocument, Debt, TransactionType } from "../types";
+import type { PaymentMethod, PaymentDocument, TransactionType } from "../types";
 
 // --- ÖDEME YÖNTEMİ TANIMLARI ---
 export const addPaymentMethod = async (name: string) => {
@@ -52,91 +52,53 @@ export const addPaymentDocument = async (payment: PaymentDocument) => {
         }
 
         await runTransaction(db, async (transaction) => {
-
-            // AYNI FİŞ İÇİNDEKİ AYNI MÜŞTERİ (SALE_ID) ÖDEMELERİNİ GRUPLA VE TOPLA
+            // AYNI FİŞ İÇİNDEKİ AYNI MÜŞTERİ (SALE_ID) ÖDEMELERİNİ GRUPLA
             const debtReductions: Record<string, number> = {};
-
             for (const item of payment.items) {
                 if (item.type === 'Tahsilat' && item.saleId) {
                     debtReductions[item.saleId] = (debtReductions[item.saleId] || 0) + Number(item.amount);
                 }
             }
 
-            //SADECE GRUPLANAN BORÇLARI 1 KERE OKU VE GÜNCELLE
-            const debtReads: { ref: any, doc: any, totalDeduction: number }[] = [];
-
-            for (const saleId in debtReductions) {
-                const debtRef = doc(db, "stores", payment.storeId, "debts", saleId);
-                const debtDoc = await transaction.get(debtRef);
-
-                if (debtDoc.exists()) {
-                    debtReads.push({
-                        ref: debtRef,
-                        doc: debtDoc,
-                        totalDeduction: debtReductions[saleId]
-                    });
-                }
-            }
-
-            //HESAPLAMA: Ödeme Yöntemi ID'sine göre grupla (Kasalar için)
+            // KASA HESAPLAMALARI
             const balanceChanges: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
-
             for (const item of payment.items) {
                 const methodId = item.paymentMethodId;
                 if (!methodId) continue;
-
-                if (!balanceChanges[methodId]) {
-                    balanceChanges[methodId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 };
-                }
+                if (!balanceChanges[methodId]) balanceChanges[methodId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 };
 
                 const realAmount = Number(item.originalAmount || item.amount);
                 const currency = item.currency || 'TL';
 
-                if (item.type === 'Tahsilat' || item.type === 'E/F') {
-                    balanceChanges[methodId][currency] += realAmount;
-                } else if (item.type === 'Masraf' || item.type === 'Merkez') {
-                    balanceChanges[methodId][currency] -= realAmount;
-                }
+                if (item.type === 'Tahsilat' || item.type === 'E/F') balanceChanges[methodId][currency] += realAmount;
+                else if (item.type === 'Masraf' || item.type === 'Merkez') balanceChanges[methodId][currency] -= realAmount;
             }
 
-            //YAZMA İŞLEMLERİ (WRITES)
+            // 1. Ödemeyi Kaydet
             const paymentRef = doc(collection(db, "payments"));
             transaction.set(paymentRef, payment);
 
-            // Borçları Güncelle
-            for (const readData of debtReads) {
-                const debt = readData.doc.data() as Debt;
-
-                //    Burada artık satır satır değil, gruplanmış toplam ödeme miktarını (totalDeduction) düşüyoruz.
-                const newPaid = (debt.paidAmount || 0) + readData.totalDeduction;
-                const newRemaining = debt.totalAmount - newPaid;
-
-                let newStatus: Debt['status'] = 'Kısmi Ödeme';
-                if (newRemaining <= 0.5) newStatus = 'Ödendi';
-                if (newPaid === 0) newStatus = 'Ödenmedi';
-
-                transaction.update(readData.ref, {
-                    paidAmount: newPaid,
-                    remainingAmount: newRemaining,
-                    status: newStatus,
+            // 🔥 2. Borçları Güncelle (Firebase Increment ile sıfır risk!)
+            for (const saleId in debtReductions) {
+                const debtRef = doc(db, "stores", payment.storeId, "debts", saleId);
+                // Artık "Toplam ne kadardı, ne kadar kaldı" diye okumamıza gerek yok.
+                // Sadece "Ödenen Tutara Şunu Ekle" diyoruz. Kalanı arayüz kendi hesaplayacak.
+                transaction.set(debtRef, {
+                    paidAmount: increment(debtReductions[saleId]),
                     lastPaymentDate: payment.date
-                });
+                }, { merge: true });
             }
 
-            //KASALARI ÖDEME YÖNTEMİNE GÖRE GÜNCELLE
+            // 3. Kasaları Güncelle
             const storeRef = doc(db, "stores", payment.storeId);
             const updates: any = {};
-
             for (const mId in balanceChanges) {
                 if (balanceChanges[mId].TL !== 0) updates[`currentBalance.${mId}.TL`] = increment(balanceChanges[mId].TL);
                 if (balanceChanges[mId].USD !== 0) updates[`currentBalance.${mId}.USD`] = increment(balanceChanges[mId].USD);
                 if (balanceChanges[mId].EUR !== 0) updates[`currentBalance.${mId}.EUR`] = increment(balanceChanges[mId].EUR);
                 if (balanceChanges[mId].GBP !== 0) updates[`currentBalance.${mId}.GBP`] = increment(balanceChanges[mId].GBP);
             }
-
-            if (Object.keys(updates).length > 0) {
-                transaction.update(storeRef, updates);
-            }
+            if (Object.keys(updates).length > 0) transaction.update(storeRef, updates);
         });
     } catch (error) {
         console.error("Ödeme ve Kasa Güncelleme hatası:", error);
@@ -230,26 +192,13 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
             if (!paymentDoc.exists()) throw new Error("Güncellenecek ödeme bulunamadı.");
             const oldPayment = paymentDoc.data() as PaymentDocument;
 
-            const saleIds = new Set<string>();
-            oldPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) saleIds.add(i.saleId); });
-            newPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) saleIds.add(i.saleId); });
-
-            const debtDocs: Record<string, { ref: any, data: Debt }> = {};
-            for (const saleId of saleIds) {
-                const debtRef = doc(db, "stores", newPayment.storeId, "debts", saleId);
-                const dDoc = await transaction.get(debtRef);
-                if (dDoc.exists()) debtDocs[saleId] = { ref: debtRef, data: dDoc.data() as Debt };
-            }
-
             const debtDifferences: Record<string, number> = {};
             oldPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) - Number(i.amount); });
             newPayment.items.forEach(i => { if (i.type === 'Tahsilat' && i.saleId) debtDifferences[i.saleId] = (debtDifferences[i.saleId] || 0) + Number(i.amount); });
 
-            //   KASA FARKLARINI ÖDEME YÖNTEMİNE GÖRE HESAPLA
             const balanceDiff: Record<string, { TL: number; USD: number; EUR: number; GBP: number }> = {};
             const initMethod = (mId: string) => { if (!balanceDiff[mId]) balanceDiff[mId] = { TL: 0, USD: 0, EUR: 0, GBP: 0 }; };
 
-            // Eski işlemi TERSİNE çevir
             oldPayment.items.forEach(i => {
                 if (!i.paymentMethodId) return;
                 initMethod(i.paymentMethodId);
@@ -259,7 +208,6 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
                 else balanceDiff[i.paymentMethodId][cur] += amt;
             });
 
-            // Yeni işlemi UYGULA
             newPayment.items.forEach(i => {
                 if (!i.paymentMethodId) return;
                 initMethod(i.paymentMethodId);
@@ -271,20 +219,15 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
 
             transaction.update(paymentRef, { ...newPayment, updatedAt: new Date() });
 
+            // 🔥 SADECE FARKI INCREMENT İLE AKTAR
             for (const saleId in debtDifferences) {
                 const diff = debtDifferences[saleId];
-                if (diff !== 0 && debtDocs[saleId]) {
-                    const debt = debtDocs[saleId].data;
-                    const newPaid = (debt.paidAmount || 0) + diff;
-                    const newRemaining = debt.totalAmount - newPaid;
-                    let newStatus: Debt['status'] = 'Kısmi Ödeme';
-                    if (newRemaining <= 0.5) newStatus = 'Ödendi';
-                    if (newPaid <= 0) newStatus = 'Ödenmedi';
-                    transaction.update(debtDocs[saleId].ref, { paidAmount: newPaid, remainingAmount: newRemaining, status: newStatus });
+                if (diff !== 0) {
+                    const debtRef = doc(db, "stores", newPayment.storeId, "debts", saleId);
+                    transaction.set(debtRef, { paidAmount: increment(diff) }, { merge: true });
                 }
             }
 
-            //   GÜNCEL KASAYI YAZ
             const storeRef = doc(db, "stores", newPayment.storeId);
             const updates: any = {};
             for (const mId in balanceDiff) {
@@ -293,16 +236,15 @@ export const updatePaymentDocument = async (id: string, newPayment: PaymentDocum
                 if (balanceDiff[mId].EUR !== 0) updates[`currentBalance.${mId}.EUR`] = increment(balanceDiff[mId].EUR);
                 if (balanceDiff[mId].GBP !== 0) updates[`currentBalance.${mId}.GBP`] = increment(balanceDiff[mId].GBP);
             }
-
-            if (Object.keys(updates).length > 0) {
-                transaction.update(storeRef, updates);
-            }
+            if (Object.keys(updates).length > 0) transaction.update(storeRef, updates);
         });
     } catch (error) {
         console.error("Ödeme güncelleme hatası:", error);
         throw error;
     }
 };
+
+
 
 
 // --- MERKEZ TRANSFERLERİ ÖZEL LİSTESİ ---

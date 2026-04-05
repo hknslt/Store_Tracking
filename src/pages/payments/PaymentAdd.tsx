@@ -125,7 +125,14 @@ const PaymentAdd = () => {
     useEffect(() => {
         if (headerData.storeId) {
             getDebtsByStore(headerData.storeId).then(data => {
-                const activeDebts = data.filter(d => d.remainingAmount > 0);
+                // 🔥 DİNAMİK HESAPLAMA (Dropdown içindeki verilerin doğruluğu için)
+                const correctedDebts = data.map(d => {
+                    const total = Number(d.totalAmount) || 0;
+                    const paid = Number(d.paidAmount) || 0;
+                    return { ...d, totalAmount: total, paidAmount: paid, remainingAmount: total - paid };
+                });
+
+                const activeDebts = correctedDebts.filter(d => d.remainingAmount > 0.5);
                 const sortedDebts = activeDebts.sort((a, b) => a.receiptNo.localeCompare(b.receiptNo, undefined, { numeric: true }));
                 setDebts(sortedDebts);
             });
@@ -441,5 +448,5 @@ const PaymentAdd = () => {
     );
 };
 
-export default PaymentAdd;  
+export default PaymentAdd;
 

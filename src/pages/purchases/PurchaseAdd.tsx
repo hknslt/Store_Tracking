@@ -25,7 +25,7 @@ const PurchaseAdd = () => {
     const [stores, setStores] = useState<Store[]>([]);
     const [groups, setGroups] = useState<Group[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [allCategories, setAllCategories] = useState<Category[]>([]); 
+    const [allCategories, setAllCategories] = useState<Category[]>([]);
     const [productsInCat, setProductsInCat] = useState<Product[]>([]);
     const [allColors, setAllColors] = useState<Color[]>([]);
     const [allDimensions, setAllDimensions] = useState<Dimension[]>([]);
@@ -116,10 +116,17 @@ const PurchaseAdd = () => {
         if (headerData.storeId) {
             // Bekleyen talepleri çek (sepetten bağımsız olarak)
             getPendingRequests(headerData.storeId).then(data => {
-                // Burada mevcut eklenenleri ayıklamak için ayrı bir kontrol yapabilirsiniz, 
-                // ama genelde sayfa ilk açıldığında sıfırdan çekmesi yeterlidir.
                 const alreadyAddedIds = addedItems.map(i => i.requestId).filter(Boolean);
-                setPendingRequests(data.filter(req => !alreadyAddedIds.includes(req.id)));
+
+                // 1. Eklenmiş olanları filtrele
+                const filteredRequests = data.filter(req => !alreadyAddedIds.includes(req.id));
+
+                // 2. Fiş numarasına göre sırala (numeric: true sayesinde 1, 2, 10 şeklinde doğru sıralar)
+                const sortedRequests = filteredRequests.sort((a, b) =>
+                    a.saleReceiptNo.localeCompare(b.saleReceiptNo, undefined, { numeric: true })
+                );
+
+                setPendingRequests(sortedRequests);
             });
 
             // SADECE mağaza değiştiğinde/seçildiğinde fiş numarasını OTOMATİK al.
@@ -212,6 +219,9 @@ const PurchaseAdd = () => {
         //   HESAPLAMA: Modalda girilen "Birim Fiyat" * Adet
         const totalAmount = Number(price) * req.quantity;
 
+        const customerInfo = `(${req.saleReceiptNo} - ${req.customerName})`;
+        const finalExplanation = req.productNote ? `${req.productNote} ${customerInfo}` : customerInfo;
+
         const newItem: PurchaseItem & { requestId?: string } = {
             groupId: req.groupId,
             categoryId: req.categoryId,
@@ -221,8 +231,8 @@ const PurchaseAdd = () => {
             cushionId: req.cushionId,
             dimensionId: req.dimensionId,
             quantity: req.quantity,
-            amount: totalAmount, // Toplam Tutar
-            explanation: req.productNote || "",
+            amount: totalAmount, 
+            explanation: finalExplanation,
             status: 'Beklemede',
             itemType: 'Sipariş',
             requestId: req.id

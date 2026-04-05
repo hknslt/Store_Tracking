@@ -50,11 +50,19 @@ const DebtDetail = () => {
     if (loading) return <div className="page-container">Yükleniyor...</div>;
     if (!debt) return <div className="page-container">Borç kaydı bulunamadı.</div>;
 
+    const total = Number(debt.totalAmount) || 0;
+    const paid = Number(debt.paidAmount) || 0;
+    const remainingAmount = total - paid;
+
+    // 🔥 status değerini dinamik olarak hesaplıyoruz
+    let currentStatus = 'Ödenmedi';
+    if (paid > 0) currentStatus = remainingAmount <= 0.5 ? 'Ödendi' : 'Kısmi Ödeme';
+
     const percentage = Math.min(100, Math.max(0, ((debt.paidAmount || 0) / (debt.totalAmount || 1)) * 100));
 
     let statusColor = '#e74c3c'; // Kırmızı
-    if (debt.status === 'Kısmi Ödeme') statusColor = '#f39c12'; // Turuncu
-    if (debt.status === 'Ödendi') statusColor = '#27ae60'; // Yeşil
+    if (currentStatus === 'Kısmi Ödeme') statusColor = '#f39c12'; // Turuncu
+    if (currentStatus === 'Ödendi') statusColor = '#27ae60'; // Yeşil
 
     return (
         <div className="page-container" style={{ maxWidth: '900px', margin: '0 auto' }}>
@@ -64,8 +72,9 @@ const DebtDetail = () => {
                 <div>
                     <h2 style={{ margin: 0, color: '#2c3e50', display: 'flex', alignItems: 'center', gap: '10px' }}>
                         Borç & Tahsilat Detayı
+                        {/* 🔥 Dinamik durumu (currentStatus) ekrana yazdırıyoruz */}
                         <span style={{ backgroundColor: `${statusColor}20`, color: statusColor, padding: '4px 10px', borderRadius: '8px', fontSize: '12px' }}>
-                            {debt.status}
+                            {currentStatus}
                         </span>
                     </h2>
                     <p style={{ margin: '5px 0 0', color: '#7f8c8d', fontSize: '14px' }}>
@@ -88,10 +97,10 @@ const DebtDetail = () => {
                         {formatMoney(debt.paidAmount || 0)}
                     </div>
                 </div>
-                <div className="card" style={{ padding: '20px', borderTop: '4px solid #e74c3c', backgroundColor: debt.remainingAmount > 0 ? '#fff5f5' : 'white' }}>
+                <div className="card" style={{ padding: '20px', borderTop: '4px solid #e74c3c', backgroundColor: remainingAmount > 0 ? '#fff5f5' : 'white' }}>
                     <div style={{ fontSize: '12px', color: '#7f8c8d', fontWeight: 'bold' }}>KALAN BAKİYE</div>
                     <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#e74c3c', marginTop: '5px' }}>
-                        {formatMoney(debt.remainingAmount)}
+                        {formatMoney(remainingAmount)}
                     </div>
                 </div>
             </div>
@@ -108,7 +117,7 @@ const DebtDetail = () => {
                     </div>
                 </div>
 
-                {debt.remainingAmount > 0.5 && (
+                {remainingAmount > 0.5 && (
                     <button
                         onClick={() => navigate('/payments/add', {
                             state: {
@@ -117,7 +126,7 @@ const DebtDetail = () => {
                                     storeId: debt.storeId,
                                     customerName: debt.customerName,
                                     receiptNo: debt.receiptNo,
-                                    remainingAmount: debt.remainingAmount
+                                    remainingAmount: remainingAmount
                                 }
                             }
                         })}
