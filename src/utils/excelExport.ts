@@ -287,3 +287,49 @@ export const exportDebtAnalysisToExcel = (data: any[], storeName: string) => {
     XLSX.utils.book_append_sheet(wb, ws, "Borç_Analizi");
     XLSX.writeFile(wb, `${storeName}_Borc_Analiz_Raporu_${dateStr}.xlsx`);
 };
+
+
+export const exportCommissionsToExcel = (
+    results: any[],
+    storeName: string,
+    year: number,
+    month: number,
+    storeTotal: number,
+    storeTarget: number
+) => {
+    const monthNames = ["Ocak", "Şubat", "Mart", "Nisan", "Mayıs", "Haziran", "Temmuz", "Ağustos", "Eylül", "Ekim", "Kasım", "Aralık"];
+    const period = `${monthNames[month - 1]} ${year}`;
+    const dateStr = new Date().toLocaleDateString('tr-TR');
+
+    const wsData = [
+        [`${storeName} - Personel Prim Raporu`, '', '', 'Rapor Tarihi:', dateStr],
+        ['Dönem:', period, '', 'Mağaza Hedefi:', `${storeTarget} TL`],
+        ['Mağaza Toplam Satış:', `${storeTotal} TL`],
+        [],
+        ['Personel Adı', 'Kişisel Toplam Satış (₺)', 'Prim Oranı (%)', 'Hakediş / Prim Tutarı (₺)', 'Durum']
+    ];
+
+    results.forEach(r => {
+        wsData.push([
+            r.personnelName,
+            r.totalSales,
+            r.commissionRate,
+            r.commissionAmount,
+            r.isEligible ? 'Hak Kazandı' : 'Hedef Tutmadı'
+        ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    ws['!cols'] = [
+        { wch: 25 }, // Personel
+        { wch: 25 }, // Toplam Satış
+        { wch: 15 }, // Prim Oranı
+        { wch: 25 }, // Hakediş
+        { wch: 15 }  // Durum
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Primler");
+    XLSX.writeFile(wb, `${storeName}_Prim_Raporu_${period}.xlsx`);
+};

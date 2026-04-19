@@ -69,6 +69,7 @@ import ProductLocations from "./pages/sales/ProductLocations";
 import DebtDetail from "./pages/debts/DebtDetail";
 import ControlPurchaseList from "./pages/purchases/ControlPurchaseList";
 import DebtReport from "./pages/reports/DebtReport";
+import PastCommissions from "./pages/targets/PastCommissions";
 
 
 // --- CUSTOM COMPONENT: Store Back Button (Mağaza Müdürü İçin) ---
@@ -340,6 +341,8 @@ function App() {
 
             {/* Mağaza Hedefleri (KPI) */}
             <Route path="/targets" element={<StoreTargets />} />
+            <Route path="/past-commissions" element={<PastCommissions />} />
+            
 
 
           </Route>

@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext";
 import { getStores, getPersonnelByStore } from "../../services/storeService";
 import { getMonthlySalesByPersonnel, updateStoreCommissionModel, updatePersonnelCommissionRate } from "../../services/commissionService";
 import { getAllTargets, setStoreTarget as saveStoreTargetToDb } from "../../services/targetService";
-import { useNavigate } from "react-router-dom"; //   Yönlendirme için eklendi
+import { useNavigate } from "react-router-dom";
 import type { Store, Personnel, CommissionResult } from "../../types";
 import "../../App.css";
 
@@ -17,7 +17,7 @@ import CancelIcon from "../../assets/icons/close-circle.svg";
 const PersonnelCommissions = () => {
     const { userRole, userData } = useAuth();
     const isAdmin = userRole === 'admin' || userRole === 'control';
-    const navigate = useNavigate(); //   Yönlendirme tanımlandı
+    const navigate = useNavigate();
 
     // Veri Stateleri
     const [stores, setStores] = useState<Store[]>([]);
@@ -36,7 +36,6 @@ const PersonnelCommissions = () => {
     const [isEditing, setIsEditing] = useState(false);
     const [message, setMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
-    // Otomatik mesaj gizleme
     useEffect(() => {
         if (message) {
             const timer = setTimeout(() => setMessage(null), 3000);
@@ -44,7 +43,6 @@ const PersonnelCommissions = () => {
         }
     }, [message]);
 
-    // 1. Başlangıç Verilerini Yükle
     useEffect(() => {
         const loadBase = async () => {
             if (isAdmin) {
@@ -60,7 +58,6 @@ const PersonnelCommissions = () => {
         loadBase();
     }, [isAdmin, userData]);
 
-    // 2. Mağaza Seçilince Hesaplamaları Yap
     const fetchData = async () => {
         if (!selectedStoreId) {
             setLoading(false);
@@ -69,6 +66,7 @@ const PersonnelCommissions = () => {
 
         setLoading(true);
         try {
+            // Aktif sayfa olduğu için doğrudan bu ayı çeker
             const [salesData, personnelData, targetsData, storeData] = await Promise.all([
                 getMonthlySalesByPersonnel(selectedStoreId),
                 getPersonnelByStore(selectedStoreId),
@@ -99,7 +97,6 @@ const PersonnelCommissions = () => {
         setIsEditing(false);
     }, [selectedStoreId]);
 
-    // 3. Hesaplama Motoru
     useEffect(() => {
         if (!personnelList.length) {
             setResults([]);
@@ -126,22 +123,13 @@ const PersonnelCommissions = () => {
                 amount = (sales * rate) / 100;
             }
 
-            return {
-                personnelId: p.id!,
-                personnelName: p.fullName,
-                totalSales: sales,
-                commissionRate: rate,
-                commissionAmount: amount,
-                isEligible: isEligible
-            };
+            return { personnelId: p.id!, personnelName: p.fullName, totalSales: sales, commissionRate: rate, commissionAmount: amount, isEligible: isEligible };
         });
 
         setResults(computed);
 
     }, [personnelList, salesMap, currentModel, storeTotalSales, storeTarget]);
 
-
-    // --- İŞLEMLER ---
     const handleRateChange = (personnelId: string, newRate: string) => {
         const updatedList = personnelList.map(p =>
             p.id === personnelId ? { ...p, commissionRate: Number(newRate) } : p
@@ -151,7 +139,7 @@ const PersonnelCommissions = () => {
 
     const handleCancel = () => {
         setIsEditing(false);
-        fetchData(); // Verileri geri yükle
+        fetchData();
         setMessage({ type: 'error', text: "Değişiklikler iptal edildi." });
     };
 
@@ -186,12 +174,22 @@ const PersonnelCommissions = () => {
 
             <div className="page-header">
                 <div className="page-title">
-                    <h2>Personel Prim Takibi</h2>
-                    <p>Satış performansı ve hakedişler</p>
+                    <h2>Aktif Personel Prim Takibi</h2>
+                    <p>İçinde bulunduğumuz ayın güncel performansları</p>
                 </div>
 
                 {isAdmin && (
                     <div style={{ display: 'flex', gap: '10px' }}>
+                        {/* 🔥 YENİ EKLENEN BUTON: GEÇMİŞ PRİMLER */}
+                        <button
+                            onClick={() => navigate('/past-commissions')}
+                            className="btn btn-secondary"
+                            style={{ display: 'flex', alignItems: 'center', gap: '5px', backgroundColor: '#3b82f6', color: '#fcfcfc', border: 'none' }}
+                        >
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                            Geçmiş Prim Analizi
+                        </button>
+
                         <button
                             onClick={() => navigate('/targets')}
                             className="btn btn-secondary"
@@ -220,7 +218,6 @@ const PersonnelCommissions = () => {
                 )}
             </div>
 
-            {/* FİLTRE (Sadece Admin) */}
             {isAdmin && (
                 <div className="card" style={{ marginBottom: '20px', padding: '15px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -241,12 +238,9 @@ const PersonnelCommissions = () => {
 
             {selectedStoreId ? (
                 <>
-                    {/* ÖZET KARTLARI */}
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '20px', marginBottom: '20px' }}>
-
-                        {/* 1. KART: MAĞAZA DURUMU */}
                         <div className="card" style={{ padding: '20px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                            <h4 style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '14px' }}>MAĞAZA HEDEF DURUMU</h4>
+                            <h4 style={{ margin: '0 0 10px 0', color: '#64748b', fontSize: '14px' }}>MAĞAZA HEDEF DURUMU (Bu Ay)</h4>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'end' }}>
                                 <div>
                                     <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#2c3e50' }}>
@@ -255,13 +249,7 @@ const PersonnelCommissions = () => {
                                     <div style={{ fontSize: '13px', color: '#94a3b8', display: 'flex', alignItems: 'center', gap: '5px', marginTop: '5px' }}>
                                         Hedef:
                                         {isEditing ? (
-                                            <input
-                                                type="number"
-                                                className="form-input"
-                                                value={storeTarget}
-                                                onChange={(e) => setStoreTarget(Number(e.target.value))}
-                                                style={{ width: '100px', padding: '2px 5px', fontSize: '13px', fontWeight: 'bold', color: '#333' }}
-                                            />
+                                            <input type="number" className="form-input" value={storeTarget} onChange={(e) => setStoreTarget(Number(e.target.value))} style={{ width: '100px', padding: '2px 5px', fontSize: '13px', fontWeight: 'bold', color: '#333' }} />
                                         ) : (
                                             <span style={{ fontWeight: 'bold' }}>{storeTarget.toLocaleString('tr-TR')} ₺</span>
                                         )}
@@ -275,50 +263,23 @@ const PersonnelCommissions = () => {
                                     )}
                                 </div>
                             </div>
-
-                            {/* Progress Bar */}
                             <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', marginTop: '15px', overflow: 'hidden' }}>
-                                <div style={{
-                                    width: `${Math.min((storeTotalSales / (storeTarget || 1)) * 100, 100)}%`,
-                                    height: '100%',
-                                    background: storeTotalSales >= storeTarget ? '#10b981' : '#f59e0b',
-                                    transition: 'width 0.5s ease'
-                                }}></div>
+                                <div style={{ width: `${Math.min((storeTotalSales / (storeTarget || 1)) * 100, 100)}%`, height: '100%', background: storeTotalSales >= storeTarget ? '#10b981' : '#f59e0b', transition: 'width 0.5s ease' }}></div>
                             </div>
                         </div>
 
-                        {/* 2. KART: AYARLAR */}
                         <div className="card" style={{ padding: '20px' }}>
                             <h4 style={{ margin: '0 0 15px 0', color: '#64748b', fontSize: '14px' }}>PRİM HESAPLAMA MODELİ</h4>
-
                             <div style={{ display: 'flex', gap: '10px' }}>
-                                <button
-                                    disabled={!isEditing}
-                                    onClick={() => setCurrentModel('target_based')}
-                                    className={`btn ${currentModel === 'target_based' ? 'btn-primary' : 'btn-secondary'}`}
-                                    style={{ flex: 1, opacity: !isEditing && currentModel !== 'target_based' ? 0.5 : 1 }}
-                                >
-                                    Hedef Odaklı
-                                </button>
-                                <button
-                                    disabled={!isEditing}
-                                    onClick={() => setCurrentModel('flat_rate')}
-                                    className={`btn ${currentModel === 'flat_rate' ? 'btn-primary' : 'btn-secondary'}`}
-                                    style={{ flex: 1, opacity: !isEditing && currentModel !== 'flat_rate' ? 0.5 : 1 }}
-                                >
-                                    Hedefsiz (Düz)
-                                </button>
+                                <button disabled={!isEditing} onClick={() => setCurrentModel('target_based')} className={`btn ${currentModel === 'target_based' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1, opacity: !isEditing && currentModel !== 'target_based' ? 0.5 : 1 }}>Hedef Odaklı</button>
+                                <button disabled={!isEditing} onClick={() => setCurrentModel('flat_rate')} className={`btn ${currentModel === 'flat_rate' ? 'btn-primary' : 'btn-secondary'}`} style={{ flex: 1, opacity: !isEditing && currentModel !== 'flat_rate' ? 0.5 : 1 }}>Hedefsiz (Düz)</button>
                             </div>
-
                             <p style={{ fontSize: '12px', color: '#64748b', marginTop: '10px', lineHeight: '1.4' }}>
-                                {currentModel === 'target_based'
-                                    ? "Personel primi, mağaza toplam hedefi tutturursa verilir. Hedef tutmazsa kimse prim alamaz."
-                                    : "Mağaza hedefinden bağımsız olarak, her personel kendi satış yüzdesi kadar prim alır."}
+                                {currentModel === 'target_based' ? "Personel primi, mağaza toplam hedefi tutturursa verilir. Hedef tutmazsa kimse prim alamaz." : "Mağaza hedefinden bağımsız olarak, her personel kendi satış yüzdesi kadar prim alır."}
                             </p>
                         </div>
                     </div>
 
-                    {/* LİSTE */}
                     <div className="card">
                         <div className="card-body" style={{ padding: 0 }}>
                             <table className="data-table">
@@ -334,38 +295,22 @@ const PersonnelCommissions = () => {
                                     {results.map(r => (
                                         <tr key={r.personnelId} className="hover-row">
                                             <td style={{ fontWeight: '500' }}>{r.personnelName}</td>
-                                            <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#334155' }}>
-                                                {r.totalSales.toLocaleString('tr-TR')} ₺
-                                            </td>
-
-                                            {/* PRİM ORANI */}
+                                            <td style={{ textAlign: 'right', fontWeight: 'bold', color: '#334155' }}>{r.totalSales.toLocaleString('tr-TR')} ₺</td>
                                             <td style={{ textAlign: 'center' }}>
                                                 {isEditing ? (
                                                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '5px' }}>
-                                                        <input
-                                                            type="number"
-                                                            value={personnelList.find(p => p.id === r.personnelId)?.commissionRate || 0}
-                                                            onChange={e => handleRateChange(r.personnelId, e.target.value)}
-                                                            className="form-input"
-                                                            style={{ width: '70px', textAlign: 'center', padding: '5px' }}
-                                                        />
+                                                        <input type="number" value={personnelList.find(p => p.id === r.personnelId)?.commissionRate || 0} onChange={e => handleRateChange(r.personnelId, e.target.value)} className="form-input" style={{ width: '70px', textAlign: 'center', padding: '5px' }} />
                                                         <span style={{ color: '#666' }}>%</span>
                                                     </div>
                                                 ) : (
                                                     <span className="badge neutral">%{r.commissionRate}</span>
                                                 )}
                                             </td>
-
-                                            {/* HAKEDİŞ */}
                                             <td style={{ textAlign: 'right' }}>
                                                 {r.isEligible ? (
-                                                    <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '15px' }}>
-                                                        +{r.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺
-                                                    </span>
+                                                    <span style={{ color: '#16a34a', fontWeight: 'bold', fontSize: '15px' }}>+{r.commissionAmount.toLocaleString('tr-TR', { minimumFractionDigits: 2 })} ₺</span>
                                                 ) : (
-                                                    <span style={{ color: '#ef4444', fontSize: '13px', fontStyle: 'italic' }}>
-                                                        (Hedef Tutmadı)
-                                                    </span>
+                                                    <span style={{ color: '#ef4444', fontSize: '13px', fontStyle: 'italic' }}>(Hedef Tutmadı)</span>
                                                 )}
                                             </td>
                                         </tr>
